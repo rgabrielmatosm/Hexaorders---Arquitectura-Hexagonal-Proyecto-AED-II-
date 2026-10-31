@@ -1,0 +1,20 @@
+groups:
+  - name: hexaorders
+    rules:
+      - alert: HexaOrdersServiceDown
+        expr: up{job=~"order-api|risk-engine"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Servicio {{ $labels.job }} sin respuesta'
+          description: 'Prometheus no puede recopilar métricas durante al menos 30 segundos.'
+      - alert: RiskRequestsFailing
+        expr: increase(orders_risk_failures_total[2m]) > 0
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Falló una evaluación de riesgo'
+          description: 'Revisar risk-engine y los tiempos de espera HTTP de order-api.'
+

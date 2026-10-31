@@ -1,0 +1,128 @@
+hexaorders/
+├── .github/
+│   └── workflows/
+│       └── verify.yml
+├── docs/
+│   ├── arquitectura.md
+│   ├── despliegue-cloud.md
+│   ├── estructura.txt
+│   ├── fuentes.md
+│   ├── github.md
+│   ├── guia-para-explicar.md
+│   ├── presentacion.md
+│   └── validacion.md
+├── infra/
+│   ├── grafana/
+│   │   ├── dashboards/
+│   │   │   └── hexaorders.json
+│   │   └── provisioning/
+│   │       ├── dashboards.yml
+│   │       └── datasource.yml
+│   ├── prometheus/
+│   │   ├── alerts.yml
+│   │   └── prometheus.yml
+│   └── compose.base.yml
+├── k8s/
+│   ├── 00-namespace.yaml
+│   ├── 10-monitoring-config.yaml
+│   ├── 20-data.yaml
+│   ├── 30-apps.yaml
+│   ├── 40-observability.yaml
+│   └── README.md
+├── services/
+│   ├── order-api/
+│   │   ├── src/
+│   │   │   ├── main/
+│   │   │   │   ├── java/
+│   │   │   │   │   └── com/
+│   │   │   │   │       └── hexaorders/
+│   │   │   │   │           ├── adapter/
+│   │   │   │   │           │   ├── in/
+│   │   │   │   │           │   │   └── web/
+│   │   │   │   │           │   │       ├── ApiExceptionHandler.java
+│   │   │   │   │           │   │       └── OrderController.java
+│   │   │   │   │           │   └── out/
+│   │   │   │   │           │       ├── http/
+│   │   │   │   │           │       │   └── HttpRiskAssessmentAdapter.java
+│   │   │   │   │           │       ├── metrics/
+│   │   │   │   │           │       │   └── MicrometerOrderTelemetry.java
+│   │   │   │   │           │       └── persistence/
+│   │   │   │   │           │           └── JdbcOrderRepository.java
+│   │   │   │   │           ├── application/
+│   │   │   │   │           │   ├── exception/
+│   │   │   │   │           │   │   ├── OrderNotFoundException.java
+│   │   │   │   │           │   │   ├── PersistenceUnavailableException.java
+│   │   │   │   │           │   │   └── RiskUnavailableException.java
+│   │   │   │   │           │   ├── port/
+│   │   │   │   │           │   │   ├── in/
+│   │   │   │   │           │   │   │   └── OrderUseCases.java
+│   │   │   │   │           │   │   └── out/
+│   │   │   │   │           │   │       ├── OrderRepository.java
+│   │   │   │   │           │   │       ├── OrderTelemetry.java
+│   │   │   │   │           │   │       └── RiskAssessmentPort.java
+│   │   │   │   │           │   └── service/
+│   │   │   │   │           │       └── OrderService.java
+│   │   │   │   │           ├── config/
+│   │   │   │   │           │   └── HexagonalConfiguration.java
+│   │   │   │   │           ├── domain/
+│   │   │   │   │           │   ├── Order.java
+│   │   │   │   │           │   ├── OrderDraft.java
+│   │   │   │   │           │   └── OrderStatus.java
+│   │   │   │   │           └── OrderApiApplication.java
+│   │   │   │   └── resources/
+│   │   │   │       ├── db/
+│   │   │   │       │   └── migration/
+│   │   │   │       │       └── V1__create_orders.sql
+│   │   │   │       ├── static/
+│   │   │   │       │   └── index.html
+│   │   │   │       └── application.yml
+│   │   │   └── test/
+│   │   │       └── java/
+│   │   │           └── com/
+│   │   │               └── hexaorders/
+│   │   │                   ├── adapter/
+│   │   │                   │   ├── HttpRiskAssessmentAdapterTest.java
+│   │   │                   │   └── OrderControllerTest.java
+│   │   │                   ├── application/
+│   │   │                   │   └── OrderServiceTest.java
+│   │   │                   ├── architecture/
+│   │   │                   │   └── HexagonalArchitectureTest.java
+│   │   │                   └── domain/
+│   │   │                       └── OrderDomainTest.java
+│   │   ├── .dockerignore
+│   │   ├── Dockerfile
+│   │   └── pom.xml
+│   └── risk-engine/
+│       ├── risk_engine/
+│       │   ├── adapters/
+│       │   │   ├── __init__.py
+│       │   │   └── http.py
+│       │   ├── application/
+│       │   │   ├── __init__.py
+│       │   │   ├── ports.py
+│       │   │   └── score_risk.py
+│       │   ├── domain/
+│       │   │   ├── __init__.py
+│       │   │   └── risk.py
+│       │   ├── __init__.py
+│       │   └── bootstrap.py
+│       ├── tests/
+│       │   ├── test_api.py
+│       │   ├── test_architecture.py
+│       │   └── test_domain.py
+│       ├── .dockerignore
+│       ├── Dockerfile
+│       ├── README.md
+│       ├── requirements-dev.txt
+│       └── requirements.txt
+├── tools/
+│   ├── generate_delivery.py
+│   ├── init-env.ps1
+│   ├── smoke.py
+│   └── validate_delivery.py
+├── .dockerignore
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── README.md
+└── requirements-tools.txt

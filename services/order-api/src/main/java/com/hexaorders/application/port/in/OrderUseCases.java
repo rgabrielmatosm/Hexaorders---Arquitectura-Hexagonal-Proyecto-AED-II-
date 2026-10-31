@@ -1,0 +1,12 @@
+package com.hexaorders.application.port.in;
+
+import com.hexaorders.domain.Order;
+import com.hexaorders.domain.OrderDraft;
+import java.util.List;
+import java.util.UUID;
+
+public interface OrderUseCases {
+    Order create(OrderDraft draft);
+    Order get(UUID id);
+    List<Order> latest();
+}

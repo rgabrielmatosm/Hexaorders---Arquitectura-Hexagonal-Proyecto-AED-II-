@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HexaOrders · Pedidos con criterio</title>
+  <style>
+    :root{color-scheme:dark;--bg:#101513;--surface:#18211d;--line:#34443a;--ink:#eaf2e8;--muted:#a8b8ac;--accent:#bbef80;--warn:#ffd58a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,sans-serif}main{max-width:1180px;margin:auto;padding:36px 30px 64px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:24px}.brand{font-weight:750;letter-spacing:-1px;font-size:25px}.brand span{color:var(--accent)}.eyebrow{color:var(--accent);font-size:12px;letter-spacing:2px;text-transform:uppercase}.connection{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:7px 12px;border-radius:30px}h1{font-size:clamp(34px,5vw,58px);letter-spacing:-2px;line-height:1.12;max-width:720px;margin:16px 0}p{color:var(--muted)}.intro{padding:38px 0 28px}.intro p{max-width:640px}.flow{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:24px}.flow span{border:1px solid var(--line);border-radius:6px;padding:6px 10px}.workspace{display:grid;grid-template-columns:340px 1fr;gap:24px}.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}h2{font-size:20px;letter-spacing:-.5px;margin:0 0 18px}label{display:block;color:var(--muted);font-size:12px;margin:18px 0 6px}input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;color:var(--ink);font:inherit}input:focus{outline:2px solid var(--accent);outline-offset:1px}button{font:inherit;cursor:pointer;border:0;border-radius:6px;font-weight:650;padding:12px 18px;background:var(--accent);color:#172013}button:disabled{opacity:.55;cursor:wait}.submit{width:100%;margin-top:22px}.small{font-size:12px;line-height:1.5}.samples{display:flex;gap:8px;margin-top:10px}.samples button,.refresh{background:transparent;color:var(--muted);border:1px solid var(--line);padding:6px 10px;font-size:12px}.table-top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.table-top h2{margin:0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th{text-align:left;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:500}th,td{padding:15px 12px 15px 0;border-bottom:1px solid var(--line)}td:last-child,th:last-child{text-align:right;padding-right:0}.pill{display:inline-block;padding:4px 8px;border-radius:5px;font-size:10px;font-weight:750;letter-spacing:.4px;background:#263d28;color:var(--accent)}.pill.review{background:#493b24;color:var(--warn)}.id{font:10px ui-monospace,monospace;color:var(--muted);display:block}.score{font-family:ui-monospace,monospace}.empty{color:var(--muted);text-align:center!important;padding:50px 0}.notice{margin-top:18px;padding:12px;border:1px solid var(--line);border-radius:6px;font-size:13px;overflow-wrap:anywhere}.notice.error{color:var(--warn);border-color:#796440}.notice.success{color:var(--accent)}details{margin-top:24px;color:var(--muted);font-size:12px}summary{cursor:pointer}pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:16px;border-radius:6px;font:11px/1.6 ui-monospace,monospace}footer{margin-top:32px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12px;display:flex;gap:18px;justify-content:space-between}a{color:var(--accent)}@media(max-width:850px){.workspace{grid-template-columns:1fr}main{padding:22px 18px}.card{padding:20px}footer{flex-direction:column}h1{letter-spacing:-1px}}
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="brand">⬡ Hexa<span>Orders</span></div><div class="connection" id="connection" role="status">Conectando con la API…</div></header>
+  <section class="intro"><div class="eyebrow">Laboratorio de arquitectura hexagonal</div><h1>Cada pedido.<br>Una decisión con criterio.</h1><p>Crea un pedido y observa cómo Java consulta el motor de riesgo en Python, aplica las reglas del negocio y guarda el resultado en PostgreSQL.</p><div class="flow" aria-label="Flujo de un pedido"><span>01 · REST / Java</span>→<span>02 · Riesgo / Python</span>→<span>03 · Dominio</span>→<span>04 · PostgreSQL</span></div></section>
+  <div class="workspace">
+    <section class="card"><h2>Nuevo pedido</h2><form id="order-form"><label for="customer">Identificador del cliente</label><input id="customer" name="customerId" value="cliente_demo" required maxlength="64" pattern="[A-Za-z0-9_-]{1,64}" autocomplete="off"><label for="amount">Importe en USD</label><input id="amount" name="amount" type="number" value="125.50" min="0.01" max="1000000" step="0.01" required><div class="samples"><button type="button" data-amount="25.00">USD 25</button><button type="button" data-amount="95000.00">USD 95 000</button></div><button id="submit" class="submit" type="submit">Evaluar y crear pedido ↗</button><p class="small">Un puntaje desde 70 requiere revisión. Los importes se procesan con precisión decimal y nunca se redondean.</p></form><div id="notice" class="notice" role="status" hidden></div><details><summary>Ver última respuesta de la API</summary><pre id="response">Todavía no hay una respuesta.</pre></details></section>
+    <section class="card"><div class="table-top"><h2>Últimos pedidos</h2><button type="button" id="refresh" class="refresh">Actualizar ↻</button></div><p class="small" id="count">Se muestran hasta 50 pedidos, del más reciente al más antiguo.</p><div class="scroll"><table><thead><tr><th>Cliente / pedido</th><th>Importe</th><th>Riesgo</th><th>Decisión</th></tr></thead><tbody id="orders"><tr><td colspan="4" class="empty">Cargando pedidos…</td></tr></tbody></table></div></section>
+  </div>
+  <footer><span>Java 21 · Python · PostgreSQL · Docker Compose</span><span>Reglas independientes de frameworks. Dependencias hacia el dominio.</span></footer>
+</main>
+<script>
+  const byId = id => document.getElementById(id);
+  const money = new Intl.NumberFormat('es-PE', {style:'currency',currency:'USD'});
+  const appendCell = (row, value, className) => { const cell = document.createElement('td'); cell.textContent = value; if(className) cell.className = className; row.appendChild(cell); return cell; };
+  async function readResponse(response){ let body;try{body=await response.json();}catch{throw new Error('La API devolvió una respuesta no válida.');} if(!response.ok) throw new Error(body.detail || 'No se pudo completar la operación.');return body; }
+  async function loadOrders(){
+    try{
+      const orders=await readResponse(await fetch('/api/orders',{cache:'no-store'}));
+      byId('orders').replaceChildren();
+      for(const order of orders){
+        const row=document.createElement('tr'); const client=appendCell(row,order.customerId); const id=document.createElement('span');id.className='id';id.textContent=order.id;client.appendChild(id);
+        appendCell(row,money.format(order.amount));appendCell(row,order.riskScore+' / 100','score');
+        const statusCell=appendCell(row,'');const pill=document.createElement('span');pill.className='pill'+(order.status==='REVIEW'?' review':'');pill.textContent=order.status==='REVIEW'?'REVISIÓN':'APROBADO';statusCell.appendChild(pill);byId('orders').appendChild(row);
+      }
+      if(!orders.length){const row=document.createElement('tr');const cell=appendCell(row,'Tu primer pedido empieza aquí.','empty');cell.colSpan=4;byId('orders').appendChild(row);}
+      byId('connection').textContent='● API conectada';byId('count').textContent=orders.length+' pedidos visibles · máximo 50 · datos persistidos';
+    }catch(error){byId('connection').textContent='● API no disponible';const row=document.createElement('tr');const cell=appendCell(row,error.message,'empty');cell.colSpan=4;byId('orders').replaceChildren(row);}
+  }
+  byId('order-form').addEventListener('submit',async event=>{
+    event.preventDefault();const button=byId('submit');button.disabled=true;button.textContent='Evaluando riesgo…';byId('notice').hidden=true;
+    try{
+      const body=await readResponse(await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerId:byId('customer').value,amount:Number(byId('amount').value),currency:'USD'})}));
+      byId('response').textContent=JSON.stringify(body,null,2);byId('notice').className='notice success';byId('notice').textContent='Pedido creado · '+(body.status==='REVIEW'?'requiere revisión':'aprobado')+' · riesgo '+body.riskScore+'/100';await loadOrders();
+    }catch(error){byId('notice').className='notice error';byId('notice').textContent=error.message;byId('response').textContent=error.message;}
+    finally{byId('notice').hidden=false;button.disabled=false;button.textContent='Evaluar y crear pedido ↗';}
+  });
+  document.querySelectorAll('[data-amount]').forEach(button=>button.addEventListener('click',()=>byId('amount').value=button.dataset.amount));
+  byId('refresh').addEventListener('click',loadOrders);loadOrders();
+</script>
+</body>
+</html>

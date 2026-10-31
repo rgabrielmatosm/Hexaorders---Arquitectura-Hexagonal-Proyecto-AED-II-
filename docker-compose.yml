@@ -1,0 +1,1881 @@
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo d440fb14836c3c826214bdbdd51f3e589186f1483f77e32024cefcd4a91ae802
+# HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
+# Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
+# Arquitectura: las dependencias del código apuntan hacia domain/application.
+name: hexaorders
+
+x-runtime: &runtime
+  restart: unless-stopped
+  init: true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: '3'
+
+services:
+  # 1. Adaptador de persistencia: solo order-api conoce esta base de datos.
+  db:
+    <<: *runtime
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: orders
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets: [db_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [data]
+    shm_size: 128mb
+    mem_limit: 512m
+    cpus: 1.0
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  # 2. Segundo hexágono: Python calcula riesgo mediante reglas deterministas.
+  risk-engine:
+    <<: *runtime
+    image: hexaorders/risk-engine:1.0.0
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        FROM python:3.12-slim-bookworm AS base
+        ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+        WORKDIR /app
+        COPY <<'HEXFILE_0' ./requirements.txt
+        # Fully pinned runtime dependency set, resolved for Python 3.12 on 2026-10-19.
+        annotated-doc==0.0.5
+        annotated-types==0.8.0
+        anyio==4.15.1
+        click==8.5.0
+        fastapi==0.146.0
+        h11==0.16.0
+        idna==3.20
+        opentelemetry-api==1.45.1
+        pydantic==2.14.1
+        pydantic-core==2.50.1
+        starlette==1.9.0
+        typing-extensions==4.16.0
+        typing-inspection==0.4.4
+        uvicorn==0.53.0
+        prometheus-client==0.26.0
+        HEXFILE_0
+        RUN pip install --no-cache-dir -r requirements.txt
+        
+        FROM base AS test
+        COPY <<'HEXFILE_1' ./requirements-dev.txt
+        -r requirements.txt
+        certifi==2026.10.18
+        colorama==0.4.6; sys_platform == "win32"
+        httpcore==1.0.9
+        iniconfig==2.3.1
+        packaging==26.3
+        pluggy==1.7.0
+        pygments==2.21.0
+        pytest==9.1.1
+        httpx==0.28.1
+        HEXFILE_1
+        RUN pip install --no-cache-dir -r requirements-dev.txt
+        COPY <<'HEXFILE_2' risk_engine/__init__.py
+        """HexaOrders risk scoring service."""
+        HEXFILE_2
+        COPY <<'HEXFILE_3' risk_engine/adapters/__init__.py
+        """Frameworks and observability live outside the core."""
+        HEXFILE_3
+        COPY <<'HEXFILE_4' risk_engine/adapters/http.py
+        """Driving adapter: exact JSON decimals, validation and Prometheus exposition."""
+        
+        from decimal import Decimal, InvalidOperation
+        import json
+        from time import perf_counter
+        from typing import Annotated, Literal
+        
+        from fastapi import FastAPI, HTTPException, Request, Response
+        from prometheus_client import CollectorRegistry, Counter, Histogram, CONTENT_TYPE_LATEST, generate_latest
+        from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+        
+        from risk_engine.application.ports import ScoreRiskPort
+        from risk_engine.domain.risk import Evaluation
+        
+        
+        class ScoreRequest(BaseModel):
+            model_config = ConfigDict(extra="forbid")
+            customerId: Annotated[str, Field(strict=True, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$$")]
+            amount: Annotated[Decimal, Field(gt=0, le=1000000, allow_inf_nan=False)]
+        
+            @field_validator("amount", mode="before")
+            @classmethod
+            def exact_money(cls, value: object) -> Decimal:
+                if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+                    raise ValueError("amount must be a decimal string or JSON number")
+                try:
+                    result = Decimal(str(value))
+                except InvalidOperation as exc:
+                    raise ValueError("amount must be a valid decimal") from exc
+                if not result.is_finite() or result.as_tuple().exponent < -2:
+                    raise ValueError("amount must be finite with at most two decimal places")
+                return result
+        
+        
+        class ScoreResponse(BaseModel):
+            score: Annotated[int, Field(ge=0, le=100)]
+            decision: Literal["APPROVED", "REVIEW"]
+        
+        
+        def _invalid_json_constant(value: str) -> None:
+            raise ValueError(f"Invalid JSON constant: {value}")
+        
+        
+        def create_app(score_risk: ScoreRiskPort) -> FastAPI:
+            app = FastAPI(title="HexaOrders risk engine", version="1.0.0")
+            # A private registry lets each test instantiate a clean application.
+            registry = CollectorRegistry()
+            evaluations = Counter(
+                "risk_evaluations_total", "Successfully evaluated orders", ["decision"], registry=registry
+            )
+            duration = Histogram(
+                "risk_evaluation_duration_seconds", "Risk use-case execution time", registry=registry
+            )
+            for decision in ("APPROVED", "REVIEW"):
+                evaluations.labels(decision=decision)
+        
+            @app.post(
+                "/score",
+                response_model=ScoreResponse,
+                openapi_extra={"requestBody": {"required": True, "content": {
+                    "application/json": {"schema": ScoreRequest.model_json_schema()}
+                }}},
+            )
+            async def score(request: Request) -> ScoreResponse:
+                if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+                    raise HTTPException(status_code=415, detail="Content-Type must be application/json")
+                try:
+                    # JSON -> Decimal directly: a float intermediate would lose monetary precision.
+                    payload = json.loads(await request.body(), parse_float=Decimal, parse_constant=_invalid_json_constant)
+                    dto = ScoreRequest.model_validate(payload)
+                    evaluation = Evaluation(dto.customerId, dto.amount)
+                except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+                    detail = exc.errors(include_input=False, include_context=False) if isinstance(exc, ValidationError) else "Invalid JSON body"
+                    raise HTTPException(status_code=422, detail=detail) from exc
+                started = perf_counter()
+                result = score_risk.execute(evaluation)
+                duration.observe(perf_counter() - started)
+                evaluations.labels(decision=result.decision.value).inc()
+                return ScoreResponse(score=result.score, decision=result.decision.value)
+        
+            @app.get("/health/live", include_in_schema=False)
+            def live() -> dict[str, str]:
+                return {"status": "UP"}
+        
+            @app.get("/health/ready", include_in_schema=False)
+            def ready() -> dict[str, str]:
+                # No external dependencies: ready as soon as this application can serve HTTP.
+                return {"status": "UP"}
+        
+            @app.get("/metrics", include_in_schema=False)
+            def metrics() -> Response:
+                return Response(content=generate_latest(registry), headers={"Content-Type": CONTENT_TYPE_LATEST})
+        
+            return app
+        HEXFILE_4
+        COPY <<'HEXFILE_5' risk_engine/application/__init__.py
+        """Input ports and use cases: dependencies point toward the domain."""
+        HEXFILE_5
+        COPY <<'HEXFILE_6' risk_engine/application/ports.py
+        from typing import Protocol
+        
+        from risk_engine.domain.risk import Evaluation, RiskResult
+        
+        
+        class ScoreRiskPort(Protocol):
+            """Driving port: HTTP and tests invoke the same business capability."""
+        
+            def execute(self, evaluation: Evaluation) -> RiskResult: ...
+        HEXFILE_6
+        COPY <<'HEXFILE_7' risk_engine/application/score_risk.py
+        from risk_engine.domain.risk import Evaluation, RiskResult, assess
+        
+        
+        class ScoreRisk:
+            """Stateless use case: this service needs no persistence or outbound I/O."""
+        
+            def execute(self, evaluation: Evaluation) -> RiskResult:
+                return assess(evaluation)
+        HEXFILE_7
+        COPY <<'HEXFILE_8' risk_engine/bootstrap.py
+        """Composition root: only this module chooses concrete adapters and use cases."""
+        
+        from risk_engine.adapters.http import create_app
+        from risk_engine.application.score_risk import ScoreRisk
+        
+        app = create_app(ScoreRisk())
+        HEXFILE_8
+        COPY <<'HEXFILE_9' risk_engine/domain/__init__.py
+        """Business rules: standard library only."""
+        HEXFILE_9
+        COPY <<'HEXFILE_10' risk_engine/domain/risk.py
+        """Deterministic, explainable demo risk policy; no framework dependencies."""
+        
+        from dataclasses import dataclass
+        from decimal import Decimal
+        from enum import StrEnum
+        import re
+        
+        
+        class Decision(StrEnum):
+            APPROVED = "APPROVED"
+            REVIEW = "REVIEW"
+        
+        
+        @dataclass(frozen=True, slots=True)
+        class Evaluation:
+            customer_id: str
+            amount: Decimal
+        
+            def __post_init__(self) -> None:
+                if not isinstance(self.customer_id, str) or not re.fullmatch(
+                    r"[A-Za-z0-9_-]{1,64}", self.customer_id
+                ):
+                    raise ValueError("customerId must match [A-Za-z0-9_-]{1,64}")
+                if not isinstance(self.amount, Decimal) or not self.amount.is_finite():
+                    raise ValueError("amount must be a finite Decimal")
+                if not Decimal("0") < self.amount <= Decimal("1000000"):
+                    raise ValueError("amount must be greater than 0 and at most 1000000")
+                if self.amount.as_tuple().exponent < -2:
+                    raise ValueError("amount must have at most two decimal places")
+        
+        
+        @dataclass(frozen=True, slots=True)
+        class RiskResult:
+            score: int
+            decision: Decision
+        
+        
+        def assess(evaluation: Evaluation) -> RiskResult:
+            """Demo rules, deliberately transparent for the university presentation."""
+            amount = evaluation.amount
+            score = 75 if amount >= Decimal("1000") else 40 if amount >= Decimal("500") else 10
+            return RiskResult(score, Decision.REVIEW if score >= 70 else Decision.APPROVED)
+        HEXFILE_10
+        COPY <<'HEXFILE_11' tests/test_api.py
+        import pytest
+        from fastapi.testclient import TestClient
+        
+        from risk_engine.adapters.http import create_app
+        from risk_engine.application.score_risk import ScoreRisk
+        
+        
+        @pytest.fixture
+        def client():
+            with TestClient(create_app(ScoreRisk())) as test_client:
+                yield test_client
+        
+        
+        @pytest.mark.parametrize("amount", ["1500.00", 1500.0, 1500])
+        def test_score_accepts_decimal_string_and_number(client, amount):
+            response = client.post("/score", json={"customerId": "customer_01", "amount": amount})
+            assert response.status_code == 200
+            assert response.json() == {"score": 75, "decision": "REVIEW"}
+        
+        
+        @pytest.mark.parametrize(
+            "payload",
+            [
+                {},
+                {"customerId": "client"},
+                {"customerId": "client", "amount": "0"},
+                {"customerId": "client", "amount": "-1"},
+                {"customerId": "client", "amount": "1000000.01"},
+                {"customerId": "client", "amount": "1.001"},
+                {"customerId": "client", "amount": "1.000"},
+                {"customerId": "client", "amount": "NaN"},
+                {"customerId": "client", "amount": "Infinity"},
+                {"customerId": "client", "amount": "text"},
+                {"customerId": "client", "amount": True},
+                {"customerId": "client", "amount": None},
+                {"customerId": "client", "amount": []},
+                {"customerId": "client", "amount": {}},
+                {"customerId": "", "amount": "1"},
+                {"customerId": "a" * 65, "amount": "1"},
+                {"customerId": "hello world", "amount": "1"},
+                {"customerId": "á", "amount": "1"},
+                {"customerId": "client\n", "amount": "1"},
+                {"customerId": 12, "amount": "1"},
+                {"customerId": "client", "amount": "1", "currency": "PEN"},
+                ["client", "1"],
+            ],
+        )
+        def test_invalid_requests_return_422(client, payload):
+            assert client.post("/score", json=payload).status_code == 422
+        
+        
+        @pytest.mark.parametrize(
+            "body",
+            [
+                '{"customerId":"client","amount":1.00000000000000000000001}',
+                '{"customerId":"client","amount":999.999999999999999999999}',
+                '{"customerId":"client","amount":NaN}',
+                '{"customerId":"client","amount":Infinity}',
+                '{bad json',
+                '',
+            ],
+        )
+        def test_json_parser_never_silently_rounds_or_accepts_non_json_numbers(client, body):
+            assert client.post("/score", content=body, headers={"Content-Type": "application/json"}).status_code == 422
+        
+        
+        def test_rejects_unexpected_media_type(client):
+            assert client.post("/score", content='{"customerId":"client","amount":1}').status_code == 415
+        
+        
+        def test_health_and_observability_match_business_outcomes(client):
+            for path in ("/health/live", "/health/ready"):
+                assert client.get(path).json() == {"status": "UP"}
+            client.post("/score", json={"customerId": "client", "amount": "100"})
+            client.post("/score", json={"customerId": "client", "amount": "1000"})
+            client.post("/score", json={"customerId": "client", "amount": "0"})
+            metrics = client.get("/metrics")
+            assert metrics.status_code == 200
+            assert 'risk_evaluations_total{decision="APPROVED"} 1.0' in metrics.text
+            assert 'risk_evaluations_total{decision="REVIEW"} 1.0' in metrics.text
+            assert "risk_evaluation_duration_seconds_count 2.0" in metrics.text
+        
+        
+        def test_openapi_exposes_input_and_output_contract(client):
+            operation = client.get("/openapi.json").json()["paths"]["/score"]["post"]
+            assert operation["requestBody"]["content"]["application/json"]["schema"]["required"] == ["customerId", "amount"]
+            assert "200" in operation["responses"]
+        HEXFILE_11
+        COPY <<'HEXFILE_12' tests/test_architecture.py
+        """The dependency rule is executable, not just a folder naming convention."""
+        
+        import ast
+        from pathlib import Path
+        import sys
+        
+        import pytest
+        
+        
+        ROOT = Path(__file__).resolve().parents[1] / "risk_engine"
+        
+        
+        @pytest.mark.parametrize("layer", ["domain", "application"])
+        def test_core_imports_only_standard_library_and_allowed_inner_layers(layer):
+            for source in (ROOT / layer).rglob("*.py"):
+                tree = ast.parse(source.read_text(encoding="utf-8"))
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        imports = [item.name for item in node.names]
+                    elif isinstance(node, ast.ImportFrom):
+                        assert node.level == 0, f"Use explicit absolute imports in {source}"
+                        imports = [node.module or ""]
+                    else:
+                        continue
+                    for imported in imports:
+                        root = imported.split(".", 1)[0]
+                        allowed = root in sys.stdlib_module_names or imported.startswith("risk_engine.domain")
+                        if layer == "application":
+                            allowed |= imported.startswith("risk_engine.application")
+                        assert allowed, f"{source}: {layer} must not import {imported}"
+        HEXFILE_12
+        COPY <<'HEXFILE_13' tests/test_domain.py
+        from decimal import Decimal
+        
+        import pytest
+        
+        from risk_engine.application.score_risk import ScoreRisk
+        from risk_engine.domain.risk import Decision, Evaluation
+        
+        
+        @pytest.mark.parametrize(
+            "amount, score, decision",
+            [
+                ("0.01", 10, Decision.APPROVED),
+                ("499.99", 10, Decision.APPROVED),
+                ("500.00", 40, Decision.APPROVED),
+                ("999.99", 40, Decision.APPROVED),
+                ("1000.00", 75, Decision.REVIEW),
+                ("1000000", 75, Decision.REVIEW),
+            ],
+        )
+        def test_risk_thresholds(amount, score, decision):
+            result = ScoreRisk().execute(Evaluation("client_01", Decimal(amount)))
+            assert (result.score, result.decision) == (score, decision)
+        
+        
+        @pytest.mark.parametrize("amount", ["0", "-1", "1000000.01", "0.001", "1.000", "NaN", "sNaN", "Infinity", "-Infinity"])
+        def test_domain_rejects_invalid_money(amount):
+            with pytest.raises(ValueError):
+                Evaluation("client_01", Decimal(amount))
+        
+        
+        @pytest.mark.parametrize("customer", ["", "a" * 65, "customer name", "á", "client\n", None, 12])
+        def test_domain_rejects_invalid_customer(customer):
+            with pytest.raises(ValueError):
+                Evaluation(customer, Decimal("1.00"))
+        
+        
+        def test_domain_requires_decimal_instead_of_binary_float():
+            with pytest.raises(ValueError):
+                Evaluation("client_01", 0.1)
+        HEXFILE_13
+        RUN python -m pytest -q -p no:cacheprovider && touch /tmp/tests-passed
+        
+        FROM base AS runtime
+        COPY --from=test /tmp/tests-passed /app/tests-passed
+        COPY <<'HEXFILE_14' risk_engine/__init__.py
+        """HexaOrders risk scoring service."""
+        HEXFILE_14
+        COPY <<'HEXFILE_15' risk_engine/adapters/__init__.py
+        """Frameworks and observability live outside the core."""
+        HEXFILE_15
+        COPY <<'HEXFILE_16' risk_engine/adapters/http.py
+        """Driving adapter: exact JSON decimals, validation and Prometheus exposition."""
+        
+        from decimal import Decimal, InvalidOperation
+        import json
+        from time import perf_counter
+        from typing import Annotated, Literal
+        
+        from fastapi import FastAPI, HTTPException, Request, Response
+        from prometheus_client import CollectorRegistry, Counter, Histogram, CONTENT_TYPE_LATEST, generate_latest
+        from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+        
+        from risk_engine.application.ports import ScoreRiskPort
+        from risk_engine.domain.risk import Evaluation
+        
+        
+        class ScoreRequest(BaseModel):
+            model_config = ConfigDict(extra="forbid")
+            customerId: Annotated[str, Field(strict=True, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$$")]
+            amount: Annotated[Decimal, Field(gt=0, le=1000000, allow_inf_nan=False)]
+        
+            @field_validator("amount", mode="before")
+            @classmethod
+            def exact_money(cls, value: object) -> Decimal:
+                if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+                    raise ValueError("amount must be a decimal string or JSON number")
+                try:
+                    result = Decimal(str(value))
+                except InvalidOperation as exc:
+                    raise ValueError("amount must be a valid decimal") from exc
+                if not result.is_finite() or result.as_tuple().exponent < -2:
+                    raise ValueError("amount must be finite with at most two decimal places")
+                return result
+        
+        
+        class ScoreResponse(BaseModel):
+            score: Annotated[int, Field(ge=0, le=100)]
+            decision: Literal["APPROVED", "REVIEW"]
+        
+        
+        def _invalid_json_constant(value: str) -> None:
+            raise ValueError(f"Invalid JSON constant: {value}")
+        
+        
+        def create_app(score_risk: ScoreRiskPort) -> FastAPI:
+            app = FastAPI(title="HexaOrders risk engine", version="1.0.0")
+            # A private registry lets each test instantiate a clean application.
+            registry = CollectorRegistry()
+            evaluations = Counter(
+                "risk_evaluations_total", "Successfully evaluated orders", ["decision"], registry=registry
+            )
+            duration = Histogram(
+                "risk_evaluation_duration_seconds", "Risk use-case execution time", registry=registry
+            )
+            for decision in ("APPROVED", "REVIEW"):
+                evaluations.labels(decision=decision)
+        
+            @app.post(
+                "/score",
+                response_model=ScoreResponse,
+                openapi_extra={"requestBody": {"required": True, "content": {
+                    "application/json": {"schema": ScoreRequest.model_json_schema()}
+                }}},
+            )
+            async def score(request: Request) -> ScoreResponse:
+                if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+                    raise HTTPException(status_code=415, detail="Content-Type must be application/json")
+                try:
+                    # JSON -> Decimal directly: a float intermediate would lose monetary precision.
+                    payload = json.loads(await request.body(), parse_float=Decimal, parse_constant=_invalid_json_constant)
+                    dto = ScoreRequest.model_validate(payload)
+                    evaluation = Evaluation(dto.customerId, dto.amount)
+                except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+                    detail = exc.errors(include_input=False, include_context=False) if isinstance(exc, ValidationError) else "Invalid JSON body"
+                    raise HTTPException(status_code=422, detail=detail) from exc
+                started = perf_counter()
+                result = score_risk.execute(evaluation)
+                duration.observe(perf_counter() - started)
+                evaluations.labels(decision=result.decision.value).inc()
+                return ScoreResponse(score=result.score, decision=result.decision.value)
+        
+            @app.get("/health/live", include_in_schema=False)
+            def live() -> dict[str, str]:
+                return {"status": "UP"}
+        
+            @app.get("/health/ready", include_in_schema=False)
+            def ready() -> dict[str, str]:
+                # No external dependencies: ready as soon as this application can serve HTTP.
+                return {"status": "UP"}
+        
+            @app.get("/metrics", include_in_schema=False)
+            def metrics() -> Response:
+                return Response(content=generate_latest(registry), headers={"Content-Type": CONTENT_TYPE_LATEST})
+        
+            return app
+        HEXFILE_16
+        COPY <<'HEXFILE_17' risk_engine/application/__init__.py
+        """Input ports and use cases: dependencies point toward the domain."""
+        HEXFILE_17
+        COPY <<'HEXFILE_18' risk_engine/application/ports.py
+        from typing import Protocol
+        
+        from risk_engine.domain.risk import Evaluation, RiskResult
+        
+        
+        class ScoreRiskPort(Protocol):
+            """Driving port: HTTP and tests invoke the same business capability."""
+        
+            def execute(self, evaluation: Evaluation) -> RiskResult: ...
+        HEXFILE_18
+        COPY <<'HEXFILE_19' risk_engine/application/score_risk.py
+        from risk_engine.domain.risk import Evaluation, RiskResult, assess
+        
+        
+        class ScoreRisk:
+            """Stateless use case: this service needs no persistence or outbound I/O."""
+        
+            def execute(self, evaluation: Evaluation) -> RiskResult:
+                return assess(evaluation)
+        HEXFILE_19
+        COPY <<'HEXFILE_20' risk_engine/bootstrap.py
+        """Composition root: only this module chooses concrete adapters and use cases."""
+        
+        from risk_engine.adapters.http import create_app
+        from risk_engine.application.score_risk import ScoreRisk
+        
+        app = create_app(ScoreRisk())
+        HEXFILE_20
+        COPY <<'HEXFILE_21' risk_engine/domain/__init__.py
+        """Business rules: standard library only."""
+        HEXFILE_21
+        COPY <<'HEXFILE_22' risk_engine/domain/risk.py
+        """Deterministic, explainable demo risk policy; no framework dependencies."""
+        
+        from dataclasses import dataclass
+        from decimal import Decimal
+        from enum import StrEnum
+        import re
+        
+        
+        class Decision(StrEnum):
+            APPROVED = "APPROVED"
+            REVIEW = "REVIEW"
+        
+        
+        @dataclass(frozen=True, slots=True)
+        class Evaluation:
+            customer_id: str
+            amount: Decimal
+        
+            def __post_init__(self) -> None:
+                if not isinstance(self.customer_id, str) or not re.fullmatch(
+                    r"[A-Za-z0-9_-]{1,64}", self.customer_id
+                ):
+                    raise ValueError("customerId must match [A-Za-z0-9_-]{1,64}")
+                if not isinstance(self.amount, Decimal) or not self.amount.is_finite():
+                    raise ValueError("amount must be a finite Decimal")
+                if not Decimal("0") < self.amount <= Decimal("1000000"):
+                    raise ValueError("amount must be greater than 0 and at most 1000000")
+                if self.amount.as_tuple().exponent < -2:
+                    raise ValueError("amount must have at most two decimal places")
+        
+        
+        @dataclass(frozen=True, slots=True)
+        class RiskResult:
+            score: int
+            decision: Decision
+        
+        
+        def assess(evaluation: Evaluation) -> RiskResult:
+            """Demo rules, deliberately transparent for the university presentation."""
+            amount = evaluation.amount
+            score = 75 if amount >= Decimal("1000") else 40 if amount >= Decimal("500") else 10
+            return RiskResult(score, Decision.REVIEW if score >= 70 else Decision.APPROVED)
+        HEXFILE_22
+        USER 10001:10001
+        EXPOSE 8000
+        HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()"]
+        CMD ["python", "-m", "uvicorn", "risk_engine.bootstrap:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-proxy-headers"]
+    networks: [compute, telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.75
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+  # 3. Adaptador REST -> puerto de entrada -> caso de uso -> puertos de salida.
+  order-api:
+    <<: *runtime
+    image: hexaorders/order-api:1.0.0
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        FROM maven:3.9.11-eclipse-temurin-21 AS build
+        WORKDIR /build
+        COPY <<'HEXFILE_0' ./pom.xml
+        <?xml version="1.0" encoding="UTF-8"?>
+        <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+          <modelVersion>4.0.0</modelVersion>
+          <parent>
+            <groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.7</version><relativePath/>
+          </parent>
+          <groupId>com.hexaorders</groupId><artifactId>order-api</artifactId><version>1.0.0</version>
+          <name>HexaOrders API</name><description>Hexagonal Java order application</description>
+          <properties><java.version>21</java.version></properties>
+          <dependencies>
+            <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+            <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
+            <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
+            <dependency><groupId>io.micrometer</groupId><artifactId>micrometer-registry-prometheus</artifactId></dependency>
+            <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
+            <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+            <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><scope>runtime</scope></dependency>
+            <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+            <dependency><groupId>com.tngtech.archunit</groupId><artifactId>archunit-junit5</artifactId><version>1.4.1</version><scope>test</scope></dependency>
+          </dependencies>
+          <build>
+            <finalName>order-api</finalName>
+            <plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins>
+          </build>
+        </project>
+        HEXFILE_0
+        RUN mvn -B -ntp dependency:go-offline
+        COPY <<'HEXFILE_1' src/main/java/com/hexaorders/adapter/in/web/ApiExceptionHandler.java
+        package com.hexaorders.adapter.in.web;
+        
+        import com.hexaorders.application.exception.OrderNotFoundException;
+        import com.hexaorders.application.exception.PersistenceUnavailableException;
+        import com.hexaorders.application.exception.RiskUnavailableException;
+        import org.springframework.http.HttpStatus;
+        import org.springframework.http.ProblemDetail;
+        import org.springframework.http.converter.HttpMessageNotReadableException;
+        import org.springframework.web.bind.annotation.ExceptionHandler;
+        import org.springframework.web.bind.annotation.RestControllerAdvice;
+        import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+        
+        @RestControllerAdvice
+        public final class ApiExceptionHandler {
+            @ExceptionHandler(IllegalArgumentException.class)
+            ProblemDetail invalidInput(IllegalArgumentException error) {
+                return problem(HttpStatus.BAD_REQUEST, "Solicitud inválida", error.getMessage());
+            }
+        
+            @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+            ProblemDetail malformedRequest(Exception ignored) {
+                return problem(HttpStatus.BAD_REQUEST, "Solicitud inválida", "Revise el JSON, los tipos de datos y el UUID del pedido");
+            }
+        
+            @ExceptionHandler(OrderNotFoundException.class)
+            ProblemDetail notFound(OrderNotFoundException error) {
+                return problem(HttpStatus.NOT_FOUND, "Pedido no encontrado", error.getMessage());
+            }
+        
+            @ExceptionHandler(RiskUnavailableException.class)
+            ProblemDetail riskUnavailable(RiskUnavailableException ignored) {
+                return problem(HttpStatus.SERVICE_UNAVAILABLE, "Motor de riesgo no disponible", "No se creó ningún pedido; vuelva a intentar más tarde");
+            }
+        
+            @ExceptionHandler(PersistenceUnavailableException.class)
+            ProblemDetail databaseUnavailable(PersistenceUnavailableException ignored) {
+                return problem(HttpStatus.SERVICE_UNAVAILABLE, "Persistencia no disponible", "No se pudo completar la operación");
+            }
+        
+            private static ProblemDetail problem(HttpStatus status, String title, String detail) {
+                ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+                problem.setTitle(title);
+                return problem;
+            }
+        }
+        HEXFILE_1
+        COPY <<'HEXFILE_2' src/main/java/com/hexaorders/adapter/in/web/OrderController.java
+        package com.hexaorders.adapter.in.web;
+        
+        import com.hexaorders.application.port.in.OrderUseCases;
+        import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderDraft;
+        import java.math.BigDecimal;
+        import java.net.URI;
+        import java.util.List;
+        import java.util.UUID;
+        import org.springframework.http.ResponseEntity;
+        import org.springframework.web.bind.annotation.GetMapping;
+        import org.springframework.web.bind.annotation.PathVariable;
+        import org.springframework.web.bind.annotation.PostMapping;
+        import org.springframework.web.bind.annotation.RequestBody;
+        import org.springframework.web.bind.annotation.RequestMapping;
+        import org.springframework.web.bind.annotation.RestController;
+        
+        @RestController
+        @RequestMapping("/api/orders")
+        public final class OrderController {
+            private final OrderUseCases orders;
+        
+            public OrderController(OrderUseCases orders) { this.orders = orders; }
+        
+            @PostMapping
+            public ResponseEntity<Order> create(@RequestBody CreateOrderRequest request) {
+                String currency = request.currency() == null ? "USD" : request.currency();
+                Order created = orders.create(new OrderDraft(request.customerId(), request.amount(), currency));
+                return ResponseEntity.created(URI.create("/api/orders/" + created.id())).body(created);
+            }
+        
+            @GetMapping("/{id}")
+            public Order get(@PathVariable UUID id) { return orders.get(id); }
+        
+            @GetMapping
+            public List<Order> latest() { return orders.latest(); }
+        
+            public record CreateOrderRequest(String customerId, BigDecimal amount, String currency) {}
+        }
+        HEXFILE_2
+        COPY <<'HEXFILE_3' src/main/java/com/hexaorders/adapter/out/http/HttpRiskAssessmentAdapter.java
+        package com.hexaorders.adapter.out.http;
+        
+        import com.hexaorders.application.exception.RiskUnavailableException;
+        import com.hexaorders.application.port.out.RiskAssessmentPort;
+        import com.hexaorders.domain.OrderDraft;
+        import java.math.BigDecimal;
+        import org.springframework.web.client.RestClient;
+        import org.springframework.web.client.RestClientException;
+        
+        public final class HttpRiskAssessmentAdapter implements RiskAssessmentPort {
+            private final RestClient client;
+        
+            public HttpRiskAssessmentAdapter(RestClient client) { this.client = client; }
+        
+            @Override
+            public int assess(OrderDraft draft) {
+                try {
+                    ScoreResponse response = client.post().uri("/score")
+                            .body(new ScoreRequest(draft.customerId(), draft.amount()))
+                            .retrieve().body(ScoreResponse.class);
+                    if (response == null || response.score() == null
+                            || !("APPROVED".equals(response.decision()) || "REVIEW".equals(response.decision()))) {
+                        throw new RiskUnavailableException("Respuesta inválida del motor de riesgo");
+                    }
+                    int score = response.score().intValueExact();
+                    if (score < 0 || score > 100) {
+                        throw new RiskUnavailableException("Puntaje de riesgo fuera del rango permitido");
+                    }
+                    // The Java domain owns the decision, even if the upstream decision differs.
+                    return score;
+                } catch (RestClientException | ArithmeticException error) {
+                    throw new RiskUnavailableException("No se pudo consultar el motor de riesgo", error);
+                }
+            }
+        
+            private record ScoreRequest(String customerId, BigDecimal amount) {}
+            private record ScoreResponse(BigDecimal score, String decision) {}
+        }
+        HEXFILE_3
+        COPY <<'HEXFILE_4' src/main/java/com/hexaorders/adapter/out/metrics/MicrometerOrderTelemetry.java
+        package com.hexaorders.adapter.out.metrics;
+        
+        import com.hexaorders.application.port.out.OrderTelemetry;
+        import com.hexaorders.domain.OrderStatus;
+        import io.micrometer.core.instrument.Counter;
+        import io.micrometer.core.instrument.MeterRegistry;
+        import java.util.EnumMap;
+        import java.util.Map;
+        
+        public final class MicrometerOrderTelemetry implements OrderTelemetry {
+            private final Map<OrderStatus, Counter> created = new EnumMap<>(OrderStatus.class);
+            private final Counter riskFailures;
+        
+            public MicrometerOrderTelemetry(MeterRegistry registry) {
+                for (OrderStatus status : OrderStatus.values()) {
+                    created.put(status, Counter.builder("orders_created").description("Pedidos persistidos")
+                            .tag("status", status.name()).register(registry));
+                }
+                riskFailures = Counter.builder("orders_risk_failures").description("Fallos del motor de riesgo")
+                        .register(registry);
+            }
+        
+            @Override
+            public void orderCreated(OrderStatus status) { created.get(status).increment(); }
+        
+            @Override
+            public void riskFailure() { riskFailures.increment(); }
+        }
+        HEXFILE_4
+        COPY <<'HEXFILE_5' src/main/java/com/hexaorders/adapter/out/persistence/JdbcOrderRepository.java
+        package com.hexaorders.adapter.out.persistence;
+        
+        import com.hexaorders.application.exception.PersistenceUnavailableException;
+        import com.hexaorders.application.port.out.OrderRepository;
+        import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderStatus;
+        import java.sql.Timestamp;
+        import java.util.List;
+        import java.util.Optional;
+        import java.util.UUID;
+        import org.springframework.dao.DataAccessException;
+        import org.springframework.jdbc.core.JdbcTemplate;
+        import org.springframework.jdbc.core.RowMapper;
+        
+        public final class JdbcOrderRepository implements OrderRepository {
+            private static final String COLUMNS = "id, customer_id, amount, currency, risk_score, status, created_at";
+            private static final RowMapper<Order> ROW_MAPPER = (rs, rowNumber) -> new Order(
+                    rs.getObject("id", UUID.class), rs.getString("customer_id"), rs.getBigDecimal("amount"),
+                    rs.getString("currency"), rs.getInt("risk_score"), OrderStatus.valueOf(rs.getString("status")),
+                    rs.getTimestamp("created_at").toInstant());
+            private final JdbcTemplate jdbc;
+        
+            public JdbcOrderRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+        
+            @Override
+            public void save(Order order) {
+                try {
+                    // One statement is atomic in PostgreSQL autocommit; there is no transaction around HTTP.
+                    jdbc.update("INSERT INTO orders (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            order.id(), order.customerId(), order.amount(), order.currency(), order.riskScore(),
+                            order.status().name(), Timestamp.from(order.createdAt()));
+                } catch (DataAccessException error) {
+                    throw new PersistenceUnavailableException(error);
+                }
+            }
+        
+            @Override
+            public Optional<Order> findById(UUID id) {
+                try {
+                    return jdbc.query("SELECT " + COLUMNS + " FROM orders WHERE id = ?", ROW_MAPPER, id)
+                            .stream().findFirst();
+                } catch (DataAccessException error) {
+                    throw new PersistenceUnavailableException(error);
+                }
+            }
+        
+            @Override
+            public List<Order> latest(int limit) {
+                try {
+                    return jdbc.query("SELECT " + COLUMNS + " FROM orders ORDER BY created_at DESC, id DESC LIMIT ?",
+                            ROW_MAPPER, limit);
+                } catch (DataAccessException error) {
+                    throw new PersistenceUnavailableException(error);
+                }
+            }
+        }
+        HEXFILE_5
+        COPY <<'HEXFILE_6' src/main/java/com/hexaorders/application/exception/OrderNotFoundException.java
+        package com.hexaorders.application.exception;
+        
+        import java.util.UUID;
+        
+        public final class OrderNotFoundException extends RuntimeException {
+            public OrderNotFoundException(UUID id) {
+                super("No existe el pedido " + id);
+            }
+        }
+        HEXFILE_6
+        COPY <<'HEXFILE_7' src/main/java/com/hexaorders/application/exception/PersistenceUnavailableException.java
+        package com.hexaorders.application.exception;
+        
+        public final class PersistenceUnavailableException extends RuntimeException {
+            public PersistenceUnavailableException(Throwable cause) {
+                super("La base de datos no está disponible", cause);
+            }
+        }
+        HEXFILE_7
+        COPY <<'HEXFILE_8' src/main/java/com/hexaorders/application/exception/RiskUnavailableException.java
+        package com.hexaorders.application.exception;
+        
+        public final class RiskUnavailableException extends RuntimeException {
+            public RiskUnavailableException(String message) { super(message); }
+            public RiskUnavailableException(String message, Throwable cause) { super(message, cause); }
+        }
+        HEXFILE_8
+        COPY <<'HEXFILE_9' src/main/java/com/hexaorders/application/port/in/OrderUseCases.java
+        package com.hexaorders.application.port.in;
+        
+        import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderDraft;
+        import java.util.List;
+        import java.util.UUID;
+        
+        public interface OrderUseCases {
+            Order create(OrderDraft draft);
+            Order get(UUID id);
+            List<Order> latest();
+        }
+        HEXFILE_9
+        COPY <<'HEXFILE_10' src/main/java/com/hexaorders/application/port/out/OrderRepository.java
+        package com.hexaorders.application.port.out;
+        
+        import com.hexaorders.domain.Order;
+        import java.util.List;
+        import java.util.Optional;
+        import java.util.UUID;
+        
+        public interface OrderRepository {
+            void save(Order order);
+            Optional<Order> findById(UUID id);
+            List<Order> latest(int limit);
+        }
+        HEXFILE_10
+        COPY <<'HEXFILE_11' src/main/java/com/hexaorders/application/port/out/OrderTelemetry.java
+        package com.hexaorders.application.port.out;
+        
+        import com.hexaorders.domain.OrderStatus;
+        
+        public interface OrderTelemetry {
+            void orderCreated(OrderStatus status);
+            void riskFailure();
+        }
+        HEXFILE_11
+        COPY <<'HEXFILE_12' src/main/java/com/hexaorders/application/port/out/RiskAssessmentPort.java
+        package com.hexaorders.application.port.out;
+        
+        import com.hexaorders.domain.OrderDraft;
+        
+        public interface RiskAssessmentPort {
+            /** Returns 0..100 or throws RiskUnavailableException. */
+            int assess(OrderDraft draft);
+        }
+        HEXFILE_12
+        COPY <<'HEXFILE_13' src/main/java/com/hexaorders/application/service/OrderService.java
+        package com.hexaorders.application.service;
+        
+        import com.hexaorders.application.exception.OrderNotFoundException;
+        import com.hexaorders.application.exception.RiskUnavailableException;
+        import com.hexaorders.application.port.in.OrderUseCases;
+        import com.hexaorders.application.port.out.OrderRepository;
+        import com.hexaorders.application.port.out.OrderTelemetry;
+        import com.hexaorders.application.port.out.RiskAssessmentPort;
+        import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderDraft;
+        import java.time.Clock;
+        import java.util.List;
+        import java.util.UUID;
+        
+        /** Plain Java orchestration: risk first; one atomic INSERT afterwards. */
+        public final class OrderService implements OrderUseCases {
+            private final OrderRepository repository;
+            private final RiskAssessmentPort riskAssessment;
+            private final OrderTelemetry telemetry;
+            private final Clock clock;
+        
+            public OrderService(OrderRepository repository, RiskAssessmentPort riskAssessment,
+                                OrderTelemetry telemetry, Clock clock) {
+                this.repository = repository;
+                this.riskAssessment = riskAssessment;
+                this.telemetry = telemetry;
+                this.clock = clock;
+            }
+        
+            @Override
+            public Order create(OrderDraft draft) {
+                int score;
+                try {
+                    score = riskAssessment.assess(draft);
+                    if (score < 0 || score > 100) {
+                        throw new RiskUnavailableException("El motor de riesgo devolvió un puntaje inválido");
+                    }
+                } catch (RiskUnavailableException error) {
+                    telemetry.riskFailure();
+                    throw error;
+                }
+                Order order = Order.create(draft, score, UUID.randomUUID(), clock.instant());
+                repository.save(order);
+                telemetry.orderCreated(order.status());
+                return order;
+            }
+        
+            @Override
+            public Order get(UUID id) {
+                return repository.findById(id).orElseThrow(() -> new OrderNotFoundException(id));
+            }
+        
+            @Override
+            public List<Order> latest() {
+                return repository.latest(50);
+            }
+        }
+        HEXFILE_13
+        COPY <<'HEXFILE_14' src/main/java/com/hexaorders/config/HexagonalConfiguration.java
+        package com.hexaorders.config;
+        
+        import com.hexaorders.adapter.out.http.HttpRiskAssessmentAdapter;
+        import com.hexaorders.adapter.out.metrics.MicrometerOrderTelemetry;
+        import com.hexaorders.adapter.out.persistence.JdbcOrderRepository;
+        import com.hexaorders.application.port.in.OrderUseCases;
+        import com.hexaorders.application.port.out.OrderRepository;
+        import com.hexaorders.application.port.out.OrderTelemetry;
+        import com.hexaorders.application.port.out.RiskAssessmentPort;
+        import com.hexaorders.application.service.OrderService;
+        import com.zaxxer.hikari.HikariDataSource;
+        import io.micrometer.core.instrument.MeterRegistry;
+        import java.io.IOException;
+        import java.nio.charset.StandardCharsets;
+        import java.nio.file.Files;
+        import java.nio.file.Path;
+        import java.time.Clock;
+        import java.time.Duration;
+        import javax.sql.DataSource;
+        import org.springframework.beans.factory.annotation.Value;
+        import org.springframework.context.annotation.Bean;
+        import org.springframework.context.annotation.Configuration;
+        import org.springframework.http.client.SimpleClientHttpRequestFactory;
+        import org.springframework.jdbc.core.JdbcTemplate;
+        import org.springframework.web.client.RestClient;
+        
+        /** The composition root is the only place that selects concrete outbound adapters. */
+        @Configuration(proxyBeanMethods = false)
+        public class HexagonalConfiguration {
+            @Bean(destroyMethod = "close")
+            DataSource dataSource(@Value("$${DB_HOST:postgres}") String host,
+                                  @Value("$${DB_PORT:5432}") int port,
+                                  @Value("$${DB_NAME:hexaorders}") String database,
+                                  @Value("$${DB_USER:hexaorders}") String user,
+                                  @Value("$${DB_PASSWORD_FILE:/run/secrets/db_password}") String passwordFile) throws IOException {
+                String password = Files.readString(Path.of(passwordFile), StandardCharsets.UTF_8).strip();
+                if (password.isEmpty()) { throw new IllegalStateException("El secreto de base de datos está vacío"); }
+                HikariDataSource source = new HikariDataSource();
+                source.setJdbcUrl("jdbc:postgresql://" + host + ":" + port + "/" + database
+                        + "?connectTimeout=3&socketTimeout=5&ApplicationName=hexaorders-api");
+                source.setUsername(user);
+                source.setPassword(password);
+                source.setMaximumPoolSize(10);
+                source.setMinimumIdle(2);
+                source.setConnectionTimeout(3000);
+                source.setValidationTimeout(1000);
+                source.setPoolName("orders-pool");
+                return source;
+            }
+        
+            @Bean
+            OrderRepository orderRepository(JdbcTemplate jdbc) { return new JdbcOrderRepository(jdbc); }
+        
+            @Bean
+            RiskAssessmentPort riskAssessmentPort(RestClient.Builder builder,
+                                                 @Value("$${RISK_BASE_URL:http://risk-engine:8000}") String baseUrl) {
+                SimpleClientHttpRequestFactory requests = new SimpleClientHttpRequestFactory();
+                requests.setConnectTimeout(Duration.ofSeconds(2));
+                requests.setReadTimeout(Duration.ofSeconds(3));
+                return new HttpRiskAssessmentAdapter(builder.baseUrl(baseUrl).requestFactory(requests).build());
+            }
+        
+            @Bean
+            OrderTelemetry orderTelemetry(MeterRegistry registry) { return new MicrometerOrderTelemetry(registry); }
+        
+            @Bean
+            Clock clock() { return Clock.systemUTC(); }
+        
+            @Bean
+            OrderUseCases orderUseCases(OrderRepository repository, RiskAssessmentPort risk,
+                                       OrderTelemetry telemetry, Clock clock) {
+                return new OrderService(repository, risk, telemetry, clock);
+            }
+        }
+        HEXFILE_14
+        COPY <<'HEXFILE_15' src/main/java/com/hexaorders/domain/Order.java
+        package com.hexaorders.domain;
+        
+        import java.math.BigDecimal;
+        import java.time.Instant;
+        import java.util.Objects;
+        import java.util.UUID;
+        
+        public record Order(UUID id, String customerId, BigDecimal amount, String currency,
+                            int riskScore, OrderStatus status, Instant createdAt) {
+            public Order {
+                Objects.requireNonNull(id, "id");
+                Objects.requireNonNull(createdAt, "createdAt");
+                OrderDraft validated = new OrderDraft(customerId, amount, currency);
+                amount = validated.amount();
+                if (status != OrderStatus.fromRiskScore(riskScore)) {
+                    throw new IllegalArgumentException("El estado no corresponde al puntaje de riesgo");
+                }
+            }
+        
+            public static Order create(OrderDraft draft, int riskScore, UUID id, Instant createdAt) {
+                return new Order(id, draft.customerId(), draft.amount(), draft.currency(),
+                        riskScore, OrderStatus.fromRiskScore(riskScore), createdAt);
+            }
+        }
+        HEXFILE_15
+        COPY <<'HEXFILE_16' src/main/java/com/hexaorders/domain/OrderDraft.java
+        package com.hexaorders.domain;
+        
+        import java.math.BigDecimal;
+        import java.util.regex.Pattern;
+        
+        /** A validated request in the business language; no framework types. */
+        public record OrderDraft(String customerId, BigDecimal amount, String currency) {
+            private static final Pattern CUSTOMER_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+            private static final BigDecimal MAX_AMOUNT = new BigDecimal("1000000.00");
+        
+            public OrderDraft {
+                if (customerId == null || !CUSTOMER_ID.matcher(customerId).matches()) {
+                    throw new IllegalArgumentException("customerId: use entre 1 y 64 letras, dígitos, guiones o guiones bajos");
+                }
+                if (amount == null || amount.signum() <= 0 || amount.compareTo(MAX_AMOUNT) > 0) {
+                    throw new IllegalArgumentException("amount: debe ser mayor que 0 y menor o igual que 1000000.00");
+                }
+                if (amount.scale() > 2) {
+                    throw new IllegalArgumentException("amount: se admiten como máximo 2 decimales; no se redondean importes");
+                }
+                if (!"USD".equals(currency)) {
+                    throw new IllegalArgumentException("currency: la única moneda admitida es USD");
+                }
+                amount = amount.setScale(2);
+            }
+        }
+        HEXFILE_16
+        COPY <<'HEXFILE_17' src/main/java/com/hexaorders/domain/OrderStatus.java
+        package com.hexaorders.domain;
+        
+        public enum OrderStatus {
+            APPROVED, REVIEW;
+        
+            public static OrderStatus fromRiskScore(int score) {
+                if (score < 0 || score > 100) {
+                    throw new IllegalArgumentException("El puntaje debe estar entre 0 y 100");
+                }
+                return score >= 70 ? REVIEW : APPROVED;
+            }
+        }
+        HEXFILE_17
+        COPY <<'HEXFILE_18' src/main/java/com/hexaorders/OrderApiApplication.java
+        package com.hexaorders;
+        
+        import org.springframework.boot.SpringApplication;
+        import org.springframework.boot.autoconfigure.SpringBootApplication;
+        
+        @SpringBootApplication
+        public class OrderApiApplication {
+            public static void main(String[] args) {
+                SpringApplication.run(OrderApiApplication.class, args);
+            }
+        }
+        HEXFILE_18
+        COPY <<'HEXFILE_19' src/main/resources/application.yml
+        spring:
+          application:
+            name: order-api
+          jackson:
+            deserialization:
+              fail-on-unknown-properties: true
+          flyway:
+            enabled: true
+            locations: classpath:db/migration
+            validate-on-migrate: true
+            clean-disabled: true
+          lifecycle:
+            timeout-per-shutdown-phase: 20s
+        server:
+          port: 8080
+          shutdown: graceful
+          error:
+            include-message: never
+            include-stacktrace: never
+          tomcat:
+            threads:
+              max: 64
+              min-spare: 4
+            max-http-form-post-size: 16KB
+        management:
+          server:
+            port: 9090
+          endpoints:
+            web:
+              exposure:
+                include: health,prometheus
+          endpoint:
+            health:
+              show-details: never
+              probes:
+                enabled: true
+              group:
+                liveness:
+                  include: livenessState
+                readiness:
+                  include: readinessState,db
+          metrics:
+            tags:
+              application: $${spring.application.name}
+            distribution:
+              percentiles-histogram:
+                http.server.requests: true
+        logging:
+          level:
+            root: INFO
+        HEXFILE_19
+        COPY <<'HEXFILE_20' src/main/resources/db/migration/V1__create_orders.sql
+        CREATE TABLE orders (
+            id UUID PRIMARY KEY,
+            customer_id VARCHAR(64) NOT NULL CHECK (customer_id ~ '^[A-Za-z0-9_-]{1,64}$$'),
+            amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0 AND amount <= 1000000.00),
+            currency VARCHAR(3) NOT NULL CHECK (currency = 'USD'),
+            risk_score SMALLINT NOT NULL CHECK (risk_score BETWEEN 0 AND 100),
+            status VARCHAR(8) NOT NULL CHECK (status IN ('APPROVED', 'REVIEW')),
+            created_at TIMESTAMPTZ NOT NULL,
+            CONSTRAINT orders_status_matches_risk CHECK (
+                (risk_score >= 70 AND status = 'REVIEW') OR (risk_score < 70 AND status = 'APPROVED')
+            )
+        );
+        
+        CREATE INDEX orders_created_at_idx ON orders (created_at DESC, id DESC);
+        HEXFILE_20
+        COPY <<'HEXFILE_21' src/main/resources/static/index.html
+        <!doctype html>
+        <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>HexaOrders · Pedidos con criterio</title>
+          <style>
+            :root{color-scheme:dark;--bg:#101513;--surface:#18211d;--line:#34443a;--ink:#eaf2e8;--muted:#a8b8ac;--accent:#bbef80;--warn:#ffd58a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,sans-serif}main{max-width:1180px;margin:auto;padding:36px 30px 64px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:24px}.brand{font-weight:750;letter-spacing:-1px;font-size:25px}.brand span{color:var(--accent)}.eyebrow{color:var(--accent);font-size:12px;letter-spacing:2px;text-transform:uppercase}.connection{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:7px 12px;border-radius:30px}h1{font-size:clamp(34px,5vw,58px);letter-spacing:-2px;line-height:1.12;max-width:720px;margin:16px 0}p{color:var(--muted)}.intro{padding:38px 0 28px}.intro p{max-width:640px}.flow{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:24px}.flow span{border:1px solid var(--line);border-radius:6px;padding:6px 10px}.workspace{display:grid;grid-template-columns:340px 1fr;gap:24px}.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}h2{font-size:20px;letter-spacing:-.5px;margin:0 0 18px}label{display:block;color:var(--muted);font-size:12px;margin:18px 0 6px}input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;color:var(--ink);font:inherit}input:focus{outline:2px solid var(--accent);outline-offset:1px}button{font:inherit;cursor:pointer;border:0;border-radius:6px;font-weight:650;padding:12px 18px;background:var(--accent);color:#172013}button:disabled{opacity:.55;cursor:wait}.submit{width:100%;margin-top:22px}.small{font-size:12px;line-height:1.5}.samples{display:flex;gap:8px;margin-top:10px}.samples button,.refresh{background:transparent;color:var(--muted);border:1px solid var(--line);padding:6px 10px;font-size:12px}.table-top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.table-top h2{margin:0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th{text-align:left;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:500}th,td{padding:15px 12px 15px 0;border-bottom:1px solid var(--line)}td:last-child,th:last-child{text-align:right;padding-right:0}.pill{display:inline-block;padding:4px 8px;border-radius:5px;font-size:10px;font-weight:750;letter-spacing:.4px;background:#263d28;color:var(--accent)}.pill.review{background:#493b24;color:var(--warn)}.id{font:10px ui-monospace,monospace;color:var(--muted);display:block}.score{font-family:ui-monospace,monospace}.empty{color:var(--muted);text-align:center!important;padding:50px 0}.notice{margin-top:18px;padding:12px;border:1px solid var(--line);border-radius:6px;font-size:13px;overflow-wrap:anywhere}.notice.error{color:var(--warn);border-color:#796440}.notice.success{color:var(--accent)}details{margin-top:24px;color:var(--muted);font-size:12px}summary{cursor:pointer}pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:16px;border-radius:6px;font:11px/1.6 ui-monospace,monospace}footer{margin-top:32px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12px;display:flex;gap:18px;justify-content:space-between}a{color:var(--accent)}@media(max-width:850px){.workspace{grid-template-columns:1fr}main{padding:22px 18px}.card{padding:20px}footer{flex-direction:column}h1{letter-spacing:-1px}}
+          </style>
+        </head>
+        <body>
+        <main>
+          <header><div class="brand">⬡ Hexa<span>Orders</span></div><div class="connection" id="connection" role="status">Conectando con la API…</div></header>
+          <section class="intro"><div class="eyebrow">Laboratorio de arquitectura hexagonal</div><h1>Cada pedido.<br>Una decisión con criterio.</h1><p>Crea un pedido y observa cómo Java consulta el motor de riesgo en Python, aplica las reglas del negocio y guarda el resultado en PostgreSQL.</p><div class="flow" aria-label="Flujo de un pedido"><span>01 · REST / Java</span>→<span>02 · Riesgo / Python</span>→<span>03 · Dominio</span>→<span>04 · PostgreSQL</span></div></section>
+          <div class="workspace">
+            <section class="card"><h2>Nuevo pedido</h2><form id="order-form"><label for="customer">Identificador del cliente</label><input id="customer" name="customerId" value="cliente_demo" required maxlength="64" pattern="[A-Za-z0-9_-]{1,64}" autocomplete="off"><label for="amount">Importe en USD</label><input id="amount" name="amount" type="number" value="125.50" min="0.01" max="1000000" step="0.01" required><div class="samples"><button type="button" data-amount="25.00">USD 25</button><button type="button" data-amount="95000.00">USD 95 000</button></div><button id="submit" class="submit" type="submit">Evaluar y crear pedido ↗</button><p class="small">Un puntaje desde 70 requiere revisión. Los importes se procesan con precisión decimal y nunca se redondean.</p></form><div id="notice" class="notice" role="status" hidden></div><details><summary>Ver última respuesta de la API</summary><pre id="response">Todavía no hay una respuesta.</pre></details></section>
+            <section class="card"><div class="table-top"><h2>Últimos pedidos</h2><button type="button" id="refresh" class="refresh">Actualizar ↻</button></div><p class="small" id="count">Se muestran hasta 50 pedidos, del más reciente al más antiguo.</p><div class="scroll"><table><thead><tr><th>Cliente / pedido</th><th>Importe</th><th>Riesgo</th><th>Decisión</th></tr></thead><tbody id="orders"><tr><td colspan="4" class="empty">Cargando pedidos…</td></tr></tbody></table></div></section>
+          </div>
+          <footer><span>Java 21 · Python · PostgreSQL · Docker Compose</span><span>Reglas independientes de frameworks. Dependencias hacia el dominio.</span></footer>
+        </main>
+        <script>
+          const byId = id => document.getElementById(id);
+          const money = new Intl.NumberFormat('es-PE', {style:'currency',currency:'USD'});
+          const appendCell = (row, value, className) => { const cell = document.createElement('td'); cell.textContent = value; if(className) cell.className = className; row.appendChild(cell); return cell; };
+          async function readResponse(response){ let body;try{body=await response.json();}catch{throw new Error('La API devolvió una respuesta no válida.');} if(!response.ok) throw new Error(body.detail || 'No se pudo completar la operación.');return body; }
+          async function loadOrders(){
+            try{
+              const orders=await readResponse(await fetch('/api/orders',{cache:'no-store'}));
+              byId('orders').replaceChildren();
+              for(const order of orders){
+                const row=document.createElement('tr'); const client=appendCell(row,order.customerId); const id=document.createElement('span');id.className='id';id.textContent=order.id;client.appendChild(id);
+                appendCell(row,money.format(order.amount));appendCell(row,order.riskScore+' / 100','score');
+                const statusCell=appendCell(row,'');const pill=document.createElement('span');pill.className='pill'+(order.status==='REVIEW'?' review':'');pill.textContent=order.status==='REVIEW'?'REVISIÓN':'APROBADO';statusCell.appendChild(pill);byId('orders').appendChild(row);
+              }
+              if(!orders.length){const row=document.createElement('tr');const cell=appendCell(row,'Tu primer pedido empieza aquí.','empty');cell.colSpan=4;byId('orders').appendChild(row);}
+              byId('connection').textContent='● API conectada';byId('count').textContent=orders.length+' pedidos visibles · máximo 50 · datos persistidos';
+            }catch(error){byId('connection').textContent='● API no disponible';const row=document.createElement('tr');const cell=appendCell(row,error.message,'empty');cell.colSpan=4;byId('orders').replaceChildren(row);}
+          }
+          byId('order-form').addEventListener('submit',async event=>{
+            event.preventDefault();const button=byId('submit');button.disabled=true;button.textContent='Evaluando riesgo…';byId('notice').hidden=true;
+            try{
+              const body=await readResponse(await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerId:byId('customer').value,amount:Number(byId('amount').value),currency:'USD'})}));
+              byId('response').textContent=JSON.stringify(body,null,2);byId('notice').className='notice success';byId('notice').textContent='Pedido creado · '+(body.status==='REVIEW'?'requiere revisión':'aprobado')+' · riesgo '+body.riskScore+'/100';await loadOrders();
+            }catch(error){byId('notice').className='notice error';byId('notice').textContent=error.message;byId('response').textContent=error.message;}
+            finally{byId('notice').hidden=false;button.disabled=false;button.textContent='Evaluar y crear pedido ↗';}
+          });
+          document.querySelectorAll('[data-amount]').forEach(button=>button.addEventListener('click',()=>byId('amount').value=button.dataset.amount));
+          byId('refresh').addEventListener('click',loadOrders);loadOrders();
+        </script>
+        </body>
+        </html>
+        HEXFILE_21
+        COPY <<'HEXFILE_22' src/test/java/com/hexaorders/adapter/HttpRiskAssessmentAdapterTest.java
+        package com.hexaorders.adapter;
+        
+        import static org.assertj.core.api.Assertions.assertThat;
+        import static org.assertj.core.api.Assertions.assertThatThrownBy;
+        import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+        import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+        import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+        import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+        import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+        
+        import com.hexaorders.adapter.out.http.HttpRiskAssessmentAdapter;
+        import com.hexaorders.application.exception.RiskUnavailableException;
+        import com.hexaorders.domain.OrderDraft;
+        import java.math.BigDecimal;
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.springframework.http.HttpMethod;
+        import org.springframework.http.MediaType;
+        import org.springframework.test.web.client.MockRestServiceServer;
+        import org.springframework.web.client.RestClient;
+        
+        class HttpRiskAssessmentAdapterTest {
+            private MockRestServiceServer server;
+            private HttpRiskAssessmentAdapter adapter;
+            private final OrderDraft draft = new OrderDraft("cliente_1", new BigDecimal("125.50"), "USD");
+        
+            @BeforeEach
+            void setup() {
+                RestClient.Builder builder = RestClient.builder().baseUrl("http://risk-engine:8000");
+                server = MockRestServiceServer.bindTo(builder).build();
+                adapter = new HttpRiskAssessmentAdapter(builder.build());
+            }
+        
+            @Test
+            void translatesPortRequestToPythonJsonAndUsesScore() {
+                server.expect(requestTo("http://risk-engine:8000/score"))
+                        .andExpect(method(HttpMethod.POST))
+                        .andExpect(content().json("{\"customerId\":\"cliente_1\",\"amount\":125.50}"))
+                        .andRespond(withSuccess("{\"score\":70,\"decision\":\"APPROVED\"}", MediaType.APPLICATION_JSON));
+                assertThat(adapter.assess(draft)).isEqualTo(70);
+                server.verify();
+            }
+        
+            @Test
+            void mapsUpstreamErrorsToApplicationFailure() {
+                server.expect(requestTo("http://risk-engine:8000/score")).andRespond(withServerError());
+                assertThatThrownBy(() -> adapter.assess(draft)).isInstanceOf(RiskUnavailableException.class);
+            }
+        
+            @Test
+            void rejectsInvalidUpstreamContract() {
+                server.expect(requestTo("http://risk-engine:8000/score"))
+                        .andRespond(withSuccess("{\"score\":101,\"decision\":\"REVIEW\"}", MediaType.APPLICATION_JSON));
+                assertThatThrownBy(() -> adapter.assess(draft)).isInstanceOf(RiskUnavailableException.class);
+            }
+        }
+        HEXFILE_22
+        COPY <<'HEXFILE_23' src/test/java/com/hexaorders/adapter/OrderControllerTest.java
+        package com.hexaorders.adapter;
+        
+        import static org.mockito.ArgumentMatchers.any;
+        import static org.mockito.Mockito.mock;
+        import static org.mockito.Mockito.when;
+        import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+        import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+        import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+        import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+        import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+        
+        import com.hexaorders.adapter.in.web.ApiExceptionHandler;
+        import com.hexaorders.adapter.in.web.OrderController;
+        import com.hexaorders.application.exception.OrderNotFoundException;
+        import com.hexaorders.application.exception.RiskUnavailableException;
+        import com.hexaorders.application.port.in.OrderUseCases;
+        import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderDraft;
+        import java.math.BigDecimal;
+        import java.time.Instant;
+        import java.util.UUID;
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.springframework.http.MediaType;
+        import org.springframework.test.web.servlet.MockMvc;
+        import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+        
+        class OrderControllerTest {
+            private final OrderUseCases useCases = mock(OrderUseCases.class);
+            private MockMvc http;
+        
+            @BeforeEach
+            void setup() {
+                http = MockMvcBuilders.standaloneSetup(new OrderController(useCases))
+                        .setControllerAdvice(new ApiExceptionHandler()).build();
+            }
+        
+            @Test
+            void createsOrderWithLocationHeader() throws Exception {
+                UUID id = UUID.randomUUID();
+                when(useCases.create(any())).thenReturn(Order.create(
+                        new OrderDraft("demo", new BigDecimal("10.00"), "USD"), 20, id, Instant.now()));
+                http.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"customerId\":\"demo\",\"amount\":10.00}"))
+                        .andExpect(status().isCreated()).andExpect(header().string("Location", "/api/orders/" + id))
+                        .andExpect(jsonPath("$$.status").value("APPROVED"));
+            }
+        
+            @Test
+            void rejectsAmountsWithThreeDecimals() throws Exception {
+                http.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"customerId\":\"demo\",\"amount\":10.001}"))
+                        .andExpect(status().isBadRequest());
+            }
+        
+            @Test
+            void unavailableRiskReturns503() throws Exception {
+                when(useCases.create(any())).thenThrow(new RiskUnavailableException("timeout"));
+                http.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"customerId\":\"demo\",\"amount\":10.00}"))
+                        .andExpect(status().isServiceUnavailable());
+            }
+        
+            @Test
+            void missingOrderReturns404AndMalformedIdReturns400() throws Exception {
+                UUID id = UUID.randomUUID();
+                when(useCases.get(id)).thenThrow(new OrderNotFoundException(id));
+                http.perform(get("/api/orders/" + id)).andExpect(status().isNotFound());
+                http.perform(get("/api/orders/not-a-uuid")).andExpect(status().isBadRequest());
+            }
+        }
+        HEXFILE_23
+        COPY <<'HEXFILE_24' src/test/java/com/hexaorders/application/OrderServiceTest.java
+        package com.hexaorders.application;
+        
+        import static org.assertj.core.api.Assertions.assertThat;
+        import static org.assertj.core.api.Assertions.assertThatThrownBy;
+        import static org.mockito.ArgumentMatchers.any;
+        import static org.mockito.Mockito.doThrow;
+        import static org.mockito.Mockito.inOrder;
+        import static org.mockito.Mockito.mock;
+        import static org.mockito.Mockito.verify;
+        import static org.mockito.Mockito.verifyNoInteractions;
+        import static org.mockito.Mockito.when;
+        
+        import com.hexaorders.application.exception.OrderNotFoundException;
+        import com.hexaorders.application.exception.PersistenceUnavailableException;
+        import com.hexaorders.application.exception.RiskUnavailableException;
+        import com.hexaorders.application.port.out.OrderRepository;
+        import com.hexaorders.application.port.out.OrderTelemetry;
+        import com.hexaorders.application.port.out.RiskAssessmentPort;
+        import com.hexaorders.application.service.OrderService;
+        import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderDraft;
+        import com.hexaorders.domain.OrderStatus;
+        import java.math.BigDecimal;
+        import java.time.Clock;
+        import java.time.Instant;
+        import java.time.ZoneOffset;
+        import java.util.Optional;
+        import java.util.UUID;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InOrder;
+        
+        class OrderServiceTest {
+            private final OrderRepository repository = mock(OrderRepository.class);
+            private final RiskAssessmentPort risk = mock(RiskAssessmentPort.class);
+            private final OrderTelemetry telemetry = mock(OrderTelemetry.class);
+            private final Instant now = Instant.parse("2026-01-01T12:00:00Z");
+            private final OrderService service = new OrderService(repository, risk, telemetry, Clock.fixed(now, ZoneOffset.UTC));
+            private final OrderDraft draft = new OrderDraft("cliente_1", new BigDecimal("125.50"), "USD");
+        
+            @Test
+            void assessesRiskBeforePersistenceAndCountsOnlyPersistedOrders() {
+                when(risk.assess(draft)).thenReturn(70);
+                Order order = service.create(draft);
+                assertThat(order.status()).isEqualTo(OrderStatus.REVIEW);
+                assertThat(order.createdAt()).isEqualTo(now);
+                InOrder orderOfCalls = inOrder(risk, repository, telemetry);
+                orderOfCalls.verify(risk).assess(draft);
+                orderOfCalls.verify(repository).save(order);
+                orderOfCalls.verify(telemetry).orderCreated(OrderStatus.REVIEW);
+            }
+        
+            @Test
+            void neverPersistsWhenRiskEngineIsUnavailable() {
+                when(risk.assess(draft)).thenThrow(new RiskUnavailableException("timeout"));
+                assertThatThrownBy(() -> service.create(draft)).isInstanceOf(RiskUnavailableException.class);
+                verifyNoInteractions(repository);
+                verify(telemetry).riskFailure();
+            }
+        
+            @Test
+            void guardsAgainstInvalidAdapterScores() {
+                when(risk.assess(draft)).thenReturn(101);
+                assertThatThrownBy(() -> service.create(draft)).isInstanceOf(RiskUnavailableException.class);
+                verifyNoInteractions(repository);
+                verify(telemetry).riskFailure();
+            }
+        
+            @Test
+            void neverCountsUncommittedOrderAsCreated() {
+                when(risk.assess(draft)).thenReturn(20);
+                doThrow(new PersistenceUnavailableException(new RuntimeException("db offline"))).when(repository).save(any());
+                assertThatThrownBy(() -> service.create(draft)).isInstanceOf(PersistenceUnavailableException.class);
+                verifyNoInteractions(telemetry);
+            }
+        
+            @Test
+            void missingOrderHasAnExplicitApplicationError() {
+                UUID id = UUID.randomUUID();
+                when(repository.findById(id)).thenReturn(Optional.empty());
+                assertThatThrownBy(() -> service.get(id)).isInstanceOf(OrderNotFoundException.class);
+            }
+        
+            @Test
+            void limitsListToFiftyOrders() {
+                service.latest();
+                verify(repository).latest(50);
+            }
+        }
+        HEXFILE_24
+        COPY <<'HEXFILE_25' src/test/java/com/hexaorders/architecture/HexagonalArchitectureTest.java
+        package com.hexaorders.architecture;
+        
+        import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+        
+        import com.tngtech.archunit.core.importer.ImportOption;
+        import com.tngtech.archunit.junit.AnalyzeClasses;
+        import com.tngtech.archunit.junit.ArchTest;
+        import com.tngtech.archunit.lang.ArchRule;
+        
+        @AnalyzeClasses(packages = "com.hexaorders", importOptions = ImportOption.DoNotIncludeTests.class)
+        class HexagonalArchitectureTest {
+            @ArchTest
+            static final ArchRule CORE_HAS_NO_FRAMEWORK_OR_INFRASTRUCTURE = noClasses()
+                    .that().resideInAnyPackage("..domain..", "..application..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "org.springframework..", "jakarta..", "javax.sql..", "java.sql..",
+                            "com.fasterxml..", "io.micrometer..", "com.zaxxer..", "..adapter..", "..config..");
+        
+            @ArchTest
+            static final ArchRule DOMAIN_IS_INNERMOST = noClasses().that().resideInAPackage("..domain..")
+                    .should().dependOnClassesThat().resideInAnyPackage("..application..", "..adapter..", "..config..");
+        
+            @ArchTest
+            static final ArchRule ADAPTERS_ARE_INDEPENDENT = noClasses().that().resideInAPackage("..adapter.in..")
+                    .should().dependOnClassesThat().resideInAPackage("..adapter.out..");
+        }
+        HEXFILE_25
+        COPY <<'HEXFILE_26' src/test/java/com/hexaorders/domain/OrderDomainTest.java
+        package com.hexaorders.domain;
+        
+        import static org.assertj.core.api.Assertions.assertThat;
+        import static org.assertj.core.api.Assertions.assertThatThrownBy;
+        
+        import java.math.BigDecimal;
+        import java.time.Instant;
+        import java.util.UUID;
+        import org.junit.jupiter.api.Test;
+        import org.junit.jupiter.params.ParameterizedTest;
+        import org.junit.jupiter.params.provider.ValueSource;
+        
+        class OrderDomainTest {
+            @Test
+            void riskThresholdIsOwnedByDomain() {
+                assertThat(OrderStatus.fromRiskScore(0)).isEqualTo(OrderStatus.APPROVED);
+                assertThat(OrderStatus.fromRiskScore(69)).isEqualTo(OrderStatus.APPROVED);
+                assertThat(OrderStatus.fromRiskScore(70)).isEqualTo(OrderStatus.REVIEW);
+                assertThat(OrderStatus.fromRiskScore(100)).isEqualTo(OrderStatus.REVIEW);
+            }
+        
+            @ParameterizedTest
+            @ValueSource(ints = {-1, 101})
+            void rejectsInvalidRiskScore(int score) {
+                assertThatThrownBy(() -> OrderStatus.fromRiskScore(score)).isInstanceOf(IllegalArgumentException.class);
+            }
+        
+            @ParameterizedTest
+            @ValueSource(strings = {"0", "-0.01", "1000000.01", "1.001", "1.000"})
+            void rejectsInvalidAmountsWithoutRounding(String amount) {
+                assertThatThrownBy(() -> new OrderDraft("customer_1", new BigDecimal(amount), "USD"))
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+        
+            @Test
+            void preservesDecimalMoneyAndUpperBoundary() {
+                assertThat(new OrderDraft("customer_1", new BigDecimal("0.10"), "USD").amount())
+                        .isEqualByComparingTo("0.10");
+                assertThat(new OrderDraft("customer_1", new BigDecimal("1000000"), "USD").amount())
+                        .isEqualTo(new BigDecimal("1000000.00"));
+            }
+        
+            @ParameterizedTest
+            @ValueSource(strings = {"", "a b", "a.b", "<script>", "cliente/1", "ñ"})
+            void rejectsUnsafeCustomerIdentifiers(String customerId) {
+                assertThatThrownBy(() -> new OrderDraft(customerId, BigDecimal.ONE, "USD"))
+                        .isInstanceOf(IllegalArgumentException.class);
+            }
+        
+            @Test
+            void rejectsUnsupportedCurrencyAndContradictoryStatus() {
+                assertThatThrownBy(() -> new OrderDraft("demo", BigDecimal.ONE, "PEN"))
+                        .isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> new Order(UUID.randomUUID(), "demo", BigDecimal.ONE, "USD", 80,
+                        OrderStatus.APPROVED, Instant.now())).isInstanceOf(IllegalArgumentException.class);
+            }
+        }
+        HEXFILE_26
+        RUN mvn -B -ntp verify
+        
+        FROM eclipse-temurin:21-jre-jammy AS runtime
+        RUN apt-get update && apt-get install -y --no-install-recommends curl \
+            && rm -rf /var/lib/apt/lists/* \
+            && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+        WORKDIR /app
+        COPY --from=build --chown=10001:10001 /build/target/order-api.jar ./order-api.jar
+        USER 10001:10001
+        EXPOSE 8080 9090
+        ENTRYPOINT ["java", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/order-api.jar"]
+    environment:
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_NAME: orders
+      DB_USER: orders
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      RISK_BASE_URL: http://risk-engine:8000
+      JAVA_TOOL_OPTIONS: '-XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError'
+    secrets: [db_password]
+    depends_on:
+      db:
+        condition: service_healthy
+      risk-engine:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:8080:8080'
+    networks: [edge, data, compute, telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    cpus: 1.0
+    stop_grace_period: 35s
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, '3', http://127.0.0.1:9090/actuator/health/readiness]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 40s
+
+  # 4. Pull de métricas; no forma parte del núcleo ni del camino del pedido.
+  prometheus:
+    <<: *runtime
+    image: prom/prometheus:v3.5.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=1GB
+      - --web.enable-lifecycle=false
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: prometheus_alerts
+        target: /etc/prometheus/alerts.yml
+    volumes:
+      - prometheus_data:/prometheus
+    ports:
+      - '127.0.0.1:9091:9090'
+    networks: [edge, telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:9090/-/ready]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  # 5. Datasource y dashboard provisionados: cero configuración manual en la demo.
+  grafana:
+    <<: *runtime
+    image: grafana/grafana:12.4.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_NEWS_NEWS_FEED_ENABLED: 'false'
+    secrets: [grafana_password]
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yml
+      - source: grafana_provider
+        target: /etc/grafana/provisioning/dashboards/default.yml
+      - source: grafana_dashboard
+        target: /var/lib/grafana/dashboards/hexaorders.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:3000:3000'
+    networks: [edge, telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:3000/api/health]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+# IPs variables; descubrimiento por nombre de servicio, nunca localhost entre servicios.
+networks:
+  edge: {}
+  data:
+    internal: true
+  compute:
+    internal: true
+  telemetry:
+    internal: true
+
+# `down` conserva estos volúmenes; `down -v` elimina los datos.
+volumes:
+  postgres_data: {}
+  prometheus_data: {}
+  grafana_data: {}
+
+# Los valores se proporcionan al desplegar, nunca se incrustan en el entregable.
+# Compose local monta archivos: no equivale al almacén cifrado de secretos de Swarm.
+secrets:
+  db_password:
+    environment: DB_PASSWORD
+  grafana_password:
+    environment: GRAFANA_PASSWORD
+
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 10s
+        evaluation_interval: 10s
+        external_labels:
+          project: hexaorders
+      rule_files:
+        - /etc/prometheus/alerts.yml
+      scrape_configs:
+        - job_name: order-api
+          metrics_path: /actuator/prometheus
+          static_configs:
+            - targets: [order-api:9090]
+        - job_name: risk-engine
+          metrics_path: /metrics
+          static_configs:
+            - targets: [risk-engine:8000]
+        - job_name: prometheus
+          static_configs:
+            - targets: [localhost:9090]
+  prometheus_alerts:
+    content: |
+      groups:
+        - name: hexaorders
+          rules:
+            - alert: HexaOrdersServiceDown
+              expr: up{job=~"order-api|risk-engine"} == 0
+              for: 30s
+              labels:
+                severity: critical
+              annotations:
+                summary: 'Servicio {{ $$labels.job }} sin respuesta'
+                description: 'Prometheus no puede recopilar métricas durante al menos 30 segundos.'
+            - alert: RiskRequestsFailing
+              expr: increase(orders_risk_failures_total[2m]) > 0
+              for: 10s
+              labels:
+                severity: warning
+              annotations:
+                summary: 'Falló una evaluación de riesgo'
+                description: 'Revisar risk-engine y los tiempos de espera HTTP de order-api.'
+  grafana_datasource:
+    content: |
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          uid: prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus:9090
+          isDefault: true
+          editable: false
+          jsonData:
+            timeInterval: 10s
+  grafana_provider:
+    content: |
+      apiVersion: 1
+      providers:
+        - name: HexaOrders
+          orgId: 1
+          folder: HexaOrders
+          type: file
+          disableDeletion: true
+          editable: false
+          options:
+            path: /var/lib/grafana/dashboards
+  grafana_dashboard:
+    content: |
+      {
+        "id": null,
+        "uid": "hexaorders",
+        "title": "HexaOrders · Puertos, adaptadores y métricas",
+        "tags": ["hexagonal", "java", "python"],
+        "timezone": "browser",
+        "schemaVersion": 39,
+        "version": 1,
+        "refresh": "10s",
+        "time": {"from": "now-15m", "to": "now"},
+        "panels": [
+          {
+            "id": 1, "title": "Servicios disponibles (1 = UP)", "type": "stat",
+            "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "up{job=~\"order-api|risk-engine\"}", "legendFormat": "{{job}}", "instant": true}],
+            "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+            "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+          },
+          {
+            "id": 2, "title": "Pedidos creados desde el arranque de Java", "type": "stat",
+            "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "sum(orders_created_total) or vector(0)", "instant": true}],
+            "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+            "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+          },
+          {
+            "id": 3, "title": "Fallos de riesgo desde el arranque de Java", "type": "stat",
+            "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "sum(orders_risk_failures_total) or vector(0)", "instant": true}],
+            "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+            "options": {"colorMode": "value", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+          },
+          {
+            "id": 4, "title": "Pedidos por estado / segundo", "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "sum by(status)(rate(orders_created_total[2m]))", "legendFormat": "{{status}}"}],
+            "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
+          },
+          {
+            "id": 5, "title": "Evaluaciones de riesgo / segundo", "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "sum by(decision)(rate(risk_evaluations_total[2m]))", "legendFormat": "{{decision}}"}],
+            "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
+          },
+          {
+            "id": 6, "title": "Latencia p95 API de pedidos", "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(http_server_requests_seconds_bucket{uri=~\"/api/orders.*\"}[2m])))", "legendFormat": "p95 REST"}],
+            "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+          },
+          {
+            "id": 7, "title": "Latencia p95 evaluación de riesgo Python", "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))", "legendFormat": "p95 riesgo"}],
+            "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+          }
+        ],
+        "annotations": {"list": []}
+      }

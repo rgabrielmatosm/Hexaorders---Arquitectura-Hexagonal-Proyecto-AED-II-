@@ -1,0 +1,57 @@
+package com.hexaorders.application.service;
+
+import com.hexaorders.application.exception.OrderNotFoundException;
+import com.hexaorders.application.exception.RiskUnavailableException;
+import com.hexaorders.application.port.in.OrderUseCases;
+import com.hexaorders.application.port.out.OrderRepository;
+import com.hexaorders.application.port.out.OrderTelemetry;
+import com.hexaorders.application.port.out.RiskAssessmentPort;
+import com.hexaorders.domain.Order;
+import com.hexaorders.domain.OrderDraft;
+import java.time.Clock;
+import java.util.List;
+import java.util.UUID;
+
+/** Plain Java orchestration: risk first; one atomic INSERT afterwards. */
+public final class OrderService implements OrderUseCases {
+    private final OrderRepository repository;
+    private final RiskAssessmentPort riskAssessment;
+    private final OrderTelemetry telemetry;
+    private final Clock clock;
+
+    public OrderService(OrderRepository repository, RiskAssessmentPort riskAssessment,
+                        OrderTelemetry telemetry, Clock clock) {
+        this.repository = repository;
+        this.riskAssessment = riskAssessment;
+        this.telemetry = telemetry;
+        this.clock = clock;
+    }
+
+    @Override
+    public Order create(OrderDraft draft) {
+        int score;
+        try {
+            score = riskAssessment.assess(draft);
+            if (score < 0 || score > 100) {
+                throw new RiskUnavailableException("El motor de riesgo devolvió un puntaje inválido");
+            }
+        } catch (RiskUnavailableException error) {
+            telemetry.riskFailure();
+            throw error;
+        }
+        Order order = Order.create(draft, score, UUID.randomUUID(), clock.instant());
+        repository.save(order);
+        telemetry.orderCreated(order.status());
+        return order;
+    }
+
+    @Override
+    public Order get(UUID id) {
+        return repository.findById(id).orElseThrow(() -> new OrderNotFoundException(id));
+    }
+
+    @Override
+    public List<Order> latest() {
+        return repository.latest(50);
+    }
+}

@@ -1,0 +1,19 @@
+# Guion verbal: HexaOrders
+
+Duración orientativa: 3 a 4 minutos a unas 140 palabras por minuto. Las referencias al final son material de respaldo; no hace falta leerlas durante la exposición.
+
+Buenos días. Presento HexaOrders, una aplicación que registra pedidos, calcula su riesgo y conserva la decisión en PostgreSQL. La implementé con Java, Python y Docker Compose. El objetivo es demostrar una arquitectura hexagonal mediante una regla que podemos comprobar: las decisiones del negocio permanecen independientes de los mecanismos que reciben, almacenan y transportan datos.
+
+La arquitectura hexagonal, también llamada puertos y adaptadores, fue descrita por Alistair Cockburn en 2005. Su propuesta distingue el interior de la aplicación de su exterior. El interior contiene las reglas del dominio y los casos de uso. El exterior contiene tecnologías como HTTP, una base de datos o un framework. El hexágono es una representación visual; no exige seis servicios ni seis capas. [Artículo original de Cockburn](https://alistair.cockburn.us/hexagonal-architecture).
+
+Un puerto expresa un contrato que la aplicación ofrece o necesita. Un adaptador conecta ese contrato con una tecnología concreta. En HexaOrders, el controlador REST es un adaptador de entrada: transforma una solicitud en la operación de crear un pedido. El caso de uso consulta el riesgo mediante un puerto de salida, cuya implementación llama al servicio Python. Otro puerto permite guardar el pedido y su resultado mediante un adaptador PostgreSQL. Las dependencias del código apuntan hacia los contratos del núcleo.
+
+El servicio Java utiliza Spring Boot para HTTP, configuración e integración. El servicio Python utiliza FastAPI para exponer reglas deterministas de riesgo: no estamos presentando esas reglas como inteligencia artificial. Ambos conservan sus decisiones de negocio separadas de sus adaptadores. La comunicación es síncrona y tiene un tiempo máximo de espera. Consultamos el riesgo antes de persistir, evitando mantener una transacción de base de datos abierta durante una llamada de red.
+
+Esta separación aporta tres ventajas: facilita probar reglas sin arrancar servidores, permite modificar integraciones con menor impacto y hace visibles las responsabilidades. Cambiar el servicio de riesgo implica desarrollar un adaptador compatible con su contrato. Tampoco debemos prometer un cambio de base de datos completamente gratuito: todavía hay que adaptar consultas, migraciones y comportamiento transaccional.
+
+Tiene costes: aparecen más interfaces, modelos y conversiones, y el equipo debe vigilar que los controladores o repositorios no absorban reglas de negocio. Para un CRUD muy pequeño puede resultar excesiva. Además, el patrón organiza dependencias; por sí solo no resuelve disponibilidad, seguridad ni fallos distribuidos.
+
+Hay antecedentes empresariales verificables. Netflix documentó en 2020 su uso en una aplicación de Studio Workflows para sustituir fuentes de datos durante la evolución de un monolito. En el blog de Allegro, un ingeniero también documentó su uso cotidiano y una implementación práctica. Son casos publicados por equipos concretos; no prueban que todas sus plataformas actuales usen el mismo patrón. [Netflix](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749), [Allegro](https://blog.allegro.tech/2020/05/hexagonal-architecture-by-example.html).
+
+Para la demostración, Docker Compose construye y conecta los servicios, conserva los datos en volúmenes y verifica su salud. Prometheus recopila métricas y Grafana permite observar solicitudes, latencia y decisiones. El YAML incorpora también las fuentes y configuraciones necesarias para entregar un único archivo ejecutable. Los manifiestos Kubernetes son una adaptación adicional. La evidencia principal será crear pedidos, observar sus decisiones y explicar por qué las reglas del núcleo no dependen de PostgreSQL, HTTP o Grafana.
