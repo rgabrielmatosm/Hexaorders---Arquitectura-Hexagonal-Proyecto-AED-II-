@@ -1,0 +1,7 @@
+# Fuentes y entregables generados siempre con LF: tools/generate_delivery.py --check
+# compara byte a byte y debe dar el mismo resultado en Windows, Linux y macOS.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary
