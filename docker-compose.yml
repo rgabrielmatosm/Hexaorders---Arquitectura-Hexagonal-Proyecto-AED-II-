@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 2013738f8e6ff32baef724c5317bb5c8728519d33ca90139b933996e3fe427b1
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 3030c76c938d77562b6f5a64e1033c2543ed691395dca9ca6a86562983494b8a
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -1649,18 +1649,63 @@ services:
   # 4. Pull de métricas; no forma parte del núcleo ni del camino del pedido.
   prometheus:
     <<: *runtime
-    image: prom/prometheus:v3.5.1
+    image: hexaorders/prometheus:1.0.0
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        # Imagen de configuración: la configuración queda dentro de la imagen para que el
+        # contenedor funcione con read_only: true (Compose no puede inyectar configs.content
+        # en servicios de solo lectura). generate_delivery.py la incorpora inline.
+        FROM prom/prometheus:v3.5.1
+        COPY <<'HEXFILE_0' /etc/prometheus/prometheus.yml
+        global:
+          scrape_interval: 10s
+          evaluation_interval: 10s
+          external_labels:
+            project: hexaorders
+        rule_files:
+          - /etc/prometheus/alerts.yml
+        scrape_configs:
+          - job_name: order-api
+            metrics_path: /actuator/prometheus
+            static_configs:
+              - targets: [order-api:9090]
+          - job_name: risk-engine
+            metrics_path: /metrics
+            static_configs:
+              - targets: [risk-engine:8000]
+          - job_name: prometheus
+            static_configs:
+              - targets: [localhost:9090]
+        HEXFILE_0
+        COPY <<'HEXFILE_1' /etc/prometheus/alerts.yml
+        groups:
+          - name: hexaorders
+            rules:
+              - alert: HexaOrdersServiceDown
+                expr: up{job=~"order-api|risk-engine"} == 0
+                for: 30s
+                labels:
+                  severity: critical
+                annotations:
+                  summary: 'Servicio {{ $$labels.job }} sin respuesta'
+                  description: 'Prometheus no puede recopilar métricas durante al menos 30 segundos.'
+              - alert: RiskRequestsFailing
+                expr: increase(orders_risk_failures_total[2m]) > 0
+                for: 10s
+                labels:
+                  severity: warning
+                annotations:
+                  summary: 'Falló una evaluación de riesgo'
+                  description: 'Revisar risk-engine y los tiempos de espera HTTP de order-api.'
+        HEXFILE_1
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --storage.tsdb.retention.size=1GB
       - --web.enable-lifecycle=false
-    configs:
-      - source: prometheus_config
-        target: /etc/prometheus/prometheus.yml
-      - source: prometheus_alerts
-        target: /etc/prometheus/alerts.yml
     volumes:
       - prometheus_data:/prometheus
     ports:
@@ -1681,7 +1726,108 @@ services:
   # 5. Datasource y dashboard provisionados: cero configuración manual en la demo.
   grafana:
     <<: *runtime
-    image: grafana/grafana:12.4.1
+    image: hexaorders/grafana:1.0.0
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        # Imagen de configuración: datasource, proveedor y dashboard dentro de la imagen para
+        # funcionar con read_only: true. El dashboard vive fuera de /var/lib/grafana (volumen
+        # de datos) para que una nueva versión de la imagen nunca quede tapada por el volumen.
+        FROM grafana/grafana:12.4.1
+        COPY <<'HEXFILE_0' /etc/grafana/provisioning/datasources/prometheus.yml
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            uid: prometheus
+            type: prometheus
+            access: proxy
+            url: http://prometheus:9090
+            isDefault: true
+            editable: false
+            jsonData:
+              timeInterval: 10s
+        HEXFILE_0
+        COPY <<'HEXFILE_1' /etc/grafana/provisioning/dashboards/default.yml
+        apiVersion: 1
+        providers:
+          - name: HexaOrders
+            orgId: 1
+            folder: HexaOrders
+            type: file
+            disableDeletion: true
+            editable: false
+            options:
+              path: /etc/grafana/dashboards
+        HEXFILE_1
+        COPY <<'HEXFILE_2' /etc/grafana/dashboards/hexaorders.json
+        {
+          "id": null,
+          "uid": "hexaorders",
+          "title": "HexaOrders · Puertos, adaptadores y métricas",
+          "tags": ["hexagonal", "java", "python"],
+          "timezone": "browser",
+          "schemaVersion": 39,
+          "version": 1,
+          "refresh": "10s",
+          "time": {"from": "now-15m", "to": "now"},
+          "panels": [
+            {
+              "id": 1, "title": "Servicios disponibles (1 = UP)", "type": "stat",
+              "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "up{job=~\"order-api|risk-engine\"}", "legendFormat": "{{job}}", "instant": true}],
+              "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+              "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+            },
+            {
+              "id": 2, "title": "Pedidos creados desde el arranque de Java", "type": "stat",
+              "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum(orders_created_total) or vector(0)", "instant": true}],
+              "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+              "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+            },
+            {
+              "id": 3, "title": "Fallos de riesgo desde el arranque de Java", "type": "stat",
+              "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum(orders_risk_failures_total) or vector(0)", "instant": true}],
+              "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+              "options": {"colorMode": "value", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+            },
+            {
+              "id": 4, "title": "Pedidos por estado / segundo", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum by(status)(rate(orders_created_total[2m]))", "legendFormat": "{{status}}"}],
+              "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 5, "title": "Evaluaciones de riesgo / segundo", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum by(decision)(rate(risk_evaluations_total[2m]))", "legendFormat": "{{decision}}"}],
+              "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 6, "title": "Latencia p95 API de pedidos", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(http_server_requests_seconds_bucket{uri=~\"/api/orders.*\"}[2m])))", "legendFormat": "p95 REST"}],
+              "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 7, "title": "Latencia p95 evaluación de riesgo Python", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))", "legendFormat": "p95 riesgo"}],
+              "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+            }
+          ],
+          "annotations": {"list": []}
+        }
+        HEXFILE_2
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
@@ -1691,13 +1837,6 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
       GF_NEWS_NEWS_FEED_ENABLED: 'false'
     secrets: [grafana_password]
-    configs:
-      - source: grafana_datasource
-        target: /etc/grafana/provisioning/datasources/prometheus.yml
-      - source: grafana_provider
-        target: /etc/grafana/provisioning/dashboards/default.yml
-      - source: grafana_dashboard
-        target: /var/lib/grafana/dashboards/hexaorders.json
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
@@ -1742,140 +1881,3 @@ secrets:
     environment: DB_PASSWORD
   grafana_password:
     environment: GRAFANA_PASSWORD
-
-configs:
-  prometheus_config:
-    content: |
-      global:
-        scrape_interval: 10s
-        evaluation_interval: 10s
-        external_labels:
-          project: hexaorders
-      rule_files:
-        - /etc/prometheus/alerts.yml
-      scrape_configs:
-        - job_name: order-api
-          metrics_path: /actuator/prometheus
-          static_configs:
-            - targets: [order-api:9090]
-        - job_name: risk-engine
-          metrics_path: /metrics
-          static_configs:
-            - targets: [risk-engine:8000]
-        - job_name: prometheus
-          static_configs:
-            - targets: [localhost:9090]
-  prometheus_alerts:
-    content: |
-      groups:
-        - name: hexaorders
-          rules:
-            - alert: HexaOrdersServiceDown
-              expr: up{job=~"order-api|risk-engine"} == 0
-              for: 30s
-              labels:
-                severity: critical
-              annotations:
-                summary: 'Servicio {{ $$labels.job }} sin respuesta'
-                description: 'Prometheus no puede recopilar métricas durante al menos 30 segundos.'
-            - alert: RiskRequestsFailing
-              expr: increase(orders_risk_failures_total[2m]) > 0
-              for: 10s
-              labels:
-                severity: warning
-              annotations:
-                summary: 'Falló una evaluación de riesgo'
-                description: 'Revisar risk-engine y los tiempos de espera HTTP de order-api.'
-  grafana_datasource:
-    content: |
-      apiVersion: 1
-      datasources:
-        - name: Prometheus
-          uid: prometheus
-          type: prometheus
-          access: proxy
-          url: http://prometheus:9090
-          isDefault: true
-          editable: false
-          jsonData:
-            timeInterval: 10s
-  grafana_provider:
-    content: |
-      apiVersion: 1
-      providers:
-        - name: HexaOrders
-          orgId: 1
-          folder: HexaOrders
-          type: file
-          disableDeletion: true
-          editable: false
-          options:
-            path: /var/lib/grafana/dashboards
-  grafana_dashboard:
-    content: |
-      {
-        "id": null,
-        "uid": "hexaorders",
-        "title": "HexaOrders · Puertos, adaptadores y métricas",
-        "tags": ["hexagonal", "java", "python"],
-        "timezone": "browser",
-        "schemaVersion": 39,
-        "version": 1,
-        "refresh": "10s",
-        "time": {"from": "now-15m", "to": "now"},
-        "panels": [
-          {
-            "id": 1, "title": "Servicios disponibles (1 = UP)", "type": "stat",
-            "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "up{job=~\"order-api|risk-engine\"}", "legendFormat": "{{job}}", "instant": true}],
-            "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
-            "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
-          },
-          {
-            "id": 2, "title": "Pedidos creados desde el arranque de Java", "type": "stat",
-            "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum(orders_created_total) or vector(0)", "instant": true}],
-            "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
-            "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
-          },
-          {
-            "id": 3, "title": "Fallos de riesgo desde el arranque de Java", "type": "stat",
-            "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum(orders_risk_failures_total) or vector(0)", "instant": true}],
-            "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
-            "options": {"colorMode": "value", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
-          },
-          {
-            "id": 4, "title": "Pedidos por estado / segundo", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum by(status)(rate(orders_created_total[2m]))", "legendFormat": "{{status}}"}],
-            "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
-          },
-          {
-            "id": 5, "title": "Evaluaciones de riesgo / segundo", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum by(decision)(rate(risk_evaluations_total[2m]))", "legendFormat": "{{decision}}"}],
-            "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
-          },
-          {
-            "id": 6, "title": "Latencia p95 API de pedidos", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(http_server_requests_seconds_bucket{uri=~\"/api/orders.*\"}[2m])))", "legendFormat": "p95 REST"}],
-            "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
-          },
-          {
-            "id": 7, "title": "Latencia p95 evaluación de riesgo Python", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))", "legendFormat": "p95 riesgo"}],
-            "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
-          }
-        ],
-        "annotations": {"list": []}
-      }

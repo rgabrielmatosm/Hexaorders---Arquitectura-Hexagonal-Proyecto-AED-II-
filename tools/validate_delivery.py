@@ -6,7 +6,7 @@ from pathlib import Path
 import jsonschema
 import yaml
 
-from generate_delivery import ROOT, compose, inline_dockerfile, monitoring_configmap
+from generate_delivery import BUILD_CONTEXTS, ROOT, compose, inline_dockerfile, monitoring_configmap
 
 
 def validate(schema, document, name, draft=None):
@@ -24,13 +24,15 @@ raw = (ROOT / 'docker-compose.yml').read_text(encoding='utf-8')
 assert raw == compose(), 'Compose desactualizado'
 document = yaml.safe_load(raw)
 assert (ROOT / 'k8s/10-monitoring-config.yaml').read_text(encoding='utf-8') == monitoring_configmap()
-for service in ['order-api', 'risk-engine']:
+for service in BUILD_CONTEXTS:
     actual = document['services'][service]['build']['dockerfile_inline'].replace('$$', '$')
     assert actual == inline_dockerfile(service), f'Fuentes inline alterados: {service}'
     for line in actual.splitlines():
         assert not (line.startswith('COPY ') and not line.startswith(('COPY <<', 'COPY --from='))), line
-for definition in document['configs'].values():
+for definition in document.get('configs', {}).values():
     assert set(definition) == {'content'}, 'Config depende de un archivo externo'
+for name in ['order-api', 'risk-engine', 'prometheus', 'grafana']:
+    assert document['services'][name].get('read_only') is True, f'{name} debe ser read_only'
 for service in document['services'].values():
     for mount in service.get('volumes', []):
         assert not mount.startswith(('./', '../', '/')), f'Bind mount no autosuficiente: {mount}'

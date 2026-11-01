@@ -242,7 +242,7 @@ spec:
               subPath: dashboards.yml
               readOnly: true
             - name: config
-              mountPath: /var/lib/grafana/dashboards/hexaorders.json
+              mountPath: /etc/grafana/dashboards/hexaorders.json
               subPath: hexaorders.json
               readOnly: true
       volumes:

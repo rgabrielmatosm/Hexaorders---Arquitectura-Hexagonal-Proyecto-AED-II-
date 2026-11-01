@@ -12,7 +12,7 @@ Fecha: **19 de octubre de 2026**.
 | Docker Compose CLI oficial 2.39.4 | `config --quiet` correcto; binario contrastado con checksums de su release oficial. |
 | Entrega de un archivo | `config --quiet` correcto desde directorio aislado que contiene solo el YAML y variables de validación. |
 | Compose Specification | Validación JSON Schema oficial correcta. |
-| Fuentes y configs embebidos | Coinciden con archivos originales, incluidos escapes `$`; sin COPY de archivos del host ni bind mounts. |
+| Fuentes y configs embebidos | Coinciden con archivos originales, incluidos escapes `$`; sin COPY de archivos del host ni bind mounts; order-api, risk-engine, Prometheus y Grafana con `read_only: true`. |
 | Kubernetes | **14 objetos** válidos según OpenAPI oficial Kubernetes 1.34.1; referencias, selectores, puertos, probes, ConfigMap, PVC y Secret revisados. |
 | Grafana | JSON del dashboard válido; datasource, UID, métricas y rutas de provisioning revisados. |
 

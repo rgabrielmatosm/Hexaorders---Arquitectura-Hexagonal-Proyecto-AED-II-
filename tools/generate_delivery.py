@@ -21,8 +21,25 @@ def sorted_files(origin: Path) -> list[Path]:
     return sorted(origin.rglob('*'), key=lambda file: file.relative_to(origin).as_posix())
 
 
+# Servicio -> contexto de build con Dockerfile. Prometheus y Grafana llevan su
+# configuración dentro de la imagen para poder ejecutarse con read_only: true
+# (Compose no puede inyectar configs.content en contenedores de solo lectura).
+BUILD_CONTEXTS = {
+    'order-api': 'services/order-api',
+    'risk-engine': 'services/risk-engine',
+    'prometheus': 'infra/prometheus',
+    'grafana': 'infra/grafana',
+}
+INLINE_MARKERS = {
+    '__INLINE_JAVA__': 'order-api',
+    '__INLINE_RISK__': 'risk-engine',
+    '__INLINE_PROMETHEUS__': 'prometheus',
+    '__INLINE_GRAFANA__': 'grafana',
+}
+
+
 def inline_dockerfile(service: str) -> str:
-    context = ROOT / 'services' / service
+    context = ROOT / BUILD_CONTEXTS[service]
     result: list[str] = []
     index = 0
     for line in read_text(context / 'Dockerfile').splitlines():
@@ -58,19 +75,10 @@ def block(content: str, indent: int) -> str:
 
 def compose() -> str:
     base = read_text(ROOT / 'infra/compose.base.yml')
-    for marker, service in [('__INLINE_JAVA__', 'order-api'), ('__INLINE_RISK__', 'risk-engine')]:
+    for marker, service in INLINE_MARKERS.items():
+        if base.count(marker) != 1:
+            raise ValueError(f'Marcador {marker} ausente o duplicado en compose.base.yml')
         base = base.replace(marker, '|\n' + block(inline_dockerfile(service), 8))
-    config_files = {
-        'prometheus_config': 'infra/prometheus/prometheus.yml',
-        'prometheus_alerts': 'infra/prometheus/alerts.yml',
-        'grafana_datasource': 'infra/grafana/provisioning/datasource.yml',
-        'grafana_provider': 'infra/grafana/provisioning/dashboards.yml',
-        'grafana_dashboard': 'infra/grafana/dashboards/hexaorders.json',
-    }
-    configs = ['configs:']
-    for name, path in config_files.items():
-        configs.extend([f'  {name}:', '    content: |', block(read_text(ROOT / path), 6)])
-    base = base.replace('# __INLINE_CONFIGS__', '\n'.join(configs))
     digest = hashlib.sha256(base.encode()).hexdigest()
     return f'# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo {digest}\n' + base
 

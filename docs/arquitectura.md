@@ -4,9 +4,9 @@ La aplicación permite crear y consultar pedidos en USD. Java coordina el caso d
 
 ## El único archivo de entrega
 
-`docker-compose.yml` es un entregable autosuficiente: sus dos `build.dockerfile_inline` contienen los Dockerfiles **y los fuentes de ambas aplicaciones**, incluidos los tests que se ejecutan al construir las imágenes. Los `configs.content` incluyen Prometheus, reglas de alerta, datasource y dashboard Grafana. No utiliza bind mounts ni necesita clonar este repositorio para arrancar. Se requieren Docker Engine/Compose V2 >= 2.23.1, BuildKit, Internet en la primera construcción y dos secretos suministrados por el operador. Las contraseñas son configuración de cada instalación; no forman parte del archivo a entregar.
+`docker-compose.yml` es un entregable autosuficiente: sus cuatro `build.dockerfile_inline` contienen los Dockerfiles **y los fuentes de ambas aplicaciones**, incluidos los tests que se ejecutan al construir las imágenes, además de las imágenes de Prometheus y Grafana con su configuración (reglas de alerta, datasource y dashboard) incorporada. Así todos los servicios propios se ejecutan con `read_only: true`: Compose no puede inyectar `configs.content` en contenedores de solo lectura. No utiliza bind mounts ni necesita clonar este repositorio para arrancar. Se requieren Docker Engine/Compose V2 >= 2.23.1, BuildKit, Internet en la primera construcción y dos secretos suministrados por el operador. Las contraseñas son configuración de cada instalación; no forman parte del archivo a entregar.
 
-Esto utiliza características oficiales de [Compose Build](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline) y [configs.content](https://docs.docker.com/reference/compose-file/configs/). No se usa el campo obsoleto `version:`.
+Esto utiliza características oficiales de [Compose Build](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline) y heredocs de BuildKit (`COPY <<EOF`). No se usa el campo obsoleto `version:`.
 
 El repositorio mantiene fuentes normales bajo `services/` para poder editarlos y revisarlos. `python tools/generate_delivery.py` vuelve a empaquetarlos en el YAML. `--check` detecta divergencias entre los fuentes y el entregable. No edites a mano el archivo generado: la siguiente generación reemplazaría esos cambios. Los signos `$` dentro de Java, JavaScript y plantillas Prometheus se escapan como `$$` para sobrevivir a la interpolación de Compose.
 
@@ -26,7 +26,7 @@ El repositorio mantiene fuentes normales bajo `services/` para poder editarlos y
 | `networks` | `data`, `compute` y `telemetry` son internas; `edge` permite acceso a los servicios publicados. Las redes no son un diagrama de dependencias Java. | Separación de conectividad |
 | `volumes` | Conserva datos PostgreSQL, TSDB Prometheus y SQLite/configuración Grafana al recrear contenedores. | Persistencia operativa |
 | `secrets` | Toma valores del entorno del proceso Compose y monta archivos en `/run/secrets`. | `DB_PASSWORD_FILE` y `GF_SECURITY_ADMIN_PASSWORD__FILE` |
-| `configs` | Contenido íntegro de configuración y dashboard, sin dependencias de archivos externos. | Plantillas `infra/` |
+| Imágenes `hexaorders/prometheus` y `hexaorders/grafana` | Contenido íntegro de configuración y dashboard dentro de la imagen, sin archivos externos y compatible con `read_only`. | `infra/prometheus/Dockerfile`, `infra/grafana/Dockerfile` |
 
 `healthcheck` decide si un servicio responde; `restart: unless-stopped` actúa cuando el proceso termina. Docker no reinicia automáticamente un proceso que sigue vivo por estar `unhealthy`. Tras una caída de Python, Java devuelve 503 y registra un fallo; la recuperación de Python permite aceptar nuevas solicitudes. Su liveness no depende de otros servicios; la readiness Java incluye DB para señalar si puede consultar pedidos. La salud de Python se observa por su propia sonda y por Prometheus.
 

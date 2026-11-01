@@ -156,7 +156,7 @@ Cambiar PostgreSQL por otro almacenamiento exigiría otro adaptador, consultas y
 | `networks` | Conecta los servicios que necesitan comunicarse. |
 | `volumes` | Conserva datos aunque se recree un contenedor. |
 | `secrets` | Concede a servicios archivos con contraseñas suministradas por el operador. |
-| `configs.content` | Incluye los archivos de configuración de monitoreo. |
+| Imágenes de monitoreo inline | Prometheus y Grafana se construyen con su configuración dentro, compatibles con `read_only`. |
 | `restart` | Política al terminar el proceso; no reinicia por sí sola un proceso vivo que está unhealthy. |
 | `mem_limit`, `cpus` | Límites de recursos por servicio. |
 | `read_only`, `cap_drop`, `security_opt` | Reducen permisos de las aplicaciones y herramientas de monitoreo. |

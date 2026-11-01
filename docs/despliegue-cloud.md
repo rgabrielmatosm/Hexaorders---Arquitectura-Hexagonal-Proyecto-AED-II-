@@ -64,7 +64,7 @@ sudo docker compose version
 sudo docker run --rm hello-world
 ```
 
-Exige **Docker Compose >= 2.23.1**, porque el entregable incorpora `configs.content`; también utiliza BuildKit para los Dockerfiles en línea. Docker Desktop reciente permite el mismo Compose en tu máquina local. [Instalación oficial](https://docs.docker.com/engine/install/ubuntu/), [configs.content](https://docs.docker.com/reference/compose-file/configs/), [dockerfile_inline](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline).
+Exige **Docker Compose >= 2.23.1**, y BuildKit, porque el entregable construye sus cuatro imágenes con Dockerfiles en línea y heredocs `COPY <<EOF`. Docker Desktop reciente permite el mismo Compose en tu máquina local. [Instalación oficial](https://docs.docker.com/engine/install/ubuntu/), [configs.content](https://docs.docker.com/reference/compose-file/configs/), [dockerfile_inline](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline).
 
 ## 3. Generar secretos y arrancar
 
