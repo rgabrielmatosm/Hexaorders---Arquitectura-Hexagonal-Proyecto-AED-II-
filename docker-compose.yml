@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 3030c76c938d77562b6f5a64e1033c2543ed691395dca9ca6a86562983494b8a
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 2408307da42dbfd9ea09a0c92128d0834a04d6c2bedb0d4d8d1dc33064c2e59f
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -1705,7 +1705,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --storage.tsdb.retention.size=1GB
-      - --web.enable-lifecycle=false
+      - --no-web.enable-lifecycle
     volumes:
       - prometheus_data:/prometheus
     ports:
