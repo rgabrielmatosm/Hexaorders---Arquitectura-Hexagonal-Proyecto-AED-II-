@@ -129,13 +129,16 @@ function Invoke-Compose {
     return Invoke-Native 'docker' ($base + $Arguments) -AllowFailure:$AllowFailure
 }
 
-function Initialize-WorkDir([switch]$CopyFromRepo) {
+function Initialize-WorkDir([switch]$CopyFromRepo, [switch]$SecretsOnly) {
+    # -SecretsOnly: solo genera secrets\ (la carpeta puede no tener todavía docker-compose.yml).
     New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
-    $source = Join-Path $RepoRoot 'docker-compose.yml'
-    $separators = [char[]]@([char]'\', [char]'/')
-    $sameFolder = [string]::Equals($WorkDir.TrimEnd($separators), $RepoRoot.TrimEnd($separators), [StringComparison]::OrdinalIgnoreCase)
-    if ($CopyFromRepo -and -not $sameFolder) { Copy-Item -LiteralPath $source -Destination $ComposeFile -Force }
-    if (-not (Test-Path -LiteralPath $ComposeFile)) { throw "No existe $ComposeFile" }
+    if (-not $SecretsOnly) {
+        $source = Join-Path $RepoRoot 'docker-compose.yml'
+        $separators = [char[]]@([char]'\', [char]'/')
+        $sameFolder = [string]::Equals($WorkDir.TrimEnd($separators), $RepoRoot.TrimEnd($separators), [StringComparison]::OrdinalIgnoreCase)
+        if ($CopyFromRepo -and -not $sameFolder) { Copy-Item -LiteralPath $source -Destination $ComposeFile -Force }
+        if (-not (Test-Path -LiteralPath $ComposeFile)) { throw "No existe $ComposeFile" }
+    }
     & (Join-Path $PSScriptRoot 'init-env.ps1') -Root $WorkDir
 }
 
@@ -199,11 +202,11 @@ function Invoke-Stop {
     }
 }
 
-function Invoke-Secrets { Initialize-WorkDir }
+function Invoke-Secrets { Initialize-WorkDir -SecretsOnly }
 
 function Invoke-K8sSecrets {
     if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) { throw 'No se encontró kubectl.' }
-    Initialize-WorkDir
+    Initialize-WorkDir -SecretsOnly
     $secrets = Join-Path $WorkDir 'secrets'
     [void](Invoke-Native 'kubectl' @('apply', '-f', (Join-Path (Join-Path $RepoRoot 'k8s') '00-namespace.yaml')))
     $yaml = & kubectl -n hexaorders create secret generic app-secrets `
