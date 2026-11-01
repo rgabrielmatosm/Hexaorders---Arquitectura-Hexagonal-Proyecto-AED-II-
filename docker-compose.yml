@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 6f87763eef1d22135c49a3724b247676e766bf72011599d81aa1e398b14b89e6
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 87fb87d0092abbc222f6134808081a814a8798a69a49b5ec86b9e652b857ffcd
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -733,6 +733,7 @@ services:
         import com.hexaorders.application.port.in.OrderUseCases;
         import com.hexaorders.domain.Order;
         import com.hexaorders.domain.OrderDraft;
+        import com.hexaorders.domain.OrderStatistics;
         import java.math.BigDecimal;
         import java.net.URI;
         import java.util.List;
@@ -758,6 +759,10 @@ services:
                 Order created = orders.create(new OrderDraft(request.customerId(), request.amount(), currency));
                 return ResponseEntity.created(URI.create("/api/orders/" + created.id())).body(created);
             }
+        
+            /** Totals over all persisted orders (the list endpoint returns only the latest 50). */
+            @GetMapping("/statistics")
+            public OrderStatistics statistics() { return orders.statistics(); }
         
             @GetMapping("/{id}")
             public Order get(@PathVariable UUID id) { return orders.get(id); }
@@ -844,6 +849,7 @@ services:
         import com.hexaorders.application.exception.PersistenceUnavailableException;
         import com.hexaorders.application.port.out.OrderRepository;
         import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderStatistics;
         import com.hexaorders.domain.OrderStatus;
         import java.sql.Timestamp;
         import java.util.List;
@@ -880,6 +886,18 @@ services:
                 try {
                     return jdbc.query("SELECT " + COLUMNS + " FROM orders WHERE id = ?", ROW_MAPPER, id)
                             .stream().findFirst();
+                } catch (DataAccessException error) {
+                    throw new PersistenceUnavailableException(error);
+                }
+            }
+        
+            @Override
+            public OrderStatistics statistics() {
+                try {
+                    // One aggregate query over the whole table; status values are enforced by a CHECK constraint.
+                    return jdbc.queryForObject("SELECT count(*) FILTER (WHERE status = 'APPROVED') AS approved, "
+                                    + "count(*) FILTER (WHERE status = 'REVIEW') AS review FROM orders",
+                            (rs, rowNumber) -> OrderStatistics.of(rs.getLong("approved"), rs.getLong("review")));
                 } catch (DataAccessException error) {
                     throw new PersistenceUnavailableException(error);
                 }
@@ -929,6 +947,7 @@ services:
         
         import com.hexaorders.domain.Order;
         import com.hexaorders.domain.OrderDraft;
+        import com.hexaorders.domain.OrderStatistics;
         import java.util.List;
         import java.util.UUID;
         
@@ -936,12 +955,14 @@ services:
             Order create(OrderDraft draft);
             Order get(UUID id);
             List<Order> latest();
+            OrderStatistics statistics();
         }
         HEXFILE_10
         COPY <<'HEXFILE_11' src/main/java/com/hexaorders/application/port/out/OrderRepository.java
         package com.hexaorders.application.port.out;
         
         import com.hexaorders.domain.Order;
+        import com.hexaorders.domain.OrderStatistics;
         import java.util.List;
         import java.util.Optional;
         import java.util.UUID;
@@ -950,6 +971,8 @@ services:
             void save(Order order);
             Optional<Order> findById(UUID id);
             List<Order> latest(int limit);
+            /** Counts every persisted order, not only the latest page. */
+            OrderStatistics statistics();
         }
         HEXFILE_11
         COPY <<'HEXFILE_12' src/main/java/com/hexaorders/application/port/out/OrderTelemetry.java
@@ -983,7 +1006,9 @@ services:
         import com.hexaorders.application.port.out.RiskAssessmentPort;
         import com.hexaorders.domain.Order;
         import com.hexaorders.domain.OrderDraft;
+        import com.hexaorders.domain.OrderStatistics;
         import java.time.Clock;
+        import java.time.temporal.ChronoUnit;
         import java.util.List;
         import java.util.UUID;
         
@@ -1014,7 +1039,9 @@ services:
                     telemetry.riskFailure();
                     throw error;
                 }
-                Order order = Order.create(draft, score, UUID.randomUUID(), clock.instant());
+                // Microsecond precision: the instant returned to the client is exactly the one that can be
+                // persisted (PostgreSQL TIMESTAMPTZ), so POST and a later GET return the same createdAt.
+                Order order = Order.create(draft, score, UUID.randomUUID(), clock.instant().truncatedTo(ChronoUnit.MICROS));
                 repository.save(order);
                 telemetry.orderCreated(order.status());
                 return order;
@@ -1028,6 +1055,11 @@ services:
             @Override
             public List<Order> latest() {
                 return repository.latest(50);
+            }
+        
+            @Override
+            public OrderStatistics statistics() {
+                return repository.statistics();
             }
         }
         HEXFILE_14
@@ -1161,7 +1193,26 @@ services:
             }
         }
         HEXFILE_17
-        COPY <<'HEXFILE_18' src/main/java/com/hexaorders/domain/OrderStatus.java
+        COPY <<'HEXFILE_18' src/main/java/com/hexaorders/domain/OrderStatistics.java
+        package com.hexaorders.domain;
+        
+        /** Aggregated counts of persisted orders, expressed in the business language. */
+        public record OrderStatistics(long total, long approved, long review) {
+            public OrderStatistics {
+                if (approved < 0 || review < 0) {
+                    throw new IllegalArgumentException("Los contadores no pueden ser negativos");
+                }
+                if (total != approved + review) {
+                    throw new IllegalArgumentException("El total debe ser la suma de pedidos aprobados y en revisión");
+                }
+            }
+        
+            public static OrderStatistics of(long approved, long review) {
+                return new OrderStatistics(approved + review, approved, review);
+            }
+        }
+        HEXFILE_18
+        COPY <<'HEXFILE_19' src/main/java/com/hexaorders/domain/OrderStatus.java
         package com.hexaorders.domain;
         
         public enum OrderStatus {
@@ -1174,8 +1225,8 @@ services:
                 return score >= 70 ? REVIEW : APPROVED;
             }
         }
-        HEXFILE_18
-        COPY <<'HEXFILE_19' src/main/resources/application.yml
+        HEXFILE_19
+        COPY <<'HEXFILE_20' src/main/resources/application.yml
         spring:
           application:
             name: order-api
@@ -1226,8 +1277,8 @@ services:
         logging:
           level:
             root: INFO
-        HEXFILE_19
-        COPY <<'HEXFILE_20' src/main/resources/db/migration/V1__create_orders.sql
+        HEXFILE_20
+        COPY <<'HEXFILE_21' src/main/resources/db/migration/V1__create_orders.sql
         CREATE TABLE orders (
             id UUID PRIMARY KEY,
             customer_id VARCHAR(64) NOT NULL CHECK (customer_id ~ '^[A-Za-z0-9_-]{1,64}$$'),
@@ -1242,61 +1293,2192 @@ services:
         );
         
         CREATE INDEX orders_created_at_idx ON orders (created_at DESC, id DESC);
-        HEXFILE_20
-        COPY <<'HEXFILE_21' src/main/resources/static/index.html
+        HEXFILE_21
+        COPY <<'HEXFILE_22' src/main/resources/static/css/base.css
+        /* HexaOrders — tokens de diseño, base tipográfica y layout. */
+        :root {
+          color-scheme: dark;
+          --bg: #0B0F14;
+          --bg-2: #151B23;
+          --bg-3: #1C2430;
+          --line: rgba(148, 163, 184, 0.14);
+          --line-strong: rgba(148, 163, 184, 0.28);
+          --violet: #8B5CF6;
+          --violet-2: #A78BFA;
+          --violet-soft: rgba(139, 92, 246, 0.14);
+          --green: #10B981;
+          --green-soft: rgba(16, 185, 129, 0.14);
+          --amber: #F59E0B;
+          --amber-soft: rgba(245, 158, 11, 0.14);
+          --red: #EF4444;
+          --red-soft: rgba(239, 68, 68, 0.14);
+          --text: #F8FAFC;
+          --text-2: #94A3B8;
+          --radius: 14px;
+          --radius-sm: 9px;
+          --shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+          --font: Inter, "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+          --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+          --topbar-h: 64px;
+          --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        
+        *, *::before, *::after { box-sizing: border-box; }
+        
+        html { scroll-behavior: smooth; scroll-padding-top: calc(var(--topbar-h) + 16px); }
+        
+        body {
+          margin: 0;
+          min-height: 100vh;
+          background: var(--bg);
+          color: var(--text);
+          font: 15px/1.6 var(--font);
+          -webkit-font-smoothing: antialiased;
+          text-rendering: optimizeLegibility;
+        }
+        
+        img, svg, canvas { display: block; max-width: 100%; }
+        
+        h1, h2, h3, h4 { margin: 0; line-height: 1.15; letter-spacing: -0.02em; }
+        h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+        h3 { font-size: 1.05rem; }
+        p { margin: 0; }
+        
+        a { color: var(--violet-2); text-decoration: none; }
+        a:hover { color: var(--text); }
+        
+        code, kbd, .mono { font-family: var(--mono); font-size: 0.86em; }
+        code { background: var(--violet-soft); color: var(--violet-2); padding: 0.1em 0.4em; border-radius: 5px; }
+        kbd { border: 1px solid var(--line-strong); border-radius: 5px; padding: 0.05em 0.45em; color: var(--text-2); }
+        
+        :focus-visible { outline: 2px solid var(--violet-2); outline-offset: 3px; border-radius: 6px; }
+        
+        ::selection { background: rgba(139, 92, 246, 0.45); }
+        
+        .muted { color: var(--text-2); }
+        .small { font-size: 0.82rem; line-height: 1.55; }
+        
+        .sr-only {
+          position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+          overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+        
+        .skip-link {
+          position: absolute; left: 16px; top: -60px; z-index: 100;
+          background: var(--violet); color: #fff; padding: 10px 14px; border-radius: var(--radius-sm);
+        }
+        .skip-link:focus { top: 12px; }
+        
+        /* Layout */
+        main { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 24px 64px; }
+        
+        .topbar {
+          position: sticky; top: 0; z-index: 20;
+          height: var(--topbar-h);
+          display: flex; align-items: center; gap: 24px;
+          padding: 0 24px;
+          background: rgba(11, 15, 20, 0.72);
+          backdrop-filter: saturate(140%) blur(14px);
+          -webkit-backdrop-filter: saturate(140%) blur(14px);
+          border-bottom: 1px solid var(--line);
+        }
+        
+        .brand { display: flex; align-items: center; gap: 10px; color: var(--text); }
+        .brand__name { font-weight: 800; letter-spacing: 0.12em; font-size: 0.95rem; }
+        .brand__name span { color: var(--violet-2); }
+        
+        .nav { display: flex; gap: 4px; margin-left: auto; }
+        .nav a {
+          color: var(--text-2); padding: 7px 12px; border-radius: 8px; font-size: 0.9rem;
+          transition: color 0.2s, background 0.2s;
+        }
+        .nav a:hover { color: var(--text); background: rgba(148, 163, 184, 0.08); }
+        .nav a.is-active { color: var(--text); background: var(--violet-soft); }
+        
+        .section { padding: 72px 0 8px; }
+        .section__head {
+          display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+          margin-bottom: 28px; flex-wrap: wrap;
+        }
+        .section__lead { color: var(--text-2); margin-top: 8px; max-width: 720px; }
+        
+        .eyebrow {
+          color: var(--violet-2); font-size: 0.74rem; font-weight: 700;
+          letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 10px;
+        }
+        
+        .hero { padding: 96px 0 40px; max-width: 900px; }
+        .hero__title { font-size: clamp(2.3rem, 6vw, 4.2rem); letter-spacing: -0.035em; line-height: 1.05; }
+        .hero__lead { color: var(--text-2); font-size: 1.08rem; margin-top: 22px; max-width: 720px; }
+        .hero__lead strong { color: var(--text); font-weight: 600; }
+        .hero__actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+        
+        .gradient-text {
+          background: linear-gradient(100deg, var(--violet-2), var(--violet) 55%, #C4B5FD);
+          -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        
+        .tech-list { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 34px 0 0; }
+        .tech-list li {
+          font-size: 0.8rem; color: var(--text-2);
+          border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+          background: rgba(21, 27, 35, 0.7);
+        }
+        
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .panel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+        .orders-grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; align-items: start; }
+        .orders-grid__side { display: grid; gap: 16px; }
+        .obs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        
+        .footer {
+          position: relative; z-index: 1;
+          max-width: 1240px; margin: 0 auto; padding: 28px 24px 40px;
+          border-top: 1px solid var(--line);
+          display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center;
+        }
+        .footer__brand { display: flex; align-items: center; gap: 10px; color: var(--text-2); }
+        .footer__brand strong { color: var(--text); }
+        
+        /* Responsive */
+        @media (max-width: 1080px) {
+          .stats { grid-template-columns: repeat(2, 1fr); }
+          .orders-grid { grid-template-columns: 1fr; }
+        }
+        
+        @media (max-width: 860px) {
+          :root { --topbar-h: 104px; }
+          .topbar { flex-wrap: wrap; height: auto; min-height: var(--topbar-h); justify-content: space-between; gap: 6px 12px; padding-top: 10px; padding-bottom: 8px; }
+          .nav { order: 3; width: 100%; margin-left: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+          .nav::-webkit-scrollbar { display: none; }
+          .nav a { white-space: nowrap; }
+          .panel-grid, .obs-grid { grid-template-columns: 1fr; }
+          .hero { padding-top: 64px; }
+          .section { padding-top: 56px; }
+        }
+        
+        @media (max-width: 520px) {
+          main { padding: 0 16px 48px; }
+          .topbar { padding: 0 16px; }
+          .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+          .footer { padding: 24px 16px 32px; }
+        }
+        HEXFILE_22
+        COPY <<'HEXFILE_23' src/main/resources/static/css/components.css
+        /* HexaOrders — componentes reutilizables. */
+        
+        /* Tarjetas */
+        .card {
+          position: relative;
+          background: linear-gradient(180deg, rgba(28, 36, 48, 0.78), rgba(21, 27, 35, 0.86));
+          border: 1px solid var(--line);
+          border-radius: var(--radius);
+          padding: 22px;
+          box-shadow: var(--shadow);
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+        }
+        .card__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .card__title { font-size: 1rem; font-weight: 650; margin-bottom: 14px; }
+        .card__head .card__title { margin-bottom: 0; }
+        .card__title--spaced { margin-top: 26px; }
+        
+        /* Botones */
+        .btn {
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          font: inherit; font-weight: 600; font-size: 0.92rem;
+          padding: 11px 18px; border-radius: 10px; border: 1px solid transparent;
+          cursor: pointer; color: var(--text);
+          transition: transform 0.15s var(--ease), background 0.2s, border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+        }
+        .btn:active { transform: translateY(1px) scale(0.99); }
+        .btn:disabled { opacity: 0.55; cursor: progress; }
+        .btn--primary {
+          background: linear-gradient(135deg, var(--violet), #7C3AED);
+          box-shadow: 0 6px 24px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+        .btn--primary:hover { box-shadow: 0 8px 30px rgba(139, 92, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2); color: #fff; }
+        .btn--ghost { background: rgba(148, 163, 184, 0.06); border-color: var(--line-strong); color: var(--text); }
+        .btn--ghost:hover { border-color: var(--violet-2); background: var(--violet-soft); color: var(--text); }
+        .btn--sm { padding: 7px 12px; font-size: 0.82rem; border-radius: 8px; }
+        .btn--block { width: 100%; }
+        .btn kbd { font-size: 0.72rem; color: rgba(248, 250, 252, 0.75); border-color: rgba(248, 250, 252, 0.3); }
+        
+        .chip {
+          font: inherit; font-size: 0.78rem; cursor: pointer;
+          padding: 6px 10px; border-radius: 999px;
+          border: 1px solid var(--line-strong); background: transparent; color: var(--text-2);
+          transition: border-color 0.2s, color 0.2s, background 0.2s;
+        }
+        .chip:hover { border-color: var(--violet-2); color: var(--text); background: var(--violet-soft); }
+        
+        .link { font-size: 0.85rem; }
+        
+        /* Indicadores */
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-2); }
+        .dot--ok { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+        .dot--warn { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+        .dot--error { background: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+        .dot--pending { background: var(--violet-2); box-shadow: 0 0 0 3px var(--violet-soft); }
+        
+        .status-pill {
+          display: flex; align-items: center; gap: 8px;
+          font-size: 0.8rem; color: var(--text-2);
+          border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+          background: rgba(21, 27, 35, 0.8); white-space: nowrap;
+        }
+        
+        .badge {
+          display: inline-block; font-size: 0.7rem; font-weight: 750; letter-spacing: 0.06em;
+          padding: 3px 8px; border-radius: 6px;
+        }
+        .badge--ok { color: var(--green); background: var(--green-soft); }
+        .badge--warn { color: var(--amber); background: var(--amber-soft); }
+        .badge--error { color: var(--red); background: var(--red-soft); }
+        .badge--neutral { color: var(--text-2); background: rgba(148, 163, 184, 0.12); }
+        
+        /* Estadísticas */
+        .stat { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+        .stat::after {
+          content: ""; position: absolute; inset: auto -40% -60% auto; width: 160px; height: 160px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(139, 92, 246, 0.18), transparent 70%); pointer-events: none;
+        }
+        .stat--success::after { background: radial-gradient(circle, rgba(16, 185, 129, 0.18), transparent 70%); }
+        .stat--warning::after { background: radial-gradient(circle, rgba(245, 158, 11, 0.18), transparent 70%); }
+        .stat__label { color: var(--text-2); font-size: 0.82rem; }
+        .stat__value { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 750; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+        .stat--success .stat__value { color: var(--green); }
+        .stat--warning .stat__value { color: var(--amber); }
+        .stat--accent .stat__value { color: var(--violet-2); }
+        .stat__hint { color: var(--text-2); font-size: 0.75rem; }
+        
+        .distribution {
+          display: flex; height: 14px; border-radius: 999px; overflow: hidden;
+          background: rgba(148, 163, 184, 0.1); margin: 6px 0 14px;
+        }
+        .distribution__bar { height: 100%; transition: width 0.8s var(--ease); }
+        .distribution__bar--approved { background: linear-gradient(90deg, #059669, var(--green)); }
+        .distribution__bar--review { background: linear-gradient(90deg, #D97706, var(--amber)); }
+        
+        .legend { list-style: none; padding: 0; margin: 0; display: flex; gap: 22px; color: var(--text-2); font-size: 0.85rem; }
+        .legend li { display: flex; align-items: center; gap: 8px; }
+        .legend strong { color: var(--text); font-variant-numeric: tabular-nums; }
+        
+        .rules { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+        .rules th { text-align: left; color: var(--text-2); font-weight: 500; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
+        .rules th, .rules td { padding: 9px 8px 9px 0; border-bottom: 1px solid var(--line); }
+        
+        .recent { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+        .recent li {
+          display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+          padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+          background: rgba(11, 15, 20, 0.45); font-size: 0.88rem;
+        }
+        .recent__customer { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .recent__meta { display: block; color: var(--text-2); font-size: 0.74rem; font-weight: 400; }
+        .recent__amount { font-variant-numeric: tabular-nums; }
+        .recent .recent__empty { display: block; color: var(--text-2); text-align: center; padding: 26px; }
+        
+        /* Formularios */
+        .form { display: grid; gap: 4px; }
+        .field { display: grid; gap: 6px; margin-bottom: 12px; }
+        .field label { font-size: 0.82rem; color: var(--text-2); }
+        input, select {
+          width: 100%; font: inherit; color: var(--text);
+          background: rgba(11, 15, 20, 0.75); border: 1px solid var(--line-strong);
+          border-radius: 10px; padding: 11px 13px;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input::placeholder { color: rgba(148, 163, 184, 0.6); }
+        input:focus, select:focus { outline: none; border-color: var(--violet-2); box-shadow: 0 0 0 3px var(--violet-soft); }
+        input[aria-invalid="true"] { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+        .field__help { color: var(--text-2); font-size: 0.74rem; }
+        .field__error { color: var(--red); font-size: 0.78rem; }
+        .presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 16px; }
+        
+        .result {
+          margin-top: 14px; padding: 13px 14px; border-radius: var(--radius-sm);
+          border: 1px solid var(--line); font-size: 0.86rem; overflow-wrap: anywhere;
+          background: rgba(11, 15, 20, 0.55);
+        }
+        .result--ok { border-color: rgba(16, 185, 129, 0.45); }
+        .result--warn { border-color: rgba(245, 158, 11, 0.45); }
+        .result--error { border-color: rgba(239, 68, 68, 0.5); color: #FCA5A5; }
+        .result__title { font-weight: 650; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--text); }
+        .result dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; }
+        .result dt { color: var(--text-2); }
+        .result dd { margin: 0; font-family: var(--mono); font-size: 0.8rem; }
+        
+        /* Tabla */
+        .toolbar { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .toolbar input { flex: 1 1 200px; width: auto; padding: 8px 12px; }
+        
+        .segmented { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(11, 15, 20, 0.6); }
+        .segmented__btn {
+          font: inherit; font-size: 0.82rem; color: var(--text-2); background: transparent;
+          border: 0; border-radius: 7px; padding: 6px 12px; cursor: pointer; transition: background 0.2s, color 0.2s;
+        }
+        .segmented__btn:hover { color: var(--text); }
+        .segmented__btn.is-active { background: var(--violet-soft); color: var(--text); box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.35); }
+        
+        .table-scroll { overflow-x: auto; margin-top: 8px; }
+        .table { width: 100%; border-collapse: collapse; font-size: 0.86rem; white-space: nowrap; }
+        .table th { text-align: left; color: var(--text-2); font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; }
+        .table th, .table td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+        .table tbody tr { transition: background 0.2s; }
+        .table tbody tr:hover { background: rgba(139, 92, 246, 0.05); }
+        .table__id { display: block; font-family: var(--mono); font-size: 0.7rem; color: var(--text-2); cursor: copy; }
+        .table__empty { text-align: center !important; color: var(--text-2); padding: 40px 0 !important; white-space: normal; }
+        .score { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.82rem; }
+        .score__bar { width: 54px; height: 6px; border-radius: 999px; background: rgba(148, 163, 184, 0.15); overflow: hidden; }
+        .score__bar span { display: block; height: 100%; border-radius: inherit; }
+        
+        /* Explorador de arquitectura */
+        .arch-legend { color: var(--text-2); font-size: 0.86rem; margin: -10px 0 16px; min-height: 1.4em; }
+        .arch { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+        .arch__diagram {
+          display: grid; grid-template-columns: 0.9fr 1fr 1.25fr 1fr 1.05fr; gap: 14px;
+          padding: 20px; overflow: hidden;
+        }
+        .arch__edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 0; }
+        .arch__col { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; }
+        .arch__col h4 { font-size: 0.66rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; min-height: 2.6em; }
+        .arch__col--core {
+          padding: 12px; margin: -12px 0; border-radius: 16px;
+          background: radial-gradient(120% 80% at 50% 40%, rgba(139, 92, 246, 0.12), transparent 70%);
+          border: 1px dashed rgba(167, 139, 250, 0.35);
+        }
+        .arch__group { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: rgba(11, 15, 20, 0.35); }
+        .arch__group-title { font-size: 0.66rem; color: var(--violet-2); text-transform: uppercase; letter-spacing: 0.1em; padding: 0 2px; }
+        
+        .node {
+          font: inherit; text-align: left; cursor: pointer; width: 100%;
+          padding: 9px 10px; border-radius: 10px;
+          border: 1px solid var(--line-strong); background: rgba(21, 27, 35, 0.92); color: var(--text);
+          transition: border-color 0.2s, box-shadow 0.25s, background 0.25s, opacity 0.25s, transform 0.2s var(--ease);
+        }
+        .node:hover { border-color: var(--violet-2); transform: translateY(-1px); }
+        .node__name { display: block; font-size: 0.8rem; font-weight: 650; overflow-wrap: break-word; }
+        .node__kind { display: block; font-size: 0.66rem; color: var(--text-2); margin-top: 2px; }
+        .node[data-kind="domain"] { border-color: rgba(167, 139, 250, 0.5); background: rgba(139, 92, 246, 0.14); }
+        .node[data-kind="port"] { border-style: dashed; }
+        .node[data-kind="external"] { background: rgba(11, 15, 20, 0.85); }
+        .node.is-selected { border-color: var(--violet-2); box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.35), 0 0 24px rgba(139, 92, 246, 0.35); }
+        .node.is-related { border-color: rgba(167, 139, 250, 0.8); }
+        .node.is-dimmed { opacity: 0.35; }
+        .node.is-active { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft), 0 0 26px rgba(16, 185, 129, 0.35); }
+        .node.is-failed { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+        
+        .edge { fill: none; stroke: rgba(148, 163, 184, 0.22); stroke-width: 1.4; }
+        .edge--related { stroke: rgba(167, 139, 250, 0.85); stroke-width: 2; }
+        .edge--active { stroke: var(--green); stroke-width: 2.4; }
+        .edge-label { fill: var(--text-2); font: 600 10px var(--font); }
+        
+        .arch__detail { position: sticky; top: calc(var(--topbar-h) + 16px); min-height: 280px; }
+        .detail__layer { margin-bottom: 8px; }
+        .detail__name { font-size: 1.15rem; overflow-wrap: anywhere; }
+        .detail__file { display: block; margin: 10px 0 14px; padding: 8px 10px; border-radius: 8px; background: rgba(11, 15, 20, 0.7); color: var(--violet-2); font-family: var(--mono); font-size: 0.74rem; overflow-wrap: anywhere; }
+        .detail dl { display: grid; gap: 10px; margin: 0; }
+        .detail dt { font-size: 0.7rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; }
+        .detail dd { margin: 2px 0 0; font-size: 0.88rem; }
+        .detail__relations { margin: 4px 0 0; padding-left: 18px; font-size: 0.84rem; color: var(--text-2); }
+        .detail__relations li { margin: 3px 0; }
+        
+        .arch-run { margin-top: 16px; }
+        .arch-run__head { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+        .arch-run__head > div:first-child { max-width: 720px; }
+        .arch-run__controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .arch-run__controls select { width: auto; }
+        .arch-run__body { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin-top: 18px; }
+        
+        .steps { list-style: none; counter-reset: step; padding: 0; margin: 0; display: grid; gap: 8px; }
+        .steps li {
+          counter-increment: step; position: relative;
+          padding: 10px 12px 10px 44px; border-radius: 10px; font-size: 0.85rem;
+          border: 1px solid var(--line); background: rgba(11, 15, 20, 0.45); color: var(--text-2);
+          transition: border-color 0.3s, color 0.3s, background 0.3s;
+        }
+        .steps li::before {
+          content: counter(step); position: absolute; left: 12px; top: 10px;
+          width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+          font: 700 0.72rem var(--mono); background: rgba(148, 163, 184, 0.12); color: var(--text-2);
+        }
+        .steps li.is-done { color: var(--text); border-color: rgba(16, 185, 129, 0.35); }
+        .steps li.is-done::before { background: var(--green); color: #052e22; }
+        .steps li.is-failed { color: var(--text); border-color: rgba(239, 68, 68, 0.5); }
+        .steps li.is-failed::before { background: var(--red); color: #fff; }
+        .steps li.is-skipped { opacity: 0.45; text-decoration: line-through; }
+        .steps code { font-size: 0.78em; }
+        
+        .evidence { display: grid; gap: 10px; align-content: start; }
+        .evidence pre {
+          margin: 0; max-height: 260px; overflow: auto; padding: 12px; border-radius: 10px;
+          background: rgba(11, 15, 20, 0.8); border: 1px solid var(--line);
+          font: 0.75rem/1.55 var(--mono); color: #C4B5FD; white-space: pre-wrap; word-break: break-word;
+        }
+        .evidence__row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; padding: 6px 0; border-bottom: 1px solid var(--line); }
+        .evidence__row span:first-child { color: var(--text-2); }
+        
+        /* Observabilidad */
+        .obs-links { display: flex; gap: 8px; }
+        .alert {
+          margin-bottom: 16px; padding: 12px 16px; border-radius: var(--radius-sm);
+          border: 1px solid rgba(245, 158, 11, 0.45); background: var(--amber-soft); color: #FCD34D; font-size: 0.88rem;
+        }
+        .health { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+        .health li {
+          display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+          padding: 11px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(11, 15, 20, 0.45);
+        }
+        .health__name { font-weight: 600; font-size: 0.9rem; }
+        .health__source { display: block; color: var(--text-2); font-size: 0.74rem; font-weight: 400; }
+        .metrics { display: grid; grid-template-columns: 1fr auto; gap: 0; margin: 0 0 12px; }
+        .metrics dt, .metrics dd { padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
+        .metrics dt { color: var(--text-2); }
+        .metrics dt code { display: block; margin-top: 3px; font-size: 0.68rem; width: fit-content; }
+        .metrics dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+        
+        /* Toasts */
+        .toasts { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: grid; gap: 10px; max-width: min(380px, calc(100vw - 36px)); }
+        .toast {
+          padding: 12px 14px; border-radius: 12px; font-size: 0.88rem;
+          background: rgba(21, 27, 35, 0.96); border: 1px solid var(--line-strong); box-shadow: var(--shadow);
+          display: flex; gap: 10px; align-items: flex-start;
+        }
+        .toast--ok { border-color: rgba(16, 185, 129, 0.5); }
+        .toast--warn { border-color: rgba(245, 158, 11, 0.5); }
+        .toast--error { border-color: rgba(239, 68, 68, 0.55); }
+        .toast .dot { margin-top: 7px; }
+        
+        /* Bienvenida */
+        .splash {
+          position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+          background: radial-gradient(60% 50% at 50% 45%, rgba(139, 92, 246, 0.16), transparent 70%), rgba(11, 15, 20, 0.94);
+          backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        }
+        .splash[hidden] { display: none; }
+        .splash__inner { text-align: center; padding: 24px; display: grid; justify-items: center; gap: 10px; }
+        .splash__logo { width: 96px; height: 96px; filter: drop-shadow(0 0 28px rgba(139, 92, 246, 0.55)); }
+        .splash__title { font-size: clamp(2rem, 7vw, 3.4rem); letter-spacing: 0.32em; font-weight: 800; margin-right: -0.32em; margin-top: 10px; }
+        .splash__subtitle { color: var(--text-2); letter-spacing: 0.08em; font-size: 0.92rem; }
+        .splash__checks { list-style: none; padding: 0; margin: 22px 0 18px; display: grid; gap: 8px; text-align: left; }
+        .splash__checks li { display: flex; align-items: center; gap: 10px; font-size: 0.86rem; color: var(--text-2); }
+        .splash__checks em { font-style: normal; color: var(--text); }
+        
+        /* Responsive de componentes */
+        @media (max-width: 1080px) {
+          .arch { grid-template-columns: 1fr; }
+          .arch__detail { position: static; min-height: 0; }
+        }
+        @media (max-width: 900px) {
+          .arch__diagram { grid-template-columns: 1fr 1fr; }
+          .arch__col--core { grid-column: 1 / -1; order: -1; margin: 0; }
+          .arch__edges { display: none; }
+          .arch-run__body { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 520px) {
+          .card { padding: 16px; }
+          .arch__diagram { grid-template-columns: 1fr; padding: 14px; }
+          .recent li { grid-template-columns: 1fr auto; }
+          .recent li > :nth-child(3) { grid-column: 2; }
+          .health li { grid-template-columns: auto 1fr; }
+          .health li > :last-child { grid-column: 2; }
+          .obs-links { width: 100%; }
+        }
+        HEXFILE_23
+        COPY <<'HEXFILE_24' src/main/resources/static/css/effects.css
+        /* HexaOrders — cuadrícula interactiva, animaciones y movimiento reducido. */
+        
+        /* Cuadrícula interactiva: un único <canvas> fijo detrás del contenido. */
+        .grid-canvas {
+          position: fixed; inset: 0; width: 100vw; height: 100vh;
+          z-index: 0; pointer-events: none;
+        }
+        /* Viñeta para que la cuadrícula no compita con el contenido. */
+        body::after {
+          content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background:
+            radial-gradient(70% 55% at 50% 0%, rgba(139, 92, 246, 0.10), transparent 70%),
+            radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(11, 15, 20, 0.85) 100%);
+        }
+        .topbar, .splash, .toasts { z-index: 20; }
+        .splash { z-index: 50; }
+        .toasts { z-index: 60; }
+        
+        /* Entrada de la bienvenida */
+        @keyframes splash-logo {
+          0% { opacity: 0; transform: scale(0.82) rotate(-30deg); }
+          60% { opacity: 1; }
+          100% { opacity: 1; transform: scale(1) rotate(0); }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: none; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.35; }
+        }
+        .splash__logo { animation: splash-logo 0.9s var(--ease) both; }
+        .splash__title { animation: fade-up 0.7s 0.15s var(--ease) both; }
+        .splash__subtitle { animation: fade-up 0.7s 0.3s var(--ease) both; }
+        .splash__checks { animation: fade-up 0.7s 0.45s var(--ease) both; }
+        #splash-enter { animation: fade-up 0.7s 0.6s var(--ease) both; }
+        .splash.is-leaving { opacity: 0; transition: opacity 0.45s var(--ease); pointer-events: none; }
+        
+        .dot--pending { animation: pulse 1.2s ease-in-out infinite; }
+        
+        /* Aparición de secciones al hacer scroll */
+        .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+        .reveal.is-visible { opacity: 1; transform: none; }
+        
+        /* Valor que cambia en una estadística */
+        @keyframes value-flash {
+          from { text-shadow: 0 0 18px rgba(167, 139, 250, 0.9); }
+          to { text-shadow: none; }
+        }
+        .stat__value.is-updated { animation: value-flash 1.2s var(--ease); }
+        
+        /* Esqueleto de carga */
+        [data-loading] { color: transparent !important; position: relative; }
+        [data-loading]::after {
+          content: ""; position: absolute; left: 0; top: 18%; height: 64%; width: 3.2em; border-radius: 8px;
+          background: linear-gradient(90deg, rgba(148, 163, 184, 0.08), rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.08));
+          background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
+        }
+        @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+        
+        /* Toasts */
+        @keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+        .toast { animation: toast-in 0.35s var(--ease); }
+        .toast.is-leaving { opacity: 0; transform: translateY(6px); transition: opacity 0.3s, transform 0.3s; }
+        
+        /* Movimiento reducido: sin animaciones decorativas; la información se mantiene. */
+        @media (prefers-reduced-motion: reduce) {
+          html { scroll-behavior: auto; }
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+          .reveal { opacity: 1; transform: none; }
+        }
+        HEXFILE_24
+        COPY <<'HEXFILE_25' src/main/resources/static/img/logo.svg
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="hexaorders-logo-title">
+          <title id="hexaorders-logo-title">HexaOrders</title>
+          <defs>
+            <linearGradient id="hexaorders-logo-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#C4B5FD"/>
+              <stop offset="0.5" stop-color="#8B5CF6"/>
+              <stop offset="1" stop-color="#6D28D9"/>
+            </linearGradient>
+          </defs>
+          <!-- Anillo exterior: adaptadores. Seis vértices: puertos. Núcleo: dominio. -->
+          <polygon points="32,4 56.25,18 56.25,46 32,60 7.75,46 7.75,18" fill="none" stroke="url(#hexaorders-logo-gradient)" stroke-width="3" stroke-linejoin="round"/>
+          <g stroke="#A78BFA" stroke-width="1.6" stroke-linecap="round" opacity="0.6">
+            <line x1="32" y1="20" x2="32" y2="4"/>
+            <line x1="42.39" y1="26" x2="56.25" y2="18"/>
+            <line x1="42.39" y1="38" x2="56.25" y2="46"/>
+            <line x1="32" y1="44" x2="32" y2="60"/>
+            <line x1="21.61" y1="38" x2="7.75" y2="46"/>
+            <line x1="21.61" y1="26" x2="7.75" y2="18"/>
+          </g>
+          <polygon points="32,20 42.39,26 42.39,38 32,44 21.61,38 21.61,26" fill="url(#hexaorders-logo-gradient)"/>
+          <path d="M26.6 32.4 L30.4 36.1 L37.6 28.6" fill="none" stroke="#0B0F14" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <g fill="#0B0F14" stroke="#A78BFA" stroke-width="2">
+            <circle cx="32" cy="4" r="3"/>
+            <circle cx="56.25" cy="18" r="3"/>
+            <circle cx="56.25" cy="46" r="3"/>
+            <circle cx="32" cy="60" r="3"/>
+            <circle cx="7.75" cy="46" r="3"/>
+          </g>
+          <circle cx="7.75" cy="18" r="3" fill="#10B981" stroke="#0B0F14" stroke-width="1.2"/>
+        </svg>
+        HEXFILE_25
+        COPY <<'HEXFILE_26' src/main/resources/static/index.html
         <!doctype html>
         <html lang="es">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>HexaOrders · Pedidos con criterio</title>
-          <style>
-            :root{color-scheme:dark;--bg:#101513;--surface:#18211d;--line:#34443a;--ink:#eaf2e8;--muted:#a8b8ac;--accent:#bbef80;--warn:#ffd58a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,sans-serif}main{max-width:1180px;margin:auto;padding:36px 30px 64px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:24px}.brand{font-weight:750;letter-spacing:-1px;font-size:25px}.brand span{color:var(--accent)}.eyebrow{color:var(--accent);font-size:12px;letter-spacing:2px;text-transform:uppercase}.connection{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:7px 12px;border-radius:30px}h1{font-size:clamp(34px,5vw,58px);letter-spacing:-2px;line-height:1.12;max-width:720px;margin:16px 0}p{color:var(--muted)}.intro{padding:38px 0 28px}.intro p{max-width:640px}.flow{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:24px}.flow span{border:1px solid var(--line);border-radius:6px;padding:6px 10px}.workspace{display:grid;grid-template-columns:340px 1fr;gap:24px}.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}h2{font-size:20px;letter-spacing:-.5px;margin:0 0 18px}label{display:block;color:var(--muted);font-size:12px;margin:18px 0 6px}input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;color:var(--ink);font:inherit}input:focus{outline:2px solid var(--accent);outline-offset:1px}button{font:inherit;cursor:pointer;border:0;border-radius:6px;font-weight:650;padding:12px 18px;background:var(--accent);color:#172013}button:disabled{opacity:.55;cursor:wait}.submit{width:100%;margin-top:22px}.small{font-size:12px;line-height:1.5}.samples{display:flex;gap:8px;margin-top:10px}.samples button,.refresh{background:transparent;color:var(--muted);border:1px solid var(--line);padding:6px 10px;font-size:12px}.table-top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.table-top h2{margin:0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th{text-align:left;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:500}th,td{padding:15px 12px 15px 0;border-bottom:1px solid var(--line)}td:last-child,th:last-child{text-align:right;padding-right:0}.pill{display:inline-block;padding:4px 8px;border-radius:5px;font-size:10px;font-weight:750;letter-spacing:.4px;background:#263d28;color:var(--accent)}.pill.review{background:#493b24;color:var(--warn)}.id{font:10px ui-monospace,monospace;color:var(--muted);display:block}.score{font-family:ui-monospace,monospace}.empty{color:var(--muted);text-align:center!important;padding:50px 0}.notice{margin-top:18px;padding:12px;border:1px solid var(--line);border-radius:6px;font-size:13px;overflow-wrap:anywhere}.notice.error{color:var(--warn);border-color:#796440}.notice.success{color:var(--accent)}details{margin-top:24px;color:var(--muted);font-size:12px}summary{cursor:pointer}pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:16px;border-radius:6px;font:11px/1.6 ui-monospace,monospace}footer{margin-top:32px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12px;display:flex;gap:18px;justify-content:space-between}a{color:var(--accent)}@media(max-width:850px){.workspace{grid-template-columns:1fr}main{padding:22px 18px}.card{padding:20px}footer{flex-direction:column}h1{letter-spacing:-1px}}
-          </style>
+          <meta name="description" content="HexaOrders — Order Management & Risk Assessment System. Arquitectura hexagonal con Java, Python, PostgreSQL, Prometheus y Grafana.">
+          <meta name="theme-color" content="#0B0F14">
+          <title>HexaOrders · Order Management &amp; Risk Assessment</title>
+          <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+          <link rel="stylesheet" href="css/base.css">
+          <link rel="stylesheet" href="css/components.css">
+          <link rel="stylesheet" href="css/effects.css">
+          <script type="module" src="js/app.js"></script>
         </head>
         <body>
-        <main>
-          <header><div class="brand">⬡ Hexa<span>Orders</span></div><div class="connection" id="connection" role="status">Conectando con la API…</div></header>
-          <section class="intro"><div class="eyebrow">Laboratorio de arquitectura hexagonal</div><h1>Cada pedido.<br>Una decisión con criterio.</h1><p>Crea un pedido y observa cómo Java consulta el motor de riesgo en Python, aplica las reglas del negocio y guarda el resultado en PostgreSQL.</p><div class="flow" aria-label="Flujo de un pedido"><span>01 · REST / Java</span>→<span>02 · Riesgo / Python</span>→<span>03 · Dominio</span>→<span>04 · PostgreSQL</span></div></section>
-          <div class="workspace">
-            <section class="card"><h2>Nuevo pedido</h2><form id="order-form"><label for="customer">Identificador del cliente</label><input id="customer" name="customerId" value="cliente_demo" required maxlength="64" pattern="[A-Za-z0-9_-]{1,64}" autocomplete="off"><label for="amount">Importe en USD</label><input id="amount" name="amount" type="number" value="125.50" min="0.01" max="1000000" step="0.01" required><div class="samples"><button type="button" data-amount="25.00">USD 25</button><button type="button" data-amount="95000.00">USD 95 000</button></div><button id="submit" class="submit" type="submit">Evaluar y crear pedido ↗</button><p class="small">Un puntaje desde 70 requiere revisión. Los importes se procesan con precisión decimal y nunca se redondean.</p></form><div id="notice" class="notice" role="status" hidden></div><details><summary>Ver última respuesta de la API</summary><pre id="response">Todavía no hay una respuesta.</pre></details></section>
-            <section class="card"><div class="table-top"><h2>Últimos pedidos</h2><button type="button" id="refresh" class="refresh">Actualizar ↻</button></div><p class="small" id="count">Se muestran hasta 50 pedidos, del más reciente al más antiguo.</p><div class="scroll"><table><thead><tr><th>Cliente / pedido</th><th>Importe</th><th>Riesgo</th><th>Decisión</th></tr></thead><tbody id="orders"><tr><td colspan="4" class="empty">Cargando pedidos…</td></tr></tbody></table></div></section>
+        <canvas id="grid-canvas" class="grid-canvas" aria-hidden="true"></canvas>
+        
+        <!-- Bienvenida: no bloquea; el estado mostrado proviene de consultas reales. -->
+        <div id="splash" class="splash" role="dialog" aria-modal="false" aria-labelledby="splash-title">
+          <div class="splash__inner">
+            <img class="splash__logo" src="img/logo.svg" alt="" width="96" height="96">
+            <h1 id="splash-title" class="splash__title">HEXAORDERS</h1>
+            <p class="splash__subtitle">Order Management &amp; Risk Assessment System</p>
+            <ul class="splash__checks" aria-live="polite">
+              <li data-check="api"><span class="dot dot--pending"></span>API Java y PostgreSQL <em>comprobando…</em></li>
+              <li data-check="prometheus"><span class="dot dot--pending"></span>Prometheus <em>comprobando…</em></li>
+            </ul>
+            <button type="button" id="splash-enter" class="btn btn--primary">Entrar <kbd>Enter</kbd></button>
           </div>
-          <footer><span>Java 21 · Python · PostgreSQL · Docker Compose</span><span>Reglas independientes de frameworks. Dependencias hacia el dominio.</span></footer>
+        </div>
+        
+        <a class="skip-link" href="#main">Saltar al contenido</a>
+        
+        <header class="topbar">
+          <a class="brand" href="#inicio" aria-label="HexaOrders, inicio">
+            <img src="img/logo.svg" alt="" width="34" height="34">
+            <span class="brand__name">HEXA<span>ORDERS</span></span>
+          </a>
+          <nav class="nav" aria-label="Secciones">
+            <a href="#panel" data-nav>Panel</a>
+            <a href="#pedidos" data-nav>Pedidos</a>
+            <a href="#arquitectura" data-nav>Arquitectura</a>
+            <a href="#observabilidad" data-nav>Observabilidad</a>
+          </nav>
+          <div id="api-status" class="status-pill" role="status" aria-live="polite">
+            <span class="dot dot--pending"></span><span class="status-pill__text">Conectando…</span>
+          </div>
+        </header>
+        
+        <main id="main">
+          <!-- INICIO -->
+          <section id="inicio" class="hero">
+            <p class="eyebrow">Order Management &amp; Risk Assessment System</p>
+            <h1 class="hero__title">Pedidos evaluados con <span class="gradient-text">arquitectura hexagonal</span>.</h1>
+            <p class="hero__lead">Cada pedido entra por un adaptador REST en <strong>Java 21</strong>, consulta el motor de riesgo en <strong>Python</strong> a través de un puerto, aplica las reglas del dominio y se guarda en <strong>PostgreSQL</strong>. Prometheus y Grafana observan el sistema completo.</p>
+            <div class="hero__actions">
+              <a class="btn btn--primary" href="#pedidos">Crear un pedido</a>
+              <a class="btn btn--ghost" href="#arquitectura">Explorar la arquitectura</a>
+            </div>
+            <ul class="tech-list" aria-label="Tecnologías">
+              <li>Java 21 · Spring Boot</li><li>Python · FastAPI</li><li>PostgreSQL 17</li>
+              <li>Docker Compose</li><li>Prometheus</li><li>Grafana</li><li>Kubernetes</li>
+            </ul>
+          </section>
+        
+          <!-- PANEL -->
+          <section id="panel" class="section" aria-labelledby="panel-title">
+            <div class="section__head">
+              <div>
+                <p class="eyebrow">Dashboard</p>
+                <h2 id="panel-title">Panel de pedidos</h2>
+                <p class="section__lead">Datos reales de PostgreSQL obtenidos con <code>GET /api/orders/statistics</code> y <code>GET /api/orders</code>.</p>
+              </div>
+              <button type="button" class="btn btn--ghost btn--sm" data-refresh>Actualizar <span aria-hidden="true">↻</span></button>
+            </div>
+        
+            <div class="stats">
+              <article class="stat card">
+                <span class="stat__label">Total de pedidos</span>
+                <strong class="stat__value" id="stat-total" data-loading>—</strong>
+                <span class="stat__hint">Todos los pedidos persistidos</span>
+              </article>
+              <article class="stat card stat--success">
+                <span class="stat__label">Aprobados</span>
+                <strong class="stat__value" id="stat-approved" data-loading>—</strong>
+                <span class="stat__hint">Puntaje de riesgo &lt; 70</span>
+              </article>
+              <article class="stat card stat--warning">
+                <span class="stat__label">En revisión</span>
+                <strong class="stat__value" id="stat-review" data-loading>—</strong>
+                <span class="stat__hint">Puntaje de riesgo ≥ 70</span>
+              </article>
+              <article class="stat card stat--accent">
+                <span class="stat__label">Tasa de revisión</span>
+                <strong class="stat__value" id="stat-rate" data-loading>—</strong>
+                <span class="stat__hint">En revisión ÷ total</span>
+              </article>
+            </div>
+        
+            <div class="panel-grid">
+              <article class="card">
+                <h3 class="card__title">Distribución por decisión</h3>
+                <div class="distribution" id="distribution" role="img" aria-label="Distribución de pedidos por decisión">
+                  <span class="distribution__bar distribution__bar--approved" style="width:0%"></span>
+                  <span class="distribution__bar distribution__bar--review" style="width:0%"></span>
+                </div>
+                <ul class="legend">
+                  <li><span class="dot dot--ok"></span>Aprobados <strong id="legend-approved">—</strong></li>
+                  <li><span class="dot dot--warn"></span>En revisión <strong id="legend-review">—</strong></li>
+                </ul>
+                <h3 class="card__title card__title--spaced">Reglas del motor de riesgo</h3>
+                <p class="muted small">Política determinista implementada en <code>risk_engine/domain/risk.py</code>. La decisión final la toma el dominio Java en <code>OrderStatus.fromRiskScore</code> (puntaje ≥ 70 → revisión).</p>
+                <table class="rules">
+                  <thead><tr><th scope="col">Importe (USD)</th><th scope="col">Puntaje</th><th scope="col">Decisión</th></tr></thead>
+                  <tbody>
+                    <tr><td>&lt; 500</td><td class="mono">10</td><td><span class="badge badge--ok">APROBADO</span></td></tr>
+                    <tr><td>500 – 999.99</td><td class="mono">40</td><td><span class="badge badge--ok">APROBADO</span></td></tr>
+                    <tr><td>≥ 1000</td><td class="mono">75</td><td><span class="badge badge--warn">REVISIÓN</span></td></tr>
+                  </tbody>
+                </table>
+              </article>
+              <article class="card">
+                <div class="card__head">
+                  <h3 class="card__title">Últimos pedidos registrados</h3>
+                  <a class="link" href="#pedidos">Ver todos →</a>
+                </div>
+                <ul class="recent" id="recent-orders" aria-live="polite">
+                  <li class="recent__empty">Cargando pedidos…</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+        
+          <!-- PEDIDOS -->
+          <section id="pedidos" class="section" aria-labelledby="orders-title">
+            <div class="section__head">
+              <div>
+                <p class="eyebrow">Order Management</p>
+                <h2 id="orders-title">Gestión de pedidos</h2>
+                <p class="section__lead">Las validaciones del formulario solo ayudan al usuario: el dominio Java vuelve a validar todo y es la autoridad.</p>
+              </div>
+            </div>
+        
+            <div class="orders-grid">
+              <div class="orders-grid__side">
+                <form id="order-form" class="card form" novalidate>
+                  <h3 class="card__title">Nuevo pedido</h3>
+                  <div class="field">
+                    <label for="customer">Identificador del cliente</label>
+                    <input id="customer" name="customerId" value="cliente_demo" required maxlength="64" autocomplete="off" spellcheck="false" aria-describedby="customer-help customer-error">
+                    <small id="customer-help" class="field__help">1 a 64 caracteres: letras, dígitos, guion o guion bajo.</small>
+                    <small id="customer-error" class="field__error" hidden></small>
+                  </div>
+                  <div class="field">
+                    <label for="amount">Importe en USD</label>
+                    <input id="amount" name="amount" inputmode="decimal" value="125.50" required autocomplete="off" aria-describedby="amount-help amount-error">
+                    <small id="amount-help" class="field__help">Mayor que 0 y hasta 1 000 000.00, con 2 decimales como máximo.</small>
+                    <small id="amount-error" class="field__error" hidden></small>
+                  </div>
+                  <div class="presets" role="group" aria-label="Importes de ejemplo">
+                    <button type="button" class="chip" data-amount="125.50">125.50 · riesgo 10</button>
+                    <button type="button" class="chip" data-amount="750.00">750.00 · riesgo 40</button>
+                    <button type="button" class="chip" data-amount="1500.00">1500.00 · riesgo 75</button>
+                  </div>
+                  <button type="submit" class="btn btn--primary btn--block" id="order-submit">Evaluar riesgo y crear pedido</button>
+                  <div id="order-result" class="result" hidden aria-live="polite"></div>
+                </form>
+        
+                <form id="lookup-form" class="card form" novalidate>
+                  <h3 class="card__title">Consultar por ID</h3>
+                  <div class="field">
+                    <label for="lookup-id">UUID del pedido</label>
+                    <input id="lookup-id" name="id" autocomplete="off" spellcheck="false" placeholder="ej. 3f2c…" aria-describedby="lookup-error">
+                    <small id="lookup-error" class="field__error" hidden></small>
+                  </div>
+                  <button type="submit" class="btn btn--ghost btn--block">Consultar <code>GET /api/orders/{id}</code></button>
+                  <div id="lookup-result" class="result" hidden aria-live="polite"></div>
+                </form>
+              </div>
+        
+              <article class="card orders-table">
+                <div class="card__head">
+                  <h3 class="card__title">Pedidos recientes</h3>
+                  <button type="button" class="btn btn--ghost btn--sm" data-refresh>Actualizar <span aria-hidden="true">↻</span></button>
+                </div>
+                <div class="toolbar">
+                  <label class="sr-only" for="order-search">Buscar por cliente</label>
+                  <input id="order-search" type="search" placeholder="Buscar por cliente…" autocomplete="off">
+                  <div class="segmented" role="group" aria-label="Filtrar por decisión">
+                    <button type="button" class="segmented__btn is-active" data-filter="ALL" aria-pressed="true">Todos</button>
+                    <button type="button" class="segmented__btn" data-filter="APPROVED" aria-pressed="false">Aprobados</button>
+                    <button type="button" class="segmented__btn" data-filter="REVIEW" aria-pressed="false">Revisión</button>
+                  </div>
+                </div>
+                <p class="muted small" id="orders-caption">El API devuelve los 50 pedidos más recientes; el filtro y la búsqueda se aplican sobre ellos.</p>
+                <div class="table-scroll">
+                  <table class="table">
+                    <thead>
+                      <tr><th scope="col">Cliente / ID</th><th scope="col">Importe</th><th scope="col">Riesgo</th><th scope="col">Decisión</th><th scope="col">Creado</th></tr>
+                    </thead>
+                    <tbody id="orders-body">
+                      <tr><td colspan="5" class="table__empty">Cargando pedidos…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+        
+          <!-- ARQUITECTURA -->
+          <section id="arquitectura" class="section" aria-labelledby="arch-title">
+            <div class="section__head">
+              <div>
+                <p class="eyebrow">Architecture Explorer</p>
+                <h2 id="arch-title">Explorador de la arquitectura hexagonal</h2>
+                <p class="section__lead">Cada bloque es una clase o módulo real del repositorio. Selecciónalo para ver su responsabilidad, capa y archivo.</p>
+              </div>
+              <div class="segmented" role="group" aria-label="Vista del diagrama">
+                <button type="button" class="segmented__btn is-active" data-arch-mode="dependencies" aria-pressed="true">Dependencias del código</button>
+                <button type="button" class="segmented__btn" data-arch-mode="execution" aria-pressed="false">Flujo de ejecución</button>
+              </div>
+            </div>
+        
+            <p class="arch-legend" id="arch-mode-help"></p>
+        
+            <div class="arch">
+              <div class="arch__diagram card" id="arch-diagram">
+                <svg class="arch__edges" id="arch-edges" aria-hidden="true"></svg>
+                <div class="arch__col" data-col="actors"><h4>Actor / externo</h4></div>
+                <div class="arch__col" data-col="in"><h4>Adaptadores de entrada</h4></div>
+                <div class="arch__col arch__col--core" data-col="core"><h4>Núcleo: aplicación + dominio</h4></div>
+                <div class="arch__col" data-col="out"><h4>Adaptadores de salida</h4></div>
+                <div class="arch__col" data-col="external"><h4>Servicios externos</h4></div>
+              </div>
+        
+              <aside class="arch__detail card" id="arch-detail" aria-live="polite">
+                <p class="muted">Selecciona un componente del diagrama.</p>
+              </aside>
+            </div>
+        
+            <div class="arch-run card">
+              <div class="arch-run__head">
+                <div>
+                  <h3 class="card__title">Solicitud real a través de la arquitectura</h3>
+                  <p class="muted small">Envía un pedido real. Los datos de la derecha (estado HTTP, latencia medida en el navegador, respuesta y lectura posterior desde PostgreSQL) son observaciones auténticas. Los pasos numerados son el <strong>recorrido conceptual</strong> del código para ese resultado: no es una traza instrumentada.</p>
+                </div>
+                <div class="arch-run__controls">
+                  <label class="sr-only" for="run-amount">Importe</label>
+                  <select id="run-amount">
+                    <option value="125.50">125.50 USD → aprobado</option>
+                    <option value="1500.00">1500.00 USD → revisión</option>
+                    <option value="0">0 USD → validación (400)</option>
+                  </select>
+                  <button type="button" class="btn btn--primary" id="run-request">Ejecutar solicitud real</button>
+                </div>
+              </div>
+              <div class="arch-run__body">
+                <ol class="steps" id="run-steps"></ol>
+                <div class="evidence" id="run-evidence">
+                  <p class="muted small">Aún no se ha ejecutado ninguna solicitud.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        
+          <!-- OBSERVABILIDAD -->
+          <section id="observabilidad" class="section" aria-labelledby="obs-title">
+            <div class="section__head">
+              <div>
+                <p class="eyebrow">Observability</p>
+                <h2 id="obs-title">Observabilidad</h2>
+                <p class="section__lead">Estado consultado en vivo. El estado de salud de una aplicación no implica que todas sus dependencias funcionen: cada fila indica de dónde procede el dato.</p>
+              </div>
+              <div class="obs-links">
+                <a class="btn btn--ghost btn--sm" id="link-grafana" target="_blank" rel="noopener">Grafana ↗</a>
+                <a class="btn btn--ghost btn--sm" id="link-prometheus" target="_blank" rel="noopener">Prometheus ↗</a>
+              </div>
+            </div>
+        
+            <div id="obs-warning" class="alert" hidden role="alert"></div>
+        
+            <div class="obs-grid">
+              <article class="card">
+                <h3 class="card__title">Componentes</h3>
+                <ul class="health" id="health-list"></ul>
+              </article>
+              <article class="card">
+                <h3 class="card__title">Métricas reales (Prometheus)</h3>
+                <dl class="metrics" id="metrics-list"></dl>
+                <p class="muted small">Los contadores de Prometheus se reinician cuando se reinicia cada proceso; los totales persistentes están en el panel (PostgreSQL).</p>
+              </article>
+            </div>
+        
+            <article class="card">
+              <div class="card__head">
+                <h3 class="card__title">Targets de Prometheus</h3>
+                <span class="muted small" id="targets-updated"></span>
+              </div>
+              <div class="table-scroll">
+                <table class="table">
+                  <thead><tr><th scope="col">Job</th><th scope="col">Endpoint</th><th scope="col">Estado</th><th scope="col">Último scrape</th><th scope="col">Duración</th><th scope="col">Error</th></tr></thead>
+                  <tbody id="targets-body"><tr><td colspan="6" class="table__empty">Consultando Prometheus…</td></tr></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
         </main>
-        <script>
-          const byId = id => document.getElementById(id);
-          const money = new Intl.NumberFormat('es-PE', {style:'currency',currency:'USD'});
-          const appendCell = (row, value, className) => { const cell = document.createElement('td'); cell.textContent = value; if(className) cell.className = className; row.appendChild(cell); return cell; };
-          async function readResponse(response){ let body;try{body=await response.json();}catch{throw new Error('La API devolvió una respuesta no válida.');} if(!response.ok) throw new Error(body.detail || 'No se pudo completar la operación.');return body; }
-          async function loadOrders(){
-            try{
-              const orders=await readResponse(await fetch('/api/orders',{cache:'no-store'}));
-              byId('orders').replaceChildren();
-              for(const order of orders){
-                const row=document.createElement('tr'); const client=appendCell(row,order.customerId); const id=document.createElement('span');id.className='id';id.textContent=order.id;client.appendChild(id);
-                appendCell(row,money.format(order.amount));appendCell(row,order.riskScore+' / 100','score');
-                const statusCell=appendCell(row,'');const pill=document.createElement('span');pill.className='pill'+(order.status==='REVIEW'?' review':'');pill.textContent=order.status==='REVIEW'?'REVISIÓN':'APROBADO';statusCell.appendChild(pill);byId('orders').appendChild(row);
-              }
-              if(!orders.length){const row=document.createElement('tr');const cell=appendCell(row,'Tu primer pedido empieza aquí.','empty');cell.colSpan=4;byId('orders').appendChild(row);}
-              byId('connection').textContent='● API conectada';byId('count').textContent=orders.length+' pedidos visibles · máximo 50 · datos persistidos';
-            }catch(error){byId('connection').textContent='● API no disponible';const row=document.createElement('tr');const cell=appendCell(row,error.message,'empty');cell.colSpan=4;byId('orders').replaceChildren(row);}
-          }
-          byId('order-form').addEventListener('submit',async event=>{
-            event.preventDefault();const button=byId('submit');button.disabled=true;button.textContent='Evaluando riesgo…';byId('notice').hidden=true;
-            try{
-              const body=await readResponse(await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerId:byId('customer').value,amount:Number(byId('amount').value),currency:'USD'})}));
-              byId('response').textContent=JSON.stringify(body,null,2);byId('notice').className='notice success';byId('notice').textContent='Pedido creado · '+(body.status==='REVIEW'?'requiere revisión':'aprobado')+' · riesgo '+body.riskScore+'/100';await loadOrders();
-            }catch(error){byId('notice').className='notice error';byId('notice').textContent=error.message;byId('response').textContent=error.message;}
-            finally{byId('notice').hidden=false;button.disabled=false;button.textContent='Evaluar y crear pedido ↗';}
-          });
-          document.querySelectorAll('[data-amount]').forEach(button=>button.addEventListener('click',()=>byId('amount').value=button.dataset.amount));
-          byId('refresh').addEventListener('click',loadOrders);loadOrders();
-        </script>
+        
+        <footer class="footer">
+          <div class="footer__brand">
+            <img src="img/logo.svg" alt="" width="28" height="28">
+            <span><strong>HexaOrders</strong> — Order Management &amp; Risk Assessment System</span>
+          </div>
+          <p class="muted small">Dominio sin frameworks · Dependencias hacia el núcleo · Java 21 · Python · PostgreSQL · Docker Compose · Prometheus · Grafana</p>
+        </footer>
+        
+        <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
         </body>
         </html>
-        HEXFILE_21
-        COPY <<'HEXFILE_22' src/test/java/com/hexaorders/adapter/HttpRiskAssessmentAdapterTest.java
+        HEXFILE_26
+        COPY <<'HEXFILE_27' src/main/resources/static/js/api.js
+        // Cliente HTTP del frontend: único módulo que habla con el backend y con Prometheus.
+        // No contiene reglas de negocio: el dominio Java es la autoridad.
+        
+        export class ApiError extends Error {
+          constructor(message, { status = 0, title = '', body = null } = {}) {
+            super(message);
+            this.name = 'ApiError';
+            this.status = status;
+            this.title = title;
+            this.body = body;
+          }
+        }
+        
+        const DEFAULT_TIMEOUT_MS = 8000;
+        
+        /** Petición JSON con tiempo límite. Devuelve { data, status, headers, ms }. */
+        export async function requestJson(url, { method = 'GET', body, timeout = DEFAULT_TIMEOUT_MS } = {}) {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeout);
+          const started = performance.now();
+          let response;
+          try {
+            response = await fetch(url, {
+              method,
+              cache: 'no-store',
+              headers: body === undefined ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
+              body: body === undefined ? undefined : JSON.stringify(body),
+              signal: controller.signal,
+            });
+          } catch (error) {
+            const reason = error.name === 'AbortError' ? 'Tiempo de espera agotado' : 'Sin conexión con el servidor';
+            throw new ApiError(reason, { status: 0 });
+          } finally {
+            clearTimeout(timer);
+          }
+          const ms = performance.now() - started;
+          let data = null;
+          const text = await response.text();
+          if (text) {
+            try { data = JSON.parse(text); } catch { data = null; }
+          }
+          if (!response.ok) {
+            // Spring devuelve ProblemDetail (RFC 9457): { title, detail, status }.
+            const message = (data && (data.detail || data.title)) || `Error HTTP $${response.status}`;
+            throw new ApiError(message, { status: response.status, title: (data && data.title) || '', body: data });
+          }
+          return { data, status: response.status, headers: response.headers, ms };
+        }
+        
+        // ---- API de pedidos (Java) ------------------------------------------------
+        
+        export const ordersApi = {
+          list: () => requestJson('/api/orders'),
+          statistics: () => requestJson('/api/orders/statistics'),
+          get: (id) => requestJson(`/api/orders/$${encodeURIComponent(id)}`),
+          // El importe se envía como número JSON; Java lo recibe como BigDecimal y valida 2 decimales.
+          create: (customerId, amount) => requestJson('/api/orders', {
+            method: 'POST',
+            body: { customerId, amount: Number(amount), currency: 'USD' },
+          }),
+        };
+        
+        // ---- Prometheus y Grafana ---------------------------------------------------
+        // Prometheus (puerto 9091) y Grafana (3000) se publican en el mismo host que la API.
+        // Prometheus admite CORS por defecto (--web.cors.origin='.*'), por eso el navegador puede consultarlo.
+        
+        const host = window.location.hostname || '127.0.0.1';
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        export const PROMETHEUS_URL = `$${protocol}//$${host}:9091`;
+        export const GRAFANA_URL = `$${protocol}//$${host}:3000`;
+        
+        export const prometheusApi = {
+          targets: () => requestJson(`$${PROMETHEUS_URL}/api/v1/targets?state=active`, { timeout: 4000 }),
+          query: (promql) => requestJson(`$${PROMETHEUS_URL}/api/v1/query?query=$${encodeURIComponent(promql)}`, { timeout: 4000 }),
+        };
+        
+        /** Grafana no envía cabeceras CORS: una petición no-cors solo confirma que el servidor responde. */
+        export async function grafanaReachable() {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 4000);
+          try {
+            await fetch(`$${GRAFANA_URL}/api/health`, { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+            return true;
+          } catch {
+            return false;
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+        
+        // ---- Estado de conexión compartido -----------------------------------------
+        
+        /** Notifica a la interfaz el resultado de la última llamada a la API Java. */
+        export function reportApiStatus(ok, detail = '') {
+          window.dispatchEvent(new CustomEvent('hexa:api-status', { detail: { ok, detail, at: new Date() } }));
+        }
+        HEXFILE_27
+        COPY <<'HEXFILE_28' src/main/resources/static/js/app.js
+        // Punto de entrada del frontend de HexaOrders (módulos ES nativos, sin frameworks).
+        
+        import { ordersApi, prometheusApi, reportApiStatus } from './api.js';
+        import { initArchitecture } from './architecture.js';
+        import { renderRecent, renderRecentError, renderStatistics, renderStatisticsError } from './dashboard.js';
+        import { initGrid } from './grid-effect.js';
+        import { initObservability, refreshObservability } from './observability.js';
+        import { initOrders, renderOrders, renderOrdersError } from './orders.js';
+        import { $$, $$$$, reducedMotion } from './ui.js';
+        
+        const DATA_REFRESH_MS = 20000;
+        const OBS_REFRESH_MS = 15000;
+        
+        // ---- Estado de la API en la barra superior --------------------------------
+        window.addEventListener('hexa:api-status', ({ detail }) => {
+          const pill = $$('#api-status');
+          pill.querySelector('.dot').className = `dot $${detail.ok ? 'dot--ok' : 'dot--error'}`;
+          pill.querySelector('.status-pill__text').textContent = detail.ok ? 'API conectada' : 'API no disponible';
+          pill.title = detail.ok ? `Última respuesta: $${detail.at.toLocaleTimeString('es-ES')}` : detail.detail;
+        });
+        
+        // ---- Datos de pedidos ------------------------------------------------------
+        let loading = null;
+        async function refreshData() {
+          if (loading) return loading;
+          loading = (async () => {
+            const [statsResult, listResult] = await Promise.allSettled([ordersApi.statistics(), ordersApi.list()]);
+            if (statsResult.status === 'fulfilled') {
+              renderStatistics(statsResult.value.data);
+              reportApiStatus(true);
+            } else {
+              renderStatisticsError(statsResult.reason.message);
+              reportApiStatus(false, statsResult.reason.message);
+            }
+            if (listResult.status === 'fulfilled') {
+              renderRecent(listResult.value.data);
+              renderOrders(listResult.value.data);
+            } else {
+              renderRecentError(listResult.reason.message);
+              renderOrdersError(listResult.reason.message);
+            }
+            return statsResult.status === 'fulfilled';
+          })();
+          try { return await loading; } finally { loading = null; }
+        }
+        
+        // ---- Bienvenida -------------------------------------------------------------
+        function setSplashCheck(name, ok, text) {
+          const item = $$(`#splash [data-check="$${name}"]`);
+          if (!item) return;
+          item.querySelector('.dot').className = `dot $${ok ? 'dot--ok' : 'dot--warn'}`;
+          item.querySelector('em').textContent = text;
+        }
+        
+        function initSplash(apiCheck) {
+          const splash = $$('#splash');
+          let seen = false;
+          try { seen = sessionStorage.getItem('hexaorders.splash') === 'seen'; } catch { /* almacenamiento no disponible */ }
+          if (seen) { splash.hidden = true; return; }
+          let closed = false;
+          const close = () => {
+            if (closed) return;
+            closed = true;
+            try { sessionStorage.setItem('hexaorders.splash', 'seen'); } catch { /* sin almacenamiento */ }
+            splash.classList.add('is-leaving');
+            setTimeout(() => { splash.hidden = true; }, reducedMotion() ? 0 : 460);
+            document.removeEventListener('keydown', onKey);
+          };
+          const onKey = (event) => { if (event.key === 'Enter' || event.key === 'Escape') close(); };
+          document.addEventListener('keydown', onKey);
+          $$('#splash-enter').addEventListener('click', close);
+          splash.addEventListener('click', (event) => { if (event.target === splash) close(); });
+          $$('#splash-enter').focus({ preventScroll: true });
+        
+          // Comprobaciones reales; la bienvenida nunca espera por ellas para dejar entrar.
+          apiCheck.then((ok) => setSplashCheck('api', ok, ok ? 'disponible' : 'no responde'));
+          prometheusApi.targets()
+            .then(() => setSplashCheck('prometheus', true, 'disponible'))
+            .catch(() => setSplashCheck('prometheus', false, 'no responde (la aplicación sigue funcionando)'));
+          setTimeout(close, reducedMotion() ? 1200 : 2400);
+        }
+        
+        // ---- Navegación -------------------------------------------------------------
+        function initNavigation() {
+          const links = $$$$('[data-nav]');
+          const sections = links.map((link) => $$(link.getAttribute('href'))).filter(Boolean);
+          if (!('IntersectionObserver' in window)) return;
+          const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              links.forEach((link) => {
+                const active = link.getAttribute('href') === `#$${entry.target.id}`;
+                link.classList.toggle('is-active', active);
+                if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+              });
+            }
+          }, { rootMargin: '-45% 0px -50% 0px' });
+          sections.forEach((section) => observer.observe(section));
+        
+          if (!reducedMotion()) {
+            const reveal = new IntersectionObserver((entries) => {
+              for (const entry of entries) {
+                if (entry.isIntersecting) { entry.target.classList.add('is-visible'); reveal.unobserve(entry.target); }
+              }
+            }, { rootMargin: '0px 0px -8% 0px' });
+            $$$$('.section .card, .stats .stat').forEach((node) => { node.classList.add('reveal'); reveal.observe(node); });
+          }
+        }
+        
+        // ---- Arranque ----------------------------------------------------------------
+        function start() {
+          initGrid($$('#grid-canvas'));
+          initNavigation();
+          initOrders({ onChanged: refreshData });
+          initArchitecture();
+          initObservability();
+        
+          const firstLoad = refreshData();
+          initSplash(firstLoad);
+          firstLoad.finally(() => refreshObservability());
+        
+          $$$$('[data-refresh]').forEach((button) => button.addEventListener('click', refreshData));
+          window.addEventListener('hexa:orders-changed', () => { refreshData(); });
+        
+          setInterval(() => { if (!document.hidden) refreshData(); }, DATA_REFRESH_MS);
+          setInterval(() => { if (!document.hidden) refreshObservability(); }, OBS_REFRESH_MS);
+          document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshData(); });
+        }
+        
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+        else start();
+        HEXFILE_28
+        COPY <<'HEXFILE_29' src/main/resources/static/js/architecture.js
+        // Architecture Explorer. Cada nodo corresponde a una clase o módulo REAL del repositorio.
+        // Dos vistas distintas:
+        //  - "dependencies": dependencias del código fuente (las flechas apuntan hacia lo que se usa;
+        //    en el núcleo todas apuntan hacia dentro: regla de dependencia de la arquitectura hexagonal).
+        //  - "execution": orden de las llamadas en tiempo de ejecución para POST /api/orders.
+        // La "solicitud real" usa datos auténticos (HTTP, latencia, respuesta, relectura en PostgreSQL);
+        // los pasos numerados son el recorrido conceptual del código, no una traza instrumentada.
+        
+        import { ApiError, ordersApi } from './api.js';
+        import { $$, $$$$, el, reducedMotion, toast } from './ui.js';
+        
+        const JAVA = 'services/order-api/src/main/java/com/hexaorders/';
+        const PY = 'services/risk-engine/risk_engine/';
+        
+        const NODES = [
+          // Actor y arranque
+          { id: 'browser', col: 'actors', kind: 'external', name: 'Navegador', label: 'Actor primario',
+            layer: 'Externo · actor que dirige (driver)', file: 'services/order-api/src/main/resources/static/js/orders.js',
+            responsibility: 'Interfaz web servida por Spring Boot como recursos estáticos. Envía JSON y muestra respuestas; no contiene reglas de negocio.',
+            role: 'Consumidor del adaptador REST.', relation: 'Inicia el caso de uso con POST /api/orders.' },
+          { id: 'config', col: 'actors', kind: 'config', name: 'HexagonalConfiguration', label: 'Composition root',
+            layer: 'Configuración (Spring)', file: `$${JAVA}config/HexagonalConfiguration.java`,
+            responsibility: 'Único lugar que elige los adaptadores concretos y construye OrderService con ellos (inyección de dependencias). Define timeouts HTTP de 2 s (conexión) y 3 s (lectura) y el pool de PostgreSQL.',
+            role: 'Conecta puertos con adaptadores.', relation: 'Crea OrderService pasándole RiskAssessmentPort, OrderRepository, OrderTelemetry y Clock.' },
+        
+          // Adaptadores de entrada
+          { id: 'controller', col: 'in', kind: 'adapter', name: 'OrderController', label: 'Adaptador REST',
+            layer: 'Adaptador de entrada (driving)', file: `$${JAVA}adapter/in/web/OrderController.java`,
+            responsibility: 'Traduce HTTP ↔ caso de uso: POST /api/orders, GET /api/orders, GET /api/orders/{id} y GET /api/orders/statistics. Construye OrderDraft y devuelve 201 con cabecera Location.',
+            role: 'Usa el puerto de entrada OrderUseCases.', relation: 'Invoca create(), get(), latest() y statistics().' },
+          { id: 'handler', col: 'in', kind: 'adapter', name: 'ApiExceptionHandler', label: 'Errores → HTTP',
+            layer: 'Adaptador de entrada (driving)', file: `$${JAVA}adapter/in/web/ApiExceptionHandler.java`,
+            responsibility: 'Convierte excepciones del dominio y de la aplicación en ProblemDetail: 400 (datos inválidos), 404 (no encontrado) y 503 (motor de riesgo o base de datos no disponibles).',
+            role: 'Parte del adaptador web.', relation: 'Decide el código HTTP cuando el caso de uso falla.' },
+        
+          // Núcleo: puertos de entrada, aplicación, dominio y puertos de salida
+          { id: 'useCases', col: 'core', group: 'Puerto de entrada', kind: 'port', name: 'OrderUseCases', label: 'Interfaz',
+            layer: 'Aplicación · puerto de entrada', file: `$${JAVA}application/port/in/OrderUseCases.java`,
+            responsibility: 'Contrato de lo que la aplicación ofrece: create, get, latest y statistics. Los adaptadores de entrada dependen de esta interfaz, no de la implementación.',
+            role: 'Puerto de entrada (driving port).', relation: 'Implementado por OrderService.' },
+          { id: 'service', col: 'core', group: 'Caso de uso', kind: 'application', name: 'OrderService', label: 'Caso de uso',
+            layer: 'Aplicación · servicio', file: `$${JAVA}application/service/OrderService.java`,
+            responsibility: 'Orquesta el caso de uso en Java puro: primero evalúa el riesgo; solo si hay puntaje válido crea el Order y lo persiste con un único INSERT. Si el riesgo falla, registra el fallo y no guarda nada.',
+            role: 'Implementa OrderUseCases; usa tres puertos de salida.', relation: 'Es el caso de uso.' },
+          { id: 'draft', col: 'core', group: 'Dominio', kind: 'domain', name: 'OrderDraft', label: 'Valor validado',
+            layer: 'Dominio', file: `$${JAVA}domain/OrderDraft.java`,
+            responsibility: 'Valida la solicitud en lenguaje de negocio: customerId [A-Za-z0-9_-]{1,64}, importe > 0 y ≤ 1 000 000.00 con máximo 2 decimales (sin redondear) y moneda USD.',
+            role: 'Entidad/valor del dominio; sin frameworks.', relation: 'Entrada del caso de uso create().' },
+          { id: 'order', col: 'core', group: 'Dominio', kind: 'domain', name: 'Order', label: 'Entidad',
+            layer: 'Dominio', file: `$${JAVA}domain/Order.java`,
+            responsibility: 'Pedido creado. Su constructor garantiza que el estado corresponde al puntaje de riesgo.',
+            role: 'Entidad del dominio.', relation: 'Lo crea OrderService con Order.create(draft, score, id, instante).' },
+          { id: 'status', col: 'core', group: 'Dominio', kind: 'domain', name: 'OrderStatus', label: 'Regla de negocio',
+            layer: 'Dominio', file: `$${JAVA}domain/OrderStatus.java`,
+            responsibility: 'Regla de decisión propiedad del dominio Java: puntaje ≥ 70 → REVIEW; < 70 → APPROVED. Rechaza puntajes fuera de 0..100.',
+            role: 'Enumeración con la regla de umbral.', relation: 'Determina el estado del pedido.' },
+          { id: 'riskPort', col: 'core', group: 'Puertos de salida', kind: 'port', name: 'RiskAssessmentPort', label: 'Interfaz',
+            layer: 'Aplicación · puerto de salida', file: `$${JAVA}application/port/out/RiskAssessmentPort.java`,
+            responsibility: 'Contrato «dame un puntaje 0..100 para este OrderDraft o lanza RiskUnavailableException». No menciona HTTP ni Python.',
+            role: 'Puerto de salida (driven port).', relation: 'OrderService lo usa antes de persistir.' },
+          { id: 'repoPort', col: 'core', group: 'Puertos de salida', kind: 'port', name: 'OrderRepository', label: 'Interfaz',
+            layer: 'Aplicación · puerto de salida', file: `$${JAVA}application/port/out/OrderRepository.java`,
+            responsibility: 'Contrato de persistencia: save, findById, latest(limit) y statistics. No menciona SQL ni PostgreSQL.',
+            role: 'Puerto de salida (driven port).', relation: 'OrderService guarda y consulta pedidos.' },
+          { id: 'telemetryPort', col: 'core', group: 'Puertos de salida', kind: 'port', name: 'OrderTelemetry', label: 'Interfaz',
+            layer: 'Aplicación · puerto de salida', file: `$${JAVA}application/port/out/OrderTelemetry.java`,
+            responsibility: 'Contrato de métricas de negocio: orderCreated(status) y riskFailure(). No menciona Micrometer.',
+            role: 'Puerto de salida (driven port).', relation: 'OrderService informa pedidos creados y fallos de riesgo.' },
+        
+          // Adaptadores de salida
+          { id: 'httpRisk', col: 'out', kind: 'adapter', name: 'HttpRiskAssessmentAdapter', label: 'Cliente HTTP',
+            layer: 'Adaptador de salida (driven)', file: `$${JAVA}adapter/out/http/HttpRiskAssessmentAdapter.java`,
+            responsibility: 'Implementa RiskAssessmentPort con RestClient: POST /score al motor Python. Valida la respuesta y convierte errores de red o respuestas inválidas en RiskUnavailableException.',
+            role: 'Implementa RiskAssessmentPort.', relation: 'Proporciona el puntaje al caso de uso.' },
+          { id: 'jdbc', col: 'out', kind: 'adapter', name: 'JdbcOrderRepository', label: 'JDBC',
+            layer: 'Adaptador de salida (driven)', file: `$${JAVA}adapter/out/persistence/JdbcOrderRepository.java`,
+            responsibility: 'Implementa OrderRepository con JdbcTemplate: INSERT atómico, SELECT por id, últimos 50 y conteo por estado. Convierte errores de acceso a datos en PersistenceUnavailableException.',
+            role: 'Implementa OrderRepository.', relation: 'Persiste el pedido tras la evaluación de riesgo.' },
+          { id: 'micrometer', col: 'out', kind: 'adapter', name: 'MicrometerOrderTelemetry', label: 'Micrometer',
+            layer: 'Adaptador de salida (driven)', file: `$${JAVA}adapter/out/metrics/MicrometerOrderTelemetry.java`,
+            responsibility: 'Implementa OrderTelemetry con contadores Micrometer: orders_created_total{status} y orders_risk_failures_total, expuestos en /actuator/prometheus (puerto 9090).',
+            role: 'Implementa OrderTelemetry.', relation: 'Hace observable el resultado del caso de uso.' },
+        
+          // Servicios externos
+          { id: 'pyAdapter', col: 'external', group: 'risk-engine (Python)', kind: 'adapter', name: 'adapters/http.py', label: 'FastAPI · POST /score',
+            layer: 'Python · adaptador de entrada', file: `$${PY}adapters/http.py`,
+            responsibility: 'Adaptador FastAPI: valida JSON con decimales exactos (sin float), invoca el puerto ScoreRiskPort y expone /metrics (risk_evaluations_total, risk_evaluation_duration_seconds).',
+            role: 'Adaptador de entrada del segundo hexágono.', relation: 'Recibe la llamada de HttpRiskAssessmentAdapter.' },
+          { id: 'pyPort', col: 'external', group: 'risk-engine (Python)', kind: 'port', name: 'ScoreRiskPort', label: 'Protocol',
+            layer: 'Python · puerto de entrada', file: `$${PY}application/ports.py`,
+            responsibility: 'Puerto de entrada (typing.Protocol): execute(Evaluation) → RiskResult. HTTP y tests usan la misma capacidad.',
+            role: 'Puerto de entrada.', relation: 'Lo usa el adaptador FastAPI.' },
+          { id: 'pyUseCase', col: 'external', group: 'risk-engine (Python)', kind: 'application', name: 'ScoreRisk', label: 'Caso de uso',
+            layer: 'Python · aplicación', file: `$${PY}application/score_risk.py`,
+            responsibility: 'Caso de uso sin estado ni E/S: delega en la política del dominio.',
+            role: 'Implementa ScoreRiskPort.', relation: 'Calcula el puntaje que recibe Java.' },
+          { id: 'pyDomain', col: 'external', group: 'risk-engine (Python)', kind: 'domain', name: 'domain/risk.py', label: 'assess()',
+            layer: 'Python · dominio', file: `$${PY}domain/risk.py`,
+            responsibility: 'Política determinista y explicable: importe < 500 → 10; 500–999.99 → 40; ≥ 1000 → 75. Solo biblioteca estándar.',
+            role: 'Dominio del motor de riesgo.', relation: 'Origen del puntaje.' },
+          { id: 'postgres', col: 'external', kind: 'external', name: 'PostgreSQL 17', label: 'Tabla orders',
+            layer: 'Infraestructura · base de datos', file: 'services/order-api/src/main/resources/db/migration/V1__create_orders.sql',
+            responsibility: 'Persistencia. La migración Flyway crea la tabla orders con restricciones CHECK que repiten las invariantes (estado coherente con el puntaje). Volumen postgres_data.',
+            role: 'Sistema externo detrás de OrderRepository.', relation: 'Guarda el pedido aprobado o en revisión.' },
+          { id: 'prometheus', col: 'external', kind: 'external', name: 'Prometheus', label: 'Scrape cada 10 s',
+            layer: 'Infraestructura · observabilidad', file: 'infra/prometheus/prometheus.yml',
+            responsibility: 'Recoge /actuator/prometheus de Java y /metrics de Python; evalúa las reglas de alerta de infra/prometheus/alerts.yml. Grafana lo usa como datasource.',
+            role: 'Consumidor de las métricas (pull).', relation: 'Observa el caso de uso desde fuera, sin acoplarlo.' },
+        ];
+        
+        // Dependencias del código fuente: [desde, hacia, etiqueta]. "desde" depende de "hacia".
+        const DEPENDENCIES = [
+          ['controller', 'useCases', 'usa'],
+          ['controller', 'draft', 'crea'],
+          ['service', 'useCases', 'implementa'],
+          ['service', 'riskPort', 'usa'],
+          ['service', 'repoPort', 'usa'],
+          ['service', 'telemetryPort', 'usa'],
+          ['service', 'order', 'crea'],
+          ['order', 'status', 'usa'],
+          ['order', 'draft', 'valida con'],
+          ['riskPort', 'draft', 'recibe'],
+          ['repoPort', 'order', 'guarda'],
+          ['telemetryPort', 'status', 'recibe'],
+          ['httpRisk', 'riskPort', 'implementa'],
+          ['jdbc', 'repoPort', 'implementa'],
+          ['micrometer', 'telemetryPort', 'implementa'],
+          ['config', 'service', 'instancia'],
+          ['config', 'httpRisk', 'instancia'],
+          ['config', 'jdbc', 'instancia'],
+          ['config', 'micrometer', 'instancia'],
+          ['pyAdapter', 'pyPort', 'usa'],
+          ['pyUseCase', 'pyPort', 'implementa'],
+          ['pyUseCase', 'pyDomain', 'usa'],
+        ];
+        
+        // Llamadas en tiempo de ejecución para POST /api/orders (no son dependencias de código).
+        const STEPS = [
+          { text: 'El navegador envía <code>POST /api/orders</code> con customerId, amount y currency.', nodes: ['browser', 'controller'], edges: [['browser', 'controller', 'HTTP']] },
+          { text: '<code>OrderController</code> construye <code>OrderDraft</code>: el dominio valida los datos (si son inválidos → 400).', nodes: ['controller', 'draft'], edges: [['controller', 'draft']], fail: 'validation' },
+          { text: 'Llama al puerto de entrada <code>OrderUseCases.create()</code>, implementado por <code>OrderService</code>.', nodes: ['controller', 'useCases', 'service'], edges: [['controller', 'useCases'], ['useCases', 'service']] },
+          { text: '<code>OrderService</code> pide el puntaje a <code>RiskAssessmentPort</code> sin saber que existe HTTP o Python.', nodes: ['service', 'riskPort'], edges: [['service', 'riskPort']] },
+          { text: '<code>HttpRiskAssessmentAdapter</code> envía <code>POST http://risk-engine:8000/score</code> (si falla o tarda → 503, sin guardar).', nodes: ['riskPort', 'httpRisk', 'pyAdapter'], edges: [['riskPort', 'httpRisk'], ['httpRisk', 'pyAdapter', 'HTTP']], fail: 'risk' },
+          { text: 'FastAPI valida el JSON y ejecuta <code>ScoreRisk</code> → <code>assess()</code>, que devuelve el puntaje.', nodes: ['pyAdapter', 'pyPort', 'pyUseCase', 'pyDomain'], edges: [['pyAdapter', 'pyPort'], ['pyPort', 'pyUseCase'], ['pyUseCase', 'pyDomain']] },
+          { text: '<code>Order.create()</code>: <code>OrderStatus.fromRiskScore</code> decide APPROVED (&lt; 70) o REVIEW (≥ 70).', nodes: ['service', 'order', 'status'], edges: [['service', 'order'], ['order', 'status']] },
+          { text: '<code>OrderRepository.save()</code> → <code>JdbcOrderRepository</code> ejecuta un INSERT atómico en PostgreSQL.', nodes: ['service', 'repoPort', 'jdbc', 'postgres'], edges: [['service', 'repoPort'], ['repoPort', 'jdbc'], ['jdbc', 'postgres', 'SQL']], fail: 'persistence' },
+          { text: '<code>OrderTelemetry.orderCreated()</code> incrementa <code>orders_created_total{status}</code>.', nodes: ['service', 'telemetryPort', 'micrometer'], edges: [['service', 'telemetryPort'], ['telemetryPort', 'micrometer']] },
+          { text: '<code>OrderController</code> responde <code>201 Created</code> con la cabecera Location y el pedido en JSON.', nodes: ['controller', 'browser'], edges: [['controller', 'browser', 'HTTP']] },
+        ];
+        
+        const MODE_HELP = {
+          dependencies: 'Dependencias del código: cada flecha apunta a lo que el componente usa o implementa. En el núcleo todas apuntan hacia dentro; el dominio no depende de nada externo. Lo verifica ArchUnit (Java) y un test AST (Python).',
+          execution: 'Flujo de ejecución de POST /api/orders: el orden real de las llamadas. Fíjate en que la llamada va del caso de uso hacia el adaptador, aunque la dependencia del código va del adaptador hacia el puerto (inversión de dependencias).',
+        };
+        
+        let mode = 'dependencies';
+        let selected = null;
+        let running = false;
+        const byId = new Map(NODES.map((node) => [node.id, node]));
+        
+        const nodeButton = (id) => $$(`.node[data-node="$${id}"]`);
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        const kindLabel = { external: 'Externo', config: 'Configuración', adapter: 'Adaptador', port: 'Puerto', application: 'Aplicación', domain: 'Dominio' };
+        
+        function buildDiagram() {
+          const groups = new Map();
+          for (const node of NODES) {
+            const column = $$(`.arch__col[data-col="$${node.col}"]`);
+            const button = el('button', { type: 'button', class: 'node', dataset: { node: node.id, kind: node.kind },
+              'aria-pressed': 'false', 'aria-label': `$${node.name}, $${node.layer}` },
+            el('span', { class: 'node__name', text: node.name.replace(/([a-z])([A-Z])/g, '$$1\u200B$$2').replace(/\//g, '/\u200B') }),
+            el('span', { class: 'node__kind', text: node.label }));
+            button.addEventListener('click', () => select(node.id));
+            if (node.group) {
+              const key = `$${node.col}:$${node.group}`;
+              if (!groups.has(key)) {
+                const group = el('div', { class: 'arch__group' }, el('span', { class: 'arch__group-title', text: node.group }));
+                groups.set(key, group);
+                column.append(group);
+              }
+              groups.get(key).append(button);
+            } else {
+              column.append(button);
+            }
+          }
+        }
+        
+        function edgesForMode() {
+          if (mode === 'dependencies') return DEPENDENCIES.map(([from, to, label]) => ({ from, to, label }));
+          const seen = new Set();
+          const list = [];
+          for (const step of STEPS) {
+            for (const [from, to, label] of step.edges) {
+              const key = `$${from}>$${to}`;
+              if (!seen.has(key)) { seen.add(key); list.push({ from, to, label }); }
+            }
+          }
+          list.push({ from: 'prometheus', to: 'micrometer', label: 'scrape' });
+          list.push({ from: 'prometheus', to: 'pyAdapter', label: 'scrape' });
+          return list;
+        }
+        
+        function anchor(rect, base, towardsRight) {
+          return { x: (towardsRight ? rect.right : rect.left) - base.left, y: rect.top + rect.height / 2 - base.top };
+        }
+        
+        function drawEdges(highlight = new Set(), activeEdges = new Set()) {
+          const svg = $$('#arch-edges');
+          const diagram = $$('#arch-diagram');
+          if (!svg || getComputedStyle(svg).display === 'none') return;
+          const base = diagram.getBoundingClientRect();
+          svg.setAttribute('viewBox', `0 0 $${base.width} $${base.height}`);
+          const ns = 'http://www.w3.org/2000/svg';
+          svg.replaceChildren();
+          const defs = document.createElementNS(ns, 'defs');
+          for (const [id, color] of [['arrow', 'rgba(148,163,184,0.45)'], ['arrow-related', '#A78BFA'], ['arrow-active', '#10B981']]) {
+            const marker = document.createElementNS(ns, 'marker');
+            marker.setAttribute('id', id);
+            marker.setAttribute('viewBox', '0 0 10 10');
+            marker.setAttribute('refX', '9');
+            marker.setAttribute('refY', '5');
+            marker.setAttribute('markerWidth', '7');
+            marker.setAttribute('markerHeight', '7');
+            marker.setAttribute('orient', 'auto-start-reverse');
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+            path.setAttribute('fill', color);
+            marker.append(path);
+            defs.append(marker);
+          }
+          svg.append(defs);
+          for (const edge of edgesForMode()) {
+            const a = nodeButton(edge.from);
+            const b = nodeButton(edge.to);
+            if (!a || !b) continue;
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            const sameColumn = Math.abs(ra.left - rb.left) < 8;
+            let p1;
+            let p2;
+            let d;
+            if (sameColumn) {
+              // Conexión dentro de una columna: arco por el lateral derecho.
+              p1 = anchor(ra, base, true);
+              p2 = anchor(rb, base, true);
+              const bulge = 26 + Math.min(40, Math.abs(p2.y - p1.y) / 6);
+              d = `M$${p1.x},$${p1.y} C$${p1.x + bulge},$${p1.y} $${p2.x + bulge},$${p2.y} $${p2.x + 2},$${p2.y}`;
+            } else {
+              const rightward = rb.left > ra.left;
+              p1 = anchor(ra, base, rightward);
+              p2 = anchor(rb, base, !rightward);
+              const dx = Math.max(30, Math.abs(p2.x - p1.x) / 2);
+              d = `M$${p1.x},$${p1.y} C$${p1.x + (rightward ? dx : -dx)},$${p1.y} $${p2.x + (rightward ? -dx : dx)},$${p2.y} $${p2.x},$${p2.y}`;
+            }
+            const key = `$${edge.from}>$${edge.to}`;
+            const isActive = activeEdges.has(key);
+            const isRelated = !isActive && (highlight.has(edge.from) && highlight.has(edge.to));
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('class', `edge$${isActive ? ' edge--active' : isRelated ? ' edge--related' : ''}`);
+            path.setAttribute('marker-end', `url(#$${isActive ? 'arrow-active' : isRelated ? 'arrow-related' : 'arrow'})`);
+            if (mode === 'execution' && !isActive) path.setAttribute('stroke-dasharray', '4 4');
+            svg.append(path);
+          }
+        }
+        
+        function relationsOf(id) {
+          const edges = edgesForMode();
+          return {
+            outgoing: edges.filter((edge) => edge.from === id),
+            incoming: edges.filter((edge) => edge.to === id),
+          };
+        }
+        
+        function renderDetail(node) {
+          const panel = $$('#arch-detail');
+          const { outgoing, incoming } = relationsOf(node.id);
+          const verbOut = mode === 'dependencies' ? 'Depende de' : 'Llama a';
+          const verbIn = mode === 'dependencies' ? 'Dependen de este componente' : 'Recibe llamadas de';
+          const relationList = (edges, pick) => (edges.length
+            ? el('ul', { class: 'detail__relations' }, edges.map((edge) => el('li', {},
+              `$${edge.label ? `$${edge.label} · ` : ''}$${byId.get(pick(edge)).name}`)))
+            : el('p', { class: 'muted small', text: 'Ninguna en esta vista.' }));
+          panel.replaceChildren(el('div', { class: 'detail' },
+            el('div', { class: 'detail__layer' }, el('span', { class: `badge $${node.kind === 'domain' ? 'badge--ok' : node.kind === 'port' ? 'badge--warn' : 'badge--neutral'}`, text: kindLabel[node.kind] })),
+            el('h3', { class: 'detail__name', text: node.name }),
+            el('code', { class: 'detail__file', title: 'Archivo real en el repositorio', text: node.file }),
+            el('dl', {},
+              el('div', {}, el('dt', { text: 'Capa' }), el('dd', { text: node.layer })),
+              el('div', {}, el('dt', { text: 'Responsabilidad' }), el('dd', { text: node.responsibility })),
+              el('div', {}, el('dt', { text: 'Puerto o adaptador' }), el('dd', { text: node.role })),
+              el('div', {}, el('dt', { text: 'Relación con el caso de uso' }), el('dd', { text: node.relation })),
+              el('div', {}, el('dt', { text: verbOut }), el('dd', {}, relationList(outgoing, (edge) => edge.to))),
+              el('div', {}, el('dt', { text: verbIn }), el('dd', {}, relationList(incoming, (edge) => edge.from))))));
+        }
+        
+        function select(id) {
+          if (running) return;
+          selected = id;
+          const node = byId.get(id);
+          const { outgoing, incoming } = relationsOf(id);
+          const related = new Set([id, ...outgoing.map((edge) => edge.to), ...incoming.map((edge) => edge.from)]);
+          $$$$('.node').forEach((button) => {
+            const nodeId = button.dataset.node;
+            button.classList.toggle('is-selected', nodeId === id);
+            button.classList.toggle('is-related', nodeId !== id && related.has(nodeId));
+            button.classList.toggle('is-dimmed', !related.has(nodeId));
+            button.setAttribute('aria-pressed', String(nodeId === id));
+          });
+          drawEdges(related);
+          renderDetail(node);
+        }
+        
+        function clearHighlights() {
+          $$$$('.node').forEach((button) => button.classList.remove('is-selected', 'is-related', 'is-dimmed', 'is-active', 'is-failed'));
+        }
+        
+        function setMode(next) {
+          mode = next;
+          $$$$('[data-arch-mode]').forEach((button) => {
+            const isActive = button.dataset.archMode === next;
+            button.classList.toggle('is-active', isActive);
+            button.setAttribute('aria-pressed', String(isActive));
+          });
+          $$('#arch-mode-help').textContent = MODE_HELP[next];
+          if (selected) select(selected); else drawEdges();
+        }
+        
+        // ---- Solicitud real ---------------------------------------------------------
+        
+        function renderSteps() {
+          $$('#run-steps').replaceChildren(...STEPS.map((step) => {
+            const item = el('li');
+            item.innerHTML = step.text; // texto estático definido en este archivo, nunca datos del usuario o del API
+            return item;
+          }));
+        }
+        
+        function evidenceRow(label, value) {
+          return el('div', { class: 'evidence__row' }, el('span', { text: label }), el('strong', { text: value }));
+        }
+        
+        /** Índice del último paso alcanzado y si falló, según el resultado REAL de la petición. */
+        function outcomeFor(error) {
+          if (!error) return { reached: STEPS.length - 1, failed: false };
+          if (!(error instanceof ApiError) || error.status === 0) return { reached: 0, failed: true };
+          if (error.status === 400) return { reached: STEPS.findIndex((step) => step.fail === 'validation'), failed: true };
+          if (error.status === 503 && /persist/i.test(error.title)) return { reached: STEPS.findIndex((step) => step.fail === 'persistence'), failed: true };
+          if (error.status === 503) return { reached: STEPS.findIndex((step) => step.fail === 'risk'), failed: true };
+          return { reached: 0, failed: true };
+        }
+        
+        async function animateOutcome({ reached, failed }) {
+          const items = $$$$('#run-steps li');
+          const delay = reducedMotion() ? 0 : 420;
+          const traversed = new Set();
+          clearHighlights();
+          for (let index = 0; index < STEPS.length; index += 1) {
+            const item = items[index];
+            if (index < reached || (index === reached && !failed)) {
+              item.className = 'is-done';
+              STEPS[index].nodes.forEach((id) => nodeButton(id)?.classList.add('is-active'));
+              STEPS[index].edges.forEach(([from, to]) => traversed.add(`$${from}>$${to}`));
+              drawEdges(new Set(), traversed);
+            } else if (index === reached && failed) {
+              item.className = 'is-failed';
+              STEPS[index].nodes.forEach((id) => nodeButton(id)?.classList.add('is-failed'));
+              nodeButton('handler')?.classList.add('is-failed');
+            } else {
+              item.className = 'is-skipped';
+            }
+            if (delay && index <= reached) await sleep(delay);
+          }
+        }
+        
+        async function runRequest() {
+          if (running) return;
+          running = true;
+          const button = $$('#run-request');
+          const amount = $$('#run-amount').value;
+          const evidence = $$('#run-evidence');
+          button.disabled = true;
+          if (mode !== 'execution') setMode('execution');
+          renderSteps();
+          const requestBody = { customerId: 'explorer_demo', amount: Number(amount), currency: 'USD' };
+          evidence.replaceChildren(el('p', { class: 'muted small', text: 'Enviando solicitud real…' }));
+          let response = null;
+          let failure = null;
+          try {
+            response = await ordersApi.create(requestBody.customerId, amount);
+          } catch (error) {
+            failure = error;
+          }
+        
+          const rows = [
+            el('p', { class: 'muted small', text: 'Observado en esta ejecución (datos reales):' }),
+            evidenceRow('Solicitud', 'POST /api/orders'),
+            el('pre', { text: JSON.stringify(requestBody, null, 2) }),
+          ];
+          if (response) {
+            const order = response.data;
+            rows.push(evidenceRow('Estado HTTP', `$${response.status} Created`));
+            rows.push(evidenceRow('Latencia (navegador)', `$${response.ms.toFixed(0)} ms`));
+            rows.push(evidenceRow('Location', response.headers.get('Location') || '—'));
+            rows.push(evidenceRow('Puntaje devuelto por Python', `$${order.riskScore}/100`));
+            rows.push(evidenceRow('Decisión del dominio Java', order.status));
+            rows.push(el('pre', { text: JSON.stringify(order, null, 2) }));
+            try {
+              const reread = await ordersApi.get(order.id);
+              const same = JSON.stringify(reread.data) === JSON.stringify(order);
+              rows.push(evidenceRow('Relectura GET /api/orders/{id}', same ? 'idéntica: persistido en PostgreSQL' : 'difiere de la respuesta'));
+            } catch (error) {
+              rows.push(evidenceRow('Relectura GET /api/orders/{id}', `falló: $${error.message}`));
+            }
+            window.dispatchEvent(new CustomEvent('hexa:orders-changed'));
+          } else {
+            rows.push(evidenceRow('Estado HTTP', failure.status ? String(failure.status) : 'sin respuesta'));
+            if (failure.title) rows.push(evidenceRow('Título (ProblemDetail)', failure.title));
+            rows.push(evidenceRow('Detalle', failure.message));
+            rows.push(el('p', { class: 'muted small', text: failure.status === 400 || failure.status === 503 ? 'No se guardó ningún pedido: el caso de uso se interrumpió antes del INSERT.' : '' }));
+          }
+          evidence.replaceChildren(...rows);
+          await animateOutcome(outcomeFor(failure));
+          if (selected) renderDetail(byId.get(selected)); // relaciones de la vista actual (ejecución)
+          if (failure) toast(`Resultado real: $${failure.status || 'sin conexión'} · $${failure.message}`, failure.status === 400 ? 'warn' : 'error');
+          button.disabled = false;
+          running = false;
+        }
+        
+        export function initArchitecture() {
+          buildDiagram();
+          renderSteps();
+          $$$$('[data-arch-mode]').forEach((button) => button.addEventListener('click', () => {
+            clearHighlights();
+            setMode(button.dataset.archMode);
+          }));
+          $$('#run-request').addEventListener('click', runRequest);
+          setMode('dependencies');
+          let timer = 0;
+          const redraw = () => { clearTimeout(timer); timer = setTimeout(() => (selected ? select(selected) : drawEdges()), 100); };
+          window.addEventListener('resize', redraw);
+          // El diagrama puede cambiar de tamaño al cargar fuentes o al hacerse visible.
+          if ('ResizeObserver' in window) new ResizeObserver(redraw).observe($$('#arch-diagram'));
+          select('service');
+        }
+        HEXFILE_29
+        COPY <<'HEXFILE_30' src/main/resources/static/js/dashboard.js
+        // Panel: estadísticas de GET /api/orders/statistics (todos los pedidos en PostgreSQL)
+        // y últimos pedidos de GET /api/orders. No se calcula ni inventa ningún dato.
+        
+        import { $$, el, formatInt, formatMoney, formatRelative, setStat, statusBadge } from './ui.js';
+        
+        const RECENT_LIMIT = 6;
+        
+        export function renderStatistics(stats) {
+          setStat($$('#stat-total'), formatInt(stats.total));
+          setStat($$('#stat-approved'), formatInt(stats.approved));
+          setStat($$('#stat-review'), formatInt(stats.review));
+          const rate = stats.total > 0 ? (stats.review / stats.total) * 100 : 0;
+          setStat($$('#stat-rate'), stats.total > 0 ? `$${rate.toFixed(1)} %` : '—');
+        
+          const approvedPct = stats.total > 0 ? (stats.approved / stats.total) * 100 : 0;
+          const reviewPct = stats.total > 0 ? 100 - approvedPct : 0;
+          $$('.distribution__bar--approved').style.width = `$${approvedPct}%`;
+          $$('.distribution__bar--review').style.width = `$${reviewPct}%`;
+          $$('#distribution').setAttribute('aria-label',
+            `Aprobados $${stats.approved} ($${approvedPct.toFixed(1)} %), en revisión $${stats.review} ($${reviewPct.toFixed(1)} %)`);
+          $$('#legend-approved').textContent = formatInt(stats.approved);
+          $$('#legend-review').textContent = formatInt(stats.review);
+        }
+        
+        export function renderStatisticsError(message) {
+          for (const id of ['#stat-total', '#stat-approved', '#stat-review', '#stat-rate']) {
+            setStat($$(id), '—');
+          }
+          $$('#legend-approved').textContent = '—';
+          $$('#legend-review').textContent = '—';
+          $$('#distribution').setAttribute('aria-label', `Sin datos: $${message}`);
+        }
+        
+        export function renderRecent(orders) {
+          const list = $$('#recent-orders');
+          if (!orders.length) {
+            list.replaceChildren(el('li', { class: 'recent__empty', text: 'Todavía no hay pedidos. Crea el primero en la sección Pedidos.' }));
+            return;
+          }
+          list.replaceChildren(...orders.slice(0, RECENT_LIMIT).map((order) => el('li', {},
+            el('span', { class: 'recent__customer' }, order.customerId,
+              el('span', { class: 'recent__meta', text: `$${formatRelative(order.createdAt)} · riesgo $${order.riskScore}/100` })),
+            el('span', { class: 'recent__amount', text: formatMoney(order.amount) }),
+            statusBadge(order.status))));
+        }
+        
+        export function renderRecentError(message) {
+          $$('#recent-orders').replaceChildren(el('li', { class: 'recent__empty', text: `No se pudieron cargar los pedidos: $${message}` }));
+        }
+        HEXFILE_30
+        COPY <<'HEXFILE_31' src/main/resources/static/js/grid-effect.js
+        // Interactive Grid: cuadrícula de fondo que se ilumina en violeta bajo el cursor y se
+        // desvanece progresivamente (~1.7 s). Un solo <canvas>, sin librerías ni miles de nodos DOM.
+        //  - Las líneas estáticas se dibujan una vez en un canvas fuera de pantalla (por resize).
+        //  - requestAnimationFrame solo corre mientras haya celdas iluminadas; si no, se detiene.
+        //  - prefers-reduced-motion: sin estela animada; solo se resalta la celda actual.
+        
+        const FADE_MS = 1700;
+        const VIOLET = [139, 92, 246];
+        const VIOLET_LIGHT = [167, 139, 250];
+        
+        export function initGrid(canvas) {
+          if (!canvas || !canvas.getContext) return;
+          const ctx = canvas.getContext('2d');
+          const staticLayer = document.createElement('canvas');
+          const staticCtx = staticLayer.getContext('2d');
+          const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        
+          let cell = 32;
+          let cols = 0;
+          let rows = 0;
+          let dpr = 1;
+          let width = 0;
+          let height = 0;
+          let frame = 0;
+          let lastIndex = -1;
+          const active = new Map(); // índice de celda -> instante en que se iluminó
+        
+          function resize() {
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            width = window.innerWidth;
+            height = window.innerHeight;
+            cell = width < 640 ? 26 : 32;
+            cols = Math.ceil(width / cell);
+            rows = Math.ceil(height / cell);
+            for (const target of [canvas, staticLayer]) {
+              target.width = Math.round(width * dpr);
+              target.height = Math.round(height * dpr);
+            }
+            canvas.style.width = `$${width}px`;
+            canvas.style.height = `$${height}px`;
+            drawStaticGrid();
+            draw(performance.now());
+          }
+        
+          function drawStaticGrid() {
+            staticCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            staticCtx.clearRect(0, 0, width, height);
+            staticCtx.strokeStyle = 'rgba(148, 163, 184, 0.055)';
+            staticCtx.lineWidth = 1;
+            staticCtx.beginPath();
+            for (let x = 0; x <= cols; x += 1) {
+              const px = Math.round(x * cell) + 0.5;
+              staticCtx.moveTo(px, 0);
+              staticCtx.lineTo(px, height);
+            }
+            for (let y = 0; y <= rows; y += 1) {
+              const py = Math.round(y * cell) + 0.5;
+              staticCtx.moveTo(0, py);
+              staticCtx.lineTo(width, py);
+            }
+            staticCtx.stroke();
+          }
+        
+          function paintCell(index, intensity) {
+            const x = (index % cols) * cell;
+            const y = Math.floor(index / cols) * cell;
+            ctx.fillStyle = `rgba($${VIOLET[0]}, $${VIOLET[1]}, $${VIOLET[2]}, $${0.42 * intensity})`;
+            ctx.fillRect(x + 1, y + 1, cell - 1, cell - 1);
+            ctx.strokeStyle = `rgba($${VIOLET_LIGHT[0]}, $${VIOLET_LIGHT[1]}, $${VIOLET_LIGHT[2]}, $${0.75 * intensity})`;
+            ctx.strokeRect(x + 1.5, y + 1.5, cell - 2, cell - 2);
+          }
+        
+          function draw(now) {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(staticLayer, 0, 0);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.lineWidth = 1;
+            for (const [index, startedAt] of active) {
+              const progress = (now - startedAt) / FADE_MS;
+              if (progress >= 1) { active.delete(index); continue; }
+              const intensity = 1 - progress * progress * (3 - 2 * progress); // smoothstep inverso
+              paintCell(index, intensity);
+            }
+          }
+        
+          function loop(now) {
+            draw(now);
+            frame = active.size > 0 && !document.hidden ? requestAnimationFrame(loop) : 0;
+          }
+        
+          function onPointer(event) {
+            const col = Math.floor(event.clientX / cell);
+            const row = Math.floor(event.clientY / cell);
+            if (col < 0 || row < 0 || col >= cols || row >= rows) return;
+            const index = row * cols + col;
+            if (index === lastIndex) return;
+            lastIndex = index;
+            if (motionQuery.matches) {
+              // Movimiento reducido: resaltado inmediato y estático de la celda actual.
+              active.clear();
+              draw(performance.now());
+              ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+              paintCell(index, 0.6);
+              return;
+            }
+            active.set(index, performance.now()); // respuesta inmediata al entrar en la celda
+            if (!frame) frame = requestAnimationFrame(loop);
+          }
+        
+          let resizeTimer = 0;
+          window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(resize, 120);
+          });
+          window.addEventListener('pointermove', onPointer, { passive: true });
+          window.addEventListener('pointerdown', onPointer, { passive: true });
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && active.size && !frame) frame = requestAnimationFrame(loop);
+          });
+          motionQuery.addEventListener?.('change', () => { active.clear(); draw(performance.now()); });
+          resize();
+        }
+        HEXFILE_31
+        COPY <<'HEXFILE_32' src/main/resources/static/js/observability.js
+        // Observabilidad en vivo. Cada dato indica su origen; si Prometheus no responde se avisa
+        // sin bloquear el resto de la aplicación. Solo se consultan métricas que el código expone:
+        //  - Java (Micrometer): orders_created_total{status}, orders_risk_failures_total,
+        //    http_server_requests_seconds_* (Spring Boot Actuator).
+        //  - Python (prometheus_client): risk_evaluations_total{decision}, risk_evaluation_duration_seconds_*.
+        
+        import { GRAFANA_URL, PROMETHEUS_URL, grafanaReachable, prometheusApi } from './api.js';
+        import { $$, el, formatDateTime } from './ui.js';
+        
+        const METRICS = [
+          { label: 'Pedidos creados (aprobados)', promql: 'sum(orders_created_total{status="APPROVED"})', format: 'int' },
+          { label: 'Pedidos creados (revisión)', promql: 'sum(orders_created_total{status="REVIEW"})', format: 'int' },
+          { label: 'Fallos del motor de riesgo', promql: 'sum(orders_risk_failures_total)', format: 'int' },
+          { label: 'Evaluaciones en Python', promql: 'sum(risk_evaluations_total)', format: 'int' },
+          { label: 'Peticiones /api/orders por segundo (5 min)', promql: 'sum(rate(http_server_requests_seconds_count{uri=~"/api/orders.*"}[5m]))', format: 'rate' },
+          { label: 'Respuestas 5xx por segundo (5 min)', promql: 'sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))', format: 'rate' },
+          { label: 'Latencia p95 /api/orders (5 min)', promql: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri=~"/api/orders.*"}[5m])))', format: 'seconds' },
+        ];
+        
+        const JOB_NAMES = { 'order-api': 'API Java (order-api)', 'risk-engine': 'Motor de riesgo Python (risk-engine)', prometheus: 'Prometheus' };
+        
+        let apiState = { ok: null, detail: 'Sin comprobar todavía', at: null };
+        
+        function formatValue(value, format) {
+          if (value === null || Number.isNaN(value)) return 'sin datos';
+          if (format === 'int') return String(Math.round(value));
+          if (format === 'rate') return `$${value.toFixed(3)} /s`;
+          if (format === 'seconds') return value < 1 ? `$${(value * 1000).toFixed(0)} ms` : `$${value.toFixed(2)} s`;
+          return String(value);
+        }
+        
+        function healthItem(name, source, kind, statusText) {
+          return el('li', {},
+            el('span', { class: `dot dot--$${kind}` }),
+            el('span', { class: 'health__name' }, name, el('span', { class: 'health__source', text: source })),
+            el('span', { class: `badge badge--$${kind === 'ok' ? 'ok' : kind === 'warn' ? 'warn' : kind === 'error' ? 'error' : 'neutral'}`, text: statusText }));
+        }
+        
+        function renderHealth({ targets, prometheusOk, grafanaOk }) {
+          const items = [];
+          const api = apiState.ok === null ? ['pending', 'comprobando'] : apiState.ok ? ['ok', 'responde'] : ['error', 'sin respuesta'];
+          items.push(healthItem('API Java (Spring Boot)', 'Última llamada del navegador a /api/orders/statistics', api[0], api[1]));
+          const db = apiState.ok === null ? ['pending', 'comprobando'] : apiState.ok ? ['ok', 'consulta correcta'] : ['warn', 'desconocido'];
+          items.push(healthItem('PostgreSQL', 'Indirecto: la API respondió a una consulta agregada sobre la tabla orders', db[0], db[1]));
+        
+          const target = (job) => targets && targets.find((item) => item.labels.job === job);
+          const risk = target('risk-engine');
+          const riskState = !prometheusOk ? ['warn', 'no comprobable'] : !risk ? ['warn', 'sin target'] : risk.health === 'up' ? ['ok', 'up'] : ['error', risk.health];
+          items.push(healthItem('Motor de riesgo (Python)', 'Prometheus: métrica up del job risk-engine (scrape de /metrics)', riskState[0], riskState[1]));
+          items.push(healthItem('Prometheus', `Consulta directa a $${PROMETHEUS_URL}/api/v1/targets`, prometheusOk ? 'ok' : 'error', prometheusOk ? 'accesible' : 'no accesible'));
+          items.push(healthItem('Grafana', `Petición no-cors a $${GRAFANA_URL} (solo confirma que el servidor responde)`, grafanaOk ? 'ok' : 'error', grafanaOk ? 'accesible' : 'no accesible'));
+          $$('#health-list').replaceChildren(...items);
+        }
+        
+        function renderTargets(targets) {
+          const body = $$('#targets-body');
+          if (!targets) {
+            body.replaceChildren(el('tr', {}, el('td', { colspan: '6', class: 'table__empty', text: 'Prometheus no está accesible desde el navegador.' })));
+            return;
+          }
+          if (!targets.length) {
+            body.replaceChildren(el('tr', {}, el('td', { colspan: '6', class: 'table__empty', text: 'Prometheus no tiene targets activos.' })));
+            return;
+          }
+          body.replaceChildren(...targets.map((target) => el('tr', {},
+            el('td', {}, el('strong', { text: JOB_NAMES[target.labels.job] || target.labels.job })),
+            el('td', { class: 'mono', text: target.scrapeUrl }),
+            el('td', {}, el('span', { class: `badge $${target.health === 'up' ? 'badge--ok' : target.health === 'down' ? 'badge--error' : 'badge--neutral'}`, text: target.health })),
+            el('td', { text: target.lastScrape && !target.lastScrape.startsWith('0001') ? formatDateTime(target.lastScrape) : '—' }),
+            el('td', { class: 'mono', text: target.lastScrapeDuration ? `$${(target.lastScrapeDuration * 1000).toFixed(1)} ms` : '—' }),
+            el('td', { class: 'small', text: target.lastError || '—' }))));
+        }
+        
+        async function renderMetrics(prometheusOk) {
+          const list = $$('#metrics-list');
+          if (!prometheusOk) {
+            list.replaceChildren(el('dt', { text: 'Métricas no disponibles: Prometheus no responde.' }), el('dd', { text: '—' }));
+            return;
+          }
+          const results = await Promise.all(METRICS.map(async (metric) => {
+            try {
+              const { data } = await prometheusApi.query(metric.promql);
+              const sample = data && data.data && data.data.result && data.data.result[0];
+              return sample ? Number(sample.value[1]) : null;
+            } catch {
+              return null;
+            }
+          }));
+          list.replaceChildren(...METRICS.flatMap((metric, index) => [
+            el('dt', {}, metric.label, el('code', { text: metric.promql.length > 64 ? `$${metric.promql.slice(0, 61)}…` : metric.promql, title: metric.promql })),
+            el('dd', { text: formatValue(results[index], metric.format) }),
+          ]));
+        }
+        
+        export async function refreshObservability() {
+          let targets = null;
+          let prometheusOk = false;
+          try {
+            const { data } = await prometheusApi.targets();
+            targets = (data && data.data && data.data.activeTargets) || [];
+            prometheusOk = true;
+          } catch {
+            prometheusOk = false;
+          }
+          const grafanaOk = await grafanaReachable();
+          const warning = $$('#obs-warning');
+          const problems = [];
+          if (!prometheusOk) problems.push(`Prometheus no responde en $${PROMETHEUS_URL}`);
+          if (!grafanaOk) problems.push(`Grafana no responde en $${GRAFANA_URL}`);
+          warning.hidden = problems.length === 0;
+          warning.textContent = problems.length ? `$${problems.join(' · ')}. El resto de la aplicación sigue funcionando.` : '';
+          renderHealth({ targets, prometheusOk, grafanaOk });
+          renderTargets(prometheusOk ? targets : null);
+          await renderMetrics(prometheusOk);
+          $$('#targets-updated').textContent = `Actualizado $${new Date().toLocaleTimeString('es-ES')}`;
+          return { prometheusOk, grafanaOk };
+        }
+        
+        export function initObservability() {
+          $$('#link-grafana').href = `$${GRAFANA_URL}/d/hexaorders`;
+          $$('#link-prometheus').href = `$${PROMETHEUS_URL}/targets`;
+          window.addEventListener('hexa:api-status', (event) => {
+            apiState = event.detail;
+          });
+        }
+        HEXFILE_32
+        COPY <<'HEXFILE_33' src/main/resources/static/js/orders.js
+        // Gestión de pedidos: alta, consulta por ID y listado. Todos los datos vienen del backend.
+        // La validación del formulario es solo ayuda al usuario; OrderDraft (dominio Java) es la autoridad.
+        
+        import { ApiError, ordersApi } from './api.js';
+        import { $$, $$$$, copyText, el, formatDateTime, formatMoney, formatRelative, scoreView, statusBadge, statusLabel, toast } from './ui.js';
+        
+        const CUSTOMER_PATTERN = /^[A-Za-z0-9_-]{1,64}$$/;
+        const AMOUNT_PATTERN = /^\d{1,7}(\.\d{1,2})?$$/;
+        const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$$/i;
+        
+        let allOrders = [];
+        let filter = 'ALL';
+        let search = '';
+        
+        export function validateCustomer(value) {
+          if (!value) return 'Introduce un identificador de cliente.';
+          if (!CUSTOMER_PATTERN.test(value)) return 'Usa entre 1 y 64 letras, dígitos, guiones o guiones bajos.';
+          return '';
+        }
+        
+        export function normalizeAmount(raw) {
+          return String(raw).trim().replace(',', '.');
+        }
+        
+        export function validateAmount(raw) {
+          const value = normalizeAmount(raw);
+          if (!value) return 'Introduce un importe.';
+          if (!AMOUNT_PATTERN.test(value)) return 'Usa un número con como máximo 2 decimales (ej. 125.50).';
+          const amount = Number(value);
+          if (!(amount > 0)) return 'El importe debe ser mayor que 0.';
+          if (amount > 1000000) return 'El importe máximo es 1 000 000.00.';
+          return '';
+        }
+        
+        function showFieldError(input, errorNode, message) {
+          input.setAttribute('aria-invalid', message ? 'true' : 'false');
+          errorNode.textContent = message;
+          errorNode.hidden = !message;
+        }
+        
+        function orderDetails(order) {
+          return el('dl', {},
+            el('dt', { text: 'ID' }), el('dd', { text: order.id }),
+            el('dt', { text: 'Cliente' }), el('dd', { text: order.customerId }),
+            el('dt', { text: 'Importe' }), el('dd', { text: formatMoney(order.amount) }),
+            el('dt', { text: 'Riesgo' }), el('dd', { text: `$${order.riskScore}/100` }),
+            el('dt', { text: 'Decisión' }), el('dd', { text: statusLabel(order.status) }),
+            el('dt', { text: 'Creado' }), el('dd', { text: formatDateTime(order.createdAt) }));
+        }
+        
+        function showResult(container, kind, title, ...content) {
+          container.className = `result result--$${kind}`;
+          const dot = { ok: 'ok', warn: 'warn', error: 'error' }[kind];
+          container.replaceChildren(el('div', { class: 'result__title' }, el('span', { class: `dot dot--$${dot}` }), title), ...content);
+          container.hidden = false;
+        }
+        
+        function errorText(error) {
+          if (error instanceof ApiError && error.status) return `HTTP $${error.status} · $${error.title || 'Error'}: $${error.message}`;
+          return error.message;
+        }
+        
+        // ---- Listado ---------------------------------------------------------------
+        
+        function visibleOrders() {
+          const term = search.trim().toLowerCase();
+          return allOrders.filter((order) => (filter === 'ALL' || order.status === filter)
+            && (!term || order.customerId.toLowerCase().includes(term)));
+        }
+        
+        function renderTable() {
+          const body = $$('#orders-body');
+          const rows = visibleOrders();
+          if (!rows.length) {
+            const message = allOrders.length ? 'Ningún pedido coincide con el filtro.' : 'Todavía no hay pedidos registrados.';
+            body.replaceChildren(el('tr', {}, el('td', { colspan: '5', class: 'table__empty', text: message })));
+          } else {
+            body.replaceChildren(...rows.map((order) => el('tr', {},
+              el('td', {}, el('strong', { text: order.customerId }),
+                el('span', { class: 'table__id', title: 'Copiar ID', tabindex: '0', role: 'button', text: order.id,
+                  onclick: () => copyText(order.id),
+                  onkeydown: (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); copyText(order.id); } } })),
+              el('td', { class: 'mono', text: formatMoney(order.amount) }),
+              el('td', {}, scoreView(order.riskScore)),
+              el('td', {}, statusBadge(order.status)),
+              el('td', { title: formatDateTime(order.createdAt), text: formatRelative(order.createdAt) }))));
+          }
+          $$('#orders-caption').textContent = `$${rows.length} de $${allOrders.length} pedidos visibles · el API devuelve los 50 más recientes.`;
+        }
+        
+        export function renderOrders(orders) {
+          allOrders = orders;
+          renderTable();
+        }
+        
+        export function renderOrdersError(message) {
+          allOrders = [];
+          $$('#orders-body').replaceChildren(el('tr', {}, el('td', { colspan: '5', class: 'table__empty', text: `No se pudieron cargar los pedidos: $${message}` })));
+        }
+        
+        // ---- Inicialización --------------------------------------------------------
+        
+        export function initOrders({ onChanged }) {
+          const form = $$('#order-form');
+          const customer = $$('#customer');
+          const amount = $$('#amount');
+          const submit = $$('#order-submit');
+          const result = $$('#order-result');
+        
+          customer.addEventListener('input', () => showFieldError(customer, $$('#customer-error'), ''));
+          amount.addEventListener('input', () => showFieldError(amount, $$('#amount-error'), ''));
+          $$$$('[data-amount]').forEach((button) => button.addEventListener('click', () => {
+            amount.value = button.dataset.amount;
+            showFieldError(amount, $$('#amount-error'), '');
+            amount.focus();
+          }));
+        
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const customerError = validateCustomer(customer.value.trim());
+            const amountError = validateAmount(amount.value);
+            showFieldError(customer, $$('#customer-error'), customerError);
+            showFieldError(amount, $$('#amount-error'), amountError);
+            if (customerError || amountError) {
+              (customerError ? customer : amount).focus();
+              return;
+            }
+            submit.disabled = true;
+            submit.textContent = 'Consultando motor de riesgo…';
+            try {
+              const { data: order, ms } = await ordersApi.create(customer.value.trim(), normalizeAmount(amount.value));
+              const review = order.status === 'REVIEW';
+              showResult(result, review ? 'warn' : 'ok',
+                review ? 'Pedido creado · requiere revisión' : 'Pedido creado · aprobado',
+                el('p', { class: 'muted small', text: `HTTP 201 Created en $${ms.toFixed(0)} ms · guardado en PostgreSQL` }),
+                orderDetails(order));
+              toast(`$${review ? 'Pedido en revisión' : 'Pedido aprobado'} · riesgo $${order.riskScore}/100`, review ? 'warn' : 'ok');
+              $$('#lookup-id').value = order.id;
+              onChanged();
+            } catch (error) {
+              const unavailable = error instanceof ApiError && error.status === 503;
+              showResult(result, 'error', unavailable ? 'Servicio no disponible: no se creó el pedido' : 'No se pudo crear el pedido',
+                el('p', { text: errorText(error) }));
+              toast(error.message, 'error');
+            } finally {
+              submit.disabled = false;
+              submit.textContent = 'Evaluar riesgo y crear pedido';
+            }
+          });
+        
+          // Consulta por ID
+          const lookupForm = $$('#lookup-form');
+          const lookupInput = $$('#lookup-id');
+          const lookupResult = $$('#lookup-result');
+          lookupInput.addEventListener('input', () => showFieldError(lookupInput, $$('#lookup-error'), ''));
+          lookupForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const id = lookupInput.value.trim();
+            const message = UUID_PATTERN.test(id) ? '' : 'Introduce un UUID válido (36 caracteres con guiones).';
+            showFieldError(lookupInput, $$('#lookup-error'), message);
+            if (message) { lookupInput.focus(); return; }
+            try {
+              const { data: order, ms } = await ordersApi.get(id);
+              showResult(lookupResult, order.status === 'REVIEW' ? 'warn' : 'ok', 'Pedido encontrado en PostgreSQL',
+                el('p', { class: 'muted small', text: `HTTP 200 en $${ms.toFixed(0)} ms` }), orderDetails(order));
+            } catch (error) {
+              showResult(lookupResult, 'error', error.status === 404 ? 'Pedido no encontrado' : 'Error en la consulta',
+                el('p', { text: errorText(error) }));
+            }
+          });
+        
+          // Filtros del listado
+          $$('#order-search').addEventListener('input', (event) => { search = event.target.value; renderTable(); });
+          $$$$('[data-filter]').forEach((button) => button.addEventListener('click', () => {
+            filter = button.dataset.filter;
+            $$$$('[data-filter]').forEach((other) => {
+              const activeButton = other === button;
+              other.classList.toggle('is-active', activeButton);
+              other.setAttribute('aria-pressed', String(activeButton));
+            });
+            renderTable();
+          }));
+        }
+        HEXFILE_33
+        COPY <<'HEXFILE_34' src/main/resources/static/js/ui.js
+        // Utilidades de presentación. Todo el texto dinámico se inserta con textContent (sin innerHTML).
+        
+        export const $$ = (selector, root = document) => root.querySelector(selector);
+        export const $$$$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+        
+        /** Crea un elemento: el(tag, {class, text, attrs...}, ...children). */
+        export function el(tag, props = {}, ...children) {
+          const node = document.createElement(tag);
+          for (const [key, value] of Object.entries(props)) {
+            if (value === undefined || value === null || value === false) continue;
+            if (key === 'class') node.className = value;
+            else if (key === 'text') node.textContent = value;
+            else if (key === 'dataset') Object.assign(node.dataset, value);
+            else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
+            else node.setAttribute(key, value === true ? '' : value);
+          }
+          for (const child of children.flat()) {
+            if (child === null || child === undefined || child === false) continue;
+            node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+          }
+          return node;
+        }
+        
+        export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        
+        const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+        const integer = new Intl.NumberFormat('es-ES');
+        const dateTime = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'medium' });
+        const relative = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+        
+        export const formatMoney = (value) => money.format(Number(value));
+        export const formatInt = (value) => integer.format(value);
+        export const formatDateTime = (iso) => dateTime.format(new Date(iso));
+        
+        export function formatRelative(iso) {
+          const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
+          const abs = Math.abs(seconds);
+          if (abs < 60) return relative.format(seconds, 'second');
+          if (abs < 3600) return relative.format(Math.round(seconds / 60), 'minute');
+          if (abs < 86400) return relative.format(Math.round(seconds / 3600), 'hour');
+          return relative.format(Math.round(seconds / 86400), 'day');
+        }
+        
+        export const statusLabel = (status) => (status === 'REVIEW' ? 'REVISIÓN' : 'APROBADO');
+        export const statusBadge = (status) => el('span', {
+          class: `badge $${status === 'REVIEW' ? 'badge--warn' : 'badge--ok'}`,
+          text: statusLabel(status),
+        });
+        
+        export function scoreView(score) {
+          const color = score >= 70 ? 'var(--amber)' : score >= 40 ? 'var(--violet-2)' : 'var(--green)';
+          const fill = el('span');
+          fill.style.width = `$${Math.max(0, Math.min(100, score))}%`;
+          fill.style.background = color;
+          return el('span', { class: 'score', title: `Puntaje de riesgo $${score} de 100` },
+            el('span', { class: 'score__bar' }, fill), `$${score}/100`);
+        }
+        
+        /** Notificación breve, anunciada por lectores de pantalla (aria-live en el contenedor). */
+        export function toast(message, kind = 'ok', timeout = 4200) {
+          const container = $$('#toasts');
+          if (!container) return;
+          const dotKind = { ok: 'ok', warn: 'warn', error: 'error' }[kind] || 'pending';
+          const node = el('div', { class: `toast toast--$${kind}`, role: kind === 'error' ? 'alert' : 'status' },
+            el('span', { class: `dot dot--$${dotKind}` }), el('span', { text: message }));
+          container.append(node);
+          setTimeout(() => {
+            node.classList.add('is-leaving');
+            setTimeout(() => node.remove(), 320);
+          }, timeout);
+        }
+        
+        /** Actualiza el texto de una estadística resaltando el cambio. */
+        export function setStat(node, text) {
+          if (!node) return;
+          const changed = node.textContent !== text;
+          node.removeAttribute('data-loading');
+          node.textContent = text;
+          if (changed && !reducedMotion()) {
+            node.classList.remove('is-updated');
+            void node.offsetWidth; // reinicia la animación
+            node.classList.add('is-updated');
+          }
+        }
+        
+        export async function copyText(text) {
+          try {
+            await navigator.clipboard.writeText(text);
+            toast('ID copiado al portapapeles', 'ok', 2000);
+          } catch {
+            toast('No se pudo copiar automáticamente', 'warn', 2500);
+          }
+        }
+        HEXFILE_34
+        COPY <<'HEXFILE_35' src/test/java/com/hexaorders/adapter/HttpRiskAssessmentAdapterTest.java
         package com.hexaorders.adapter;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -1353,8 +3535,8 @@ services:
                 assertThatThrownBy(() -> adapter.assess(draft)).isInstanceOf(RiskUnavailableException.class);
             }
         }
-        HEXFILE_22
-        COPY <<'HEXFILE_23' src/test/java/com/hexaorders/adapter/OrderControllerTest.java
+        HEXFILE_35
+        COPY <<'HEXFILE_36' src/test/java/com/hexaorders/adapter/OrderControllerTest.java
         package com.hexaorders.adapter;
         
         import static org.mockito.ArgumentMatchers.any;
@@ -1373,6 +3555,7 @@ services:
         import com.hexaorders.application.port.in.OrderUseCases;
         import com.hexaorders.domain.Order;
         import com.hexaorders.domain.OrderDraft;
+        import com.hexaorders.domain.OrderStatistics;
         import java.math.BigDecimal;
         import java.time.Instant;
         import java.util.UUID;
@@ -1419,6 +3602,16 @@ services:
             }
         
             @Test
+            void statisticsEndpointIsNotMistakenForAnOrderId() throws Exception {
+                when(useCases.statistics()).thenReturn(OrderStatistics.of(3, 1));
+                http.perform(get("/api/orders/statistics"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$$.total").value(4))
+                        .andExpect(jsonPath("$$.approved").value(3))
+                        .andExpect(jsonPath("$$.review").value(1));
+            }
+        
+            @Test
             void missingOrderReturns404AndMalformedIdReturns400() throws Exception {
                 UUID id = UUID.randomUUID();
                 when(useCases.get(id)).thenThrow(new OrderNotFoundException(id));
@@ -1426,8 +3619,8 @@ services:
                 http.perform(get("/api/orders/not-a-uuid")).andExpect(status().isBadRequest());
             }
         }
-        HEXFILE_23
-        COPY <<'HEXFILE_24' src/test/java/com/hexaorders/application/OrderServiceTest.java
+        HEXFILE_36
+        COPY <<'HEXFILE_37' src/test/java/com/hexaorders/application/OrderServiceTest.java
         package com.hexaorders.application;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -1449,6 +3642,7 @@ services:
         import com.hexaorders.application.service.OrderService;
         import com.hexaorders.domain.Order;
         import com.hexaorders.domain.OrderDraft;
+        import com.hexaorders.domain.OrderStatistics;
         import com.hexaorders.domain.OrderStatus;
         import java.math.BigDecimal;
         import java.time.Clock;
@@ -1515,9 +3709,24 @@ services:
                 service.latest();
                 verify(repository).latest(50);
             }
+        
+            @Test
+            void createdAtHasMicrosecondPrecisionSoTheResponseMatchesWhatIsPersisted() {
+                Instant withNanos = Instant.parse("2026-01-01T12:00:00.123456789Z");
+                OrderService preciseClockService = new OrderService(repository, risk, telemetry, Clock.fixed(withNanos, ZoneOffset.UTC));
+                when(risk.assess(draft)).thenReturn(10);
+                assertThat(preciseClockService.create(draft).createdAt()).isEqualTo(Instant.parse("2026-01-01T12:00:00.123456Z"));
+            }
+        
+            @Test
+            void statisticsComeFromTheRepositoryAndNeverCallTheRiskEngine() {
+                when(repository.statistics()).thenReturn(OrderStatistics.of(4, 2));
+                assertThat(service.statistics()).isEqualTo(new OrderStatistics(6, 4, 2));
+                verifyNoInteractions(risk, telemetry);
+            }
         }
-        HEXFILE_24
-        COPY <<'HEXFILE_25' src/test/java/com/hexaorders/architecture/HexagonalArchitectureTest.java
+        HEXFILE_37
+        COPY <<'HEXFILE_38' src/test/java/com/hexaorders/architecture/HexagonalArchitectureTest.java
         package com.hexaorders.architecture;
         
         import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -1544,8 +3753,8 @@ services:
             static final ArchRule ADAPTERS_ARE_INDEPENDENT = noClasses().that().resideInAPackage("..adapter.in..")
                     .should().dependOnClassesThat().resideInAPackage("..adapter.out..");
         }
-        HEXFILE_25
-        COPY <<'HEXFILE_26' src/test/java/com/hexaorders/domain/OrderDomainTest.java
+        HEXFILE_38
+        COPY <<'HEXFILE_39' src/test/java/com/hexaorders/domain/OrderDomainTest.java
         package com.hexaorders.domain;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -1602,8 +3811,17 @@ services:
                 assertThatThrownBy(() -> new Order(UUID.randomUUID(), "demo", BigDecimal.ONE, "USD", 80,
                         OrderStatus.APPROVED, Instant.now())).isInstanceOf(IllegalArgumentException.class);
             }
+        
+            @Test
+            void statisticsTotalIsAlwaysTheSumOfBothStatuses() {
+                OrderStatistics statistics = OrderStatistics.of(7, 3);
+                assertThat(statistics.total()).isEqualTo(10);
+                assertThat(OrderStatistics.of(0, 0).total()).isZero();
+                assertThatThrownBy(() -> new OrderStatistics(5, 1, 1)).isInstanceOf(IllegalArgumentException.class);
+                assertThatThrownBy(() -> OrderStatistics.of(-1, 2)).isInstanceOf(IllegalArgumentException.class);
+            }
         }
-        HEXFILE_26
+        HEXFILE_39
         RUN mvn -B -ntp verify
         
         FROM eclipse-temurin:21-jre-jammy AS runtime
@@ -1768,7 +3986,7 @@ services:
           "tags": ["hexagonal", "java", "python"],
           "timezone": "browser",
           "schemaVersion": 39,
-          "version": 1,
+          "version": 2,
           "refresh": "10s",
           "time": {"from": "now-15m", "to": "now"},
           "panels": [
@@ -1823,6 +4041,20 @@ services:
               "datasource": {"type": "prometheus", "uid": "prometheus"},
               "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))", "legendFormat": "p95 riesgo"}],
               "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 8, "title": "Respuestas HTTP /api/orders por código / segundo", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 0, "y": 21},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum by(status)(rate(http_server_requests_seconds_count{uri=~\"/api/orders.*\"}[2m]))", "legendFormat": "HTTP {{status}}"}],
+              "fieldConfig": {"defaults": {"unit": "reqps", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 9, "title": "Errores HTTP 5xx / segundo (p. ej. 503 si cae el motor de riesgo)", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 12, "y": 21},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum by(uri, status)(rate(http_server_requests_seconds_count{status=~\"5..\"}[2m])) or vector(0)", "legendFormat": "{{status}} {{uri}}"}],
+              "fieldConfig": {"defaults": {"unit": "reqps", "min": 0, "color": {"mode": "fixed", "fixedColor": "red"}}, "overrides": []}
             }
           ],
           "annotations": {"list": []}

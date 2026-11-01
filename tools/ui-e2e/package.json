@@ -1,0 +1,11 @@
+{
+  "name": "hexaorders-ui-e2e",
+  "private": true,
+  "description": "Prueba end-to-end de la interfaz de HexaOrders contra el stack real (Docker Compose).",
+  "scripts": {
+    "test": "node ui-e2e.js"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

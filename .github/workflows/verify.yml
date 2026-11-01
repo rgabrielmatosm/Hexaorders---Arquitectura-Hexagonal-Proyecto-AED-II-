@@ -26,6 +26,28 @@ jobs:
       # smoke HTTP (pedidos, persistencia, métricas, dashboard) y HTTP 503 sin risk-engine.
       - name: Verify delivery end to end (tools/hexaorders.ps1 verify)
         run: ./tools/hexaorders.ps1 verify -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery') -KeepRunning
+      # Interfaz web contra el stack REAL que verify deja en marcha: formulario, panel,
+      # explorador de arquitectura, observabilidad con Prometheus/Grafana y vista móvil.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: UI end to end against the real stack (Playwright)
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node ui-e2e.js
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hexaorders-ui-screenshots
+          path: ${{ runner.temp }}/ui-screenshots
+          if-no-files-found: ignore
       # Seguros aunque falle cualquier paso anterior: si no existe el entregable, terminan sin error.
       - name: Show diagnostics on failure
         if: failure()

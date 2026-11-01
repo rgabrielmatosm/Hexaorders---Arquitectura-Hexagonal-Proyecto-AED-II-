@@ -72,7 +72,7 @@ Content-Type: application/json
 4. Python conserva precisión con `Decimal`. Importe < 500 → score 10; de 500 a < 1000 → 40; >= 1000 → 75. Devuelve `{score,decision}`.
 5. Java valida el contrato del proveedor y conserva la autoridad sobre el estado del pedido: score >= 70 → `REVIEW`, de lo contrario `APPROVED`.
 6. JDBC ejecuta un único INSERT atómico en autocommit. El esquema impone restricciones e índice de fecha. Flyway crea y valida el esquema al iniciar Java.
-7. La API responde `201 Created`, `Location: /api/orders/{uuid}` y el pedido con `id`, `customerId`, `amount`, `currency`, `riskScore`, `status`, `createdAt` UTC. GET por UUID devuelve 404 si no existe; listado devuelve los 50 más recientes.
+7. La API responde `201 Created`, `Location: /api/orders/{uuid}` y el pedido con `id`, `customerId`, `amount`, `currency`, `riskScore`, `status`, `createdAt` UTC. GET por UUID devuelve 404 si no existe; listado devuelve los 50 más recientes; `GET /api/orders/statistics` cuenta todos los pedidos por estado con una consulta agregada (`OrderUseCases.statistics()` → `OrderRepository.statistics()`), sin pasar por el motor de riesgo.
 
 Una falla o respuesta inválida de Python produce 503 **antes de insertar**. Una falla de base produce 503. No hay transacción abierta durante la llamada HTTP. La API no implementa idempotencia: un cliente que repita una creación después de perder una respuesta puede crear otro pedido. Es una mejora futura concreta, junto con autenticación, autorización, TLS y backups externos si se publica para uso real. Para la demostración se accede por loopback o túnel SSH.
 

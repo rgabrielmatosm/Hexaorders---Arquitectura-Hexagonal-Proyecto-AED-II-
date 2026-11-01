@@ -19,6 +19,7 @@ import com.hexaorders.application.port.out.RiskAssessmentPort;
 import com.hexaorders.application.service.OrderService;
 import com.hexaorders.domain.Order;
 import com.hexaorders.domain.OrderDraft;
+import com.hexaorders.domain.OrderStatistics;
 import com.hexaorders.domain.OrderStatus;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -84,5 +85,20 @@ class OrderServiceTest {
     void limitsListToFiftyOrders() {
         service.latest();
         verify(repository).latest(50);
+    }
+
+    @Test
+    void createdAtHasMicrosecondPrecisionSoTheResponseMatchesWhatIsPersisted() {
+        Instant withNanos = Instant.parse("2026-01-01T12:00:00.123456789Z");
+        OrderService preciseClockService = new OrderService(repository, risk, telemetry, Clock.fixed(withNanos, ZoneOffset.UTC));
+        when(risk.assess(draft)).thenReturn(10);
+        assertThat(preciseClockService.create(draft).createdAt()).isEqualTo(Instant.parse("2026-01-01T12:00:00.123456Z"));
+    }
+
+    @Test
+    void statisticsComeFromTheRepositoryAndNeverCallTheRiskEngine() {
+        when(repository.statistics()).thenReturn(OrderStatistics.of(4, 2));
+        assertThat(service.statistics()).isEqualTo(new OrderStatistics(6, 4, 2));
+        verifyNoInteractions(risk, telemetry);
     }
 }

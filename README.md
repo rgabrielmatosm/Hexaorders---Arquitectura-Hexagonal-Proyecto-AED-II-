@@ -1,105 +1,578 @@
-# HexaOrders
+<div align="center">
 
-Proyecto final: **arquitectura hexagonal estricta con Java y Python, íntegramente orquestado con Docker Compose**. Una interfaz web registra pedidos, consulta riesgo por HTTP y conserva sus decisiones en PostgreSQL. Prometheus y Grafana muestran disponibilidad, volumen, errores y latencias.
+<img src="services/order-api/src/main/resources/static/img/logo.svg" alt="Logo de HexaOrders" width="112">
 
-**Entrega principal: [docker-compose.yml](docker-compose.yml).** Incluye los fuentes y tests en Dockerfiles inline, y la configuración de monitoreo (Prometheus, alertas, datasource y dashboard Grafana) dentro de imágenes también construidas inline, para que los cuatro servicios propios (Java, Python, Prometheus y Grafana) funcionen con `read_only: true`. Puedes copiar únicamente este archivo a otra máquina y generar en el destino los dos secretos en `secrets/db_password.txt` y `secrets/grafana_password.txt`. No necesita los archivos `services/` ni `infra/` para desplegarlo. Requiere Docker con contenedores Linux, Compose >= 2.23.1 y BuildKit. Primera construcción con Internet; capacidad orientativa para la demo: 2 vCPU, 8 GB RAM y 30 GB disco.
+# HEXAORDERS
 
-## Parte 1 — Exposición sin diapositivas
+**Order Management & Risk Assessment System**
 
-[Guía para enseñar el funcionamiento a otra persona](docs/guia-para-explicar.md): recorrido de pedidos, conceptos, archivos, demostración, evidencias y preguntas de defensa.
+Gestión de pedidos con evaluación determinista de riesgo, construida con **arquitectura hexagonal** (puertos y adaptadores) en **Java 21** y **Python**, persistida en **PostgreSQL**, orquestada con **Docker Compose** y observada con **Prometheus** y **Grafana**.
 
-[Guion verbal de 3–4 minutos](docs/presentacion.md), con definición, ventajas, costes, límites y casos empresariales documentados. [Fuentes primarias y alcance de las afirmaciones](docs/fuentes.md). Los casos Netflix Studio Workflows y Allegro están documentados en 2020: no se atribuye la misma arquitectura a toda la empresa ni se presenta como una auditoría de su estado en 2026.
+[Inicio rápido](#-inicio-rápido) · [Arquitectura](#-arquitectura-hexagonal) · [API](#-endpoints) · [Demostración](#-demostración) · [Guía en inglés](docs/english/presentation-guide.md)
 
-## Parte 2 — YAML y arquitectura
+</div>
 
-- [YAML completo y autosuficiente](docker-compose.yml).
-- [Explicación técnica siguiendo el orden del YAML](docs/arquitectura.md).
-- [Estructura completa de archivos](docs/estructura.txt).
-- Java: `services/order-api/{pom.xml,Dockerfile,src/main,src/test}`.
-- Python: `services/risk-engine/{requirements.txt,Dockerfile,risk_engine,tests}`.
-- Configuración editable: `infra/{compose.base.yml,prometheus,grafana}`.
-- Adaptación Kubernetes: [`k8s/README.md`](k8s/README.md).
-- Evidencia de revisión local: [`docs/validacion.md`](docs/validacion.md).
+---
 
-| Servicio | Responsabilidad | Comunicación |
-|---|---|---|
-| `order-api` | REST/UI Java 21 + Spring Boot; casos de uso y dominio independientes | HTTP Python + JDBC PostgreSQL |
-| `risk-engine` | Python 3.12 + FastAPI; reglas deterministas con Decimal | `POST /score`; sin acceso a DB |
-| `db` | PostgreSQL 17.11; esquema Flyway y restricciones | Red interna, sin puerto publicado |
-| `prometheus` | Scrape, TSDB y reglas de alerta | Java `:9090/actuator/prometheus`, Python `:8000/metrics` |
-| `grafana` | Dashboard provisionado | Datasource `http://prometheus:9090` |
+## Índice
 
-La hexagonalidad se comprueba con ArchUnit e imports AST, no con el número de contenedores. El núcleo no importa frameworks, bases de datos ni adaptadores. El motor de riesgo responde con score; Java conserva la regla de estado del pedido. Importe <500: score10; 500–<1000: score40; >=1000: score75. Score>=70 implica `REVIEW`.
+<details>
+<summary>Mostrar el índice completo</summary>
 
-## Parte 3 — Arranque y repositorio
+1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+2. [Tecnologías](#-tecnologías)
+3. [Arquitectura hexagonal](#-arquitectura-hexagonal) · [Diagrama hexagonal](#diagrama-1--estructura-hexagonal-dependencias-vs-ejecución) · [Secuencia](#diagrama-2--secuencia-de-post-apiorders) · [Infraestructura](#diagrama-3--infraestructura-docker-compose)
+4. [Estructura de carpetas](#-estructura-de-carpetas) · [Componentes](#-componentes)
+5. [Requisitos](#-requisitos-previos) · [Inicio rápido](#-inicio-rápido) · [Docker Compose](#-ejecución-con-docker-compose)
+6. [Endpoints](#-endpoints) · [Ejemplos](#-ejemplos-de-solicitudes-y-respuestas)
+7. [Integración Java-Python](#-integración-java--python) · [PostgreSQL](#-persistencia-en-postgresql)
+8. [Prometheus](#-monitoreo-con-prometheus) · [Grafana](#-dashboard-de-grafana) · [Kubernetes](#-despliegue-en-kubernetes)
+9. [Interfaz web](#-interfaz-web) · [Pruebas](#-pruebas) · [Manejo de errores](#-manejo-de-errores)
+10. [Demostración](#-demostración) · [Limitaciones](#-limitaciones-conocidas) · [Referencias](#-referencias-técnicas)
 
-En Windows, instala [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) con contenedores Linux (opción predeterminada, con WSL 2) y ábrelo hasta que indique *Engine running*. Después, desde **PowerShell o CMD** en esta carpeta:
+</details>
+
+## 🧭 Descripción
+
+HexaOrders registra pedidos de clientes y decide si cada pedido queda **aprobado** o **en revisión**. Para decidir, el servicio Java consulta un **motor de riesgo en Python** que asigna un puntaje de 0 a 100 con reglas deterministas y explicables (no es inteligencia artificial). El pedido y su decisión se guardan en PostgreSQL con un único `INSERT` atómico, y todo el sistema expone métricas que Prometheus recoge y Grafana visualiza.
+
+El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma verificable** la arquitectura hexagonal: las reglas de negocio no dependen de Spring Boot, FastAPI, PostgreSQL, Docker ni Grafana, y esa independencia se comprueba con pruebas automáticas (ArchUnit en Java, análisis AST en Python).
+
+## 🎯 Problema que resuelve y objetivos
+
+**Problema.** En muchas aplicaciones, las reglas de negocio acaban mezcladas con el framework web, el ORM o el cliente HTTP. Cambiar una integración obliga entonces a tocar reglas, y probar una regla exige arrancar servidores y bases de datos.
+
+**Objetivos.**
+
+| Objetivo | Cómo se cumple |
+| --- | --- |
+| Núcleo independiente de la tecnología | `domain/` y `application/` en Java puro; `domain/` y `application/` en Python solo con la biblioteca estándar. |
+| Dependencias hacia el núcleo | Los adaptadores implementan interfaces del núcleo (`RiskAssessmentPort`, `OrderRepository`, `OrderTelemetry`). |
+| Regla verificable, no solo una convención | `HexagonalArchitectureTest` (ArchUnit) y `test_architecture.py` (AST) fallan si alguien rompe la regla. |
+| Integración de dos lenguajes | Java orquesta los pedidos; Python calcula el riesgo mediante HTTP con timeouts. |
+| Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
+| Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
+| Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## 🧰 Tecnologías
+
+| Capa | Tecnología | Uso en el proyecto |
+| --- | --- | --- |
+| Servicio principal | Java 21 · Spring Boot 3.5 | API REST, composición de dependencias, JDBC, Actuator. |
+| Motor de riesgo | Python 3.12 · FastAPI · Pydantic | `POST /score` con decimales exactos. |
+| Base de datos | PostgreSQL 17.11 · Flyway | Tabla `orders`, migración versionada, volumen persistente. |
+| Observabilidad | Micrometer · prometheus_client · Prometheus 3.5.1 · Grafana 12.4.1 | Métricas, alertas y dashboard como código. |
+| Frontend | HTML5 · CSS3 · JavaScript nativo (módulos ES) | Interfaz servida por Spring Boot; sin frameworks ni librerías. |
+| Contenedores | Docker · Docker Compose (BuildKit) | Cinco servicios, redes internas, secretos, healthchecks y límites. |
+| Orquestación opcional | Kubernetes | 14 manifiestos validados contra el esquema oficial. |
+| Pruebas | JUnit 5 · Mockito · ArchUnit · pytest · Playwright | Unitarias, de arquitectura, de API, de integración y de interfaz. |
+| Automatización | GitHub Actions · PowerShell | CI en Ubuntu y Windows; `hexaorders.cmd` para Windows. |
+
+## ⬡ Arquitectura hexagonal
+
+La arquitectura hexagonal (Alistair Cockburn, 2005) separa el **interior** de la aplicación (dominio y casos de uso) de su **exterior** (HTTP, bases de datos, otros servicios). El interior define **puertos**, que son interfaces, y el exterior aporta **adaptadores** que los implementan o los usan. El hexágono es solo una forma de dibujarlo: no exige seis componentes.
+
+| Concepto | En HexaOrders (Java) | En el motor de riesgo (Python) |
+| --- | --- | --- |
+| Dominio | `Order`, `OrderDraft`, `OrderStatus`, `OrderStatistics` | `domain/risk.py` (`Evaluation`, `assess`) |
+| Caso de uso | `OrderService` | `ScoreRisk` |
+| Puerto de entrada | `OrderUseCases` | `ScoreRiskPort` |
+| Puertos de salida | `RiskAssessmentPort`, `OrderRepository`, `OrderTelemetry` | (no tiene: es un servicio sin estado ni E/S) |
+| Adaptadores de entrada | `OrderController`, `ApiExceptionHandler` | `adapters/http.py` (FastAPI) |
+| Adaptadores de salida | `HttpRiskAssessmentAdapter`, `JdbcOrderRepository`, `MicrometerOrderTelemetry` | — |
+| Composition root | `HexagonalConfiguration` | `bootstrap.py` |
+
+### Diagrama 1 — Estructura hexagonal: dependencias vs. ejecución
+
+Las **flechas continuas** son dependencias del código fuente: apuntan hacia lo que se usa o implementa, y en el núcleo siempre hacia dentro. Las **flechas discontinuas** son comunicaciones en tiempo de ejecución. Fíjate en la inversión de dependencias: en ejecución, `OrderService` llama al adaptador HTTP, pero en el código es el adaptador el que depende del puerto.
+
+```mermaid
+flowchart LR
+    Browser(["Navegador"])
+    subgraph IN["Adaptadores de entrada"]
+        Controller["OrderController<br/>(REST)"]
+        Handler["ApiExceptionHandler"]
+    end
+    subgraph CORE["Núcleo: aplicación + dominio (Java puro)"]
+        direction TB
+        UseCases[["OrderUseCases<br/>puerto de entrada"]]
+        Service["OrderService<br/>caso de uso"]
+        subgraph DOMAIN["Dominio"]
+            Draft["OrderDraft"]
+            Order["Order"]
+            Status["OrderStatus<br/>score ≥ 70 → REVIEW"]
+        end
+        RiskPort[["RiskAssessmentPort"]]
+        RepoPort[["OrderRepository"]]
+        TelPort[["OrderTelemetry"]]
+    end
+    subgraph OUT["Adaptadores de salida"]
+        HttpRisk["HttpRiskAssessmentAdapter"]
+        Jdbc["JdbcOrderRepository"]
+        Micrometer["MicrometerOrderTelemetry"]
+    end
+    subgraph EXT["Servicios externos"]
+        Risk["risk-engine (Python)<br/>FastAPI → ScoreRisk → assess()"]
+        PG[("PostgreSQL")]
+        Prom["Prometheus"]
+    end
+
+    Controller --> UseCases
+    Service -- implementa --> UseCases
+    Service --> RiskPort & RepoPort & TelPort
+    Service --> Order
+    Order --> Status & Draft
+    HttpRisk -- implementa --> RiskPort
+    Jdbc -- implementa --> RepoPort
+    Micrometer -- implementa --> TelPort
+
+    Browser -. "HTTP JSON" .-> Controller
+    HttpRisk -. "POST /score" .-> Risk
+    Jdbc -. "SQL INSERT/SELECT" .-> PG
+    Prom -. "scrape /actuator/prometheus" .-> Micrometer
+    Prom -. "scrape /metrics" .-> Risk
+```
+
+### Diagrama 2 — Secuencia de `POST /api/orders`
+
+Interacción entre usuario, Java, Python y PostgreSQL con los nombres reales del código.
+
+> Nota: las instrucciones mencionaban como referencia el gráfico de la página 6 de un PDF que no estaba disponible al preparar este README. El diagrama se ha construido a partir del código y cubre los siete pasos pedidos: solicitud, validación, petición de riesgo, respuesta de Python, decisión, persistencia y respuesta.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Usuario (navegador)
+    participant C as OrderController<br/>(Java · adaptador REST)
+    participant S as OrderService<br/>(caso de uso)
+    participant R as HttpRiskAssessmentAdapter<br/>(RiskAssessmentPort)
+    participant P as risk-engine<br/>(Python · FastAPI)
+    participant J as JdbcOrderRepository<br/>(OrderRepository)
+    participant DB as PostgreSQL
+
+    U->>C: POST /api/orders {customerId, amount, currency}
+    C->>C: new OrderDraft(...): validación del dominio
+    alt Datos inválidos
+        C-->>U: 400 Bad Request (ProblemDetail)
+    end
+    C->>S: OrderUseCases.create(draft)
+    S->>R: assess(draft)
+    R->>P: POST /score {customerId, amount}
+    Note over R,P: timeouts: 2 s conexión, 3 s lectura
+    alt Python no responde o responde mal
+        R-->>S: RiskUnavailableException
+        S-->>C: (sin INSERT) · orders_risk_failures_total++
+        C-->>U: 503 Service Unavailable
+    end
+    P-->>R: 200 {score: 0..100, decision}
+    R-->>S: score
+    S->>S: Order.create(): OrderStatus.fromRiskScore(score)<br/>score ≥ 70 → REVIEW, si no → APPROVED
+    S->>J: save(order)
+    J->>DB: INSERT INTO orders (...) (una sentencia atómica)
+    DB-->>J: OK
+    S->>S: OrderTelemetry.orderCreated(status)
+    S-->>C: Order
+    C-->>U: 201 Created · Location: /api/orders/{id} · JSON del pedido
+```
+
+### Diagrama 3 — Infraestructura (Docker Compose)
+
+Cinco servicios y cuatro redes. Solo la red `edge` publica puertos, y lo hace únicamente en `127.0.0.1`. PostgreSQL y el motor de riesgo no son accesibles desde fuera.
+
+```mermaid
+flowchart TB
+    Browser(["Navegador<br/>127.0.0.1"])
+    subgraph edge["red edge (puertos publicados en 127.0.0.1)"]
+        API["order-api · Java 21<br/>:8080 (API + interfaz web)<br/>:9090 interno (actuator)"]
+        PROM["prometheus<br/>:9091 → 9090"]
+        GRAF["grafana<br/>:3000"]
+    end
+    subgraph compute["red compute (interna)"]
+        RISK["risk-engine · Python<br/>:8000 /score /metrics"]
+    end
+    subgraph data["red data (interna)"]
+        DB[("db · PostgreSQL 17<br/>volumen postgres_data")]
+    end
+
+    Browser -- "HTTP :8080" --> API
+    Browser -- ":9091 (API de Prometheus, CORS)" --> PROM
+    Browser -- ":3000" --> GRAF
+    API -- "POST /score (compute)" --> RISK
+    API -- "JDBC :5432 (data)" --> DB
+    PROM -- "scrape order-api:9090 (telemetry)" --> API
+    PROM -- "scrape risk-engine:8000 (telemetry)" --> RISK
+    GRAF -- "datasource http://prometheus:9090 (telemetry)" --> PROM
+```
+
+| Servicio | Redes | Puerto publicado | Seguridad |
+| --- | --- | --- | --- |
+| `db` | data | — | Contraseña desde secreto de archivo, `no-new-privileges`. |
+| `risk-engine` | compute, telemetry | — | `read_only`, `cap_drop: ALL`, usuario sin privilegios. |
+| `order-api` | edge, data, compute, telemetry | `127.0.0.1:8080` | `read_only`, `cap_drop: ALL`, secreto de archivo. |
+| `prometheus` | edge, telemetry | `127.0.0.1:9091` | `read_only`, configuración incorporada en la imagen. |
+| `grafana` | edge, telemetry | `127.0.0.1:3000` | `read_only`, contraseña de admin desde secreto de archivo. |
+
+## 📁 Estructura de carpetas
+
+<details>
+<summary>Ver el árbol del repositorio</summary>
+
+```text
+.
+├── docker-compose.yml          ← ENTREGABLE: un único YAML autosuficiente (generado)
+├── hexaorders.cmd              ← lanzador para Windows
+├── infra/
+│   ├── compose.base.yml        ← plantilla fuente del docker-compose.yml
+│   ├── prometheus/             ← prometheus.yml, alerts.yml, Dockerfile
+│   └── grafana/                ← datasource, proveedor, dashboard JSON, Dockerfile
+├── services/
+│   ├── order-api/              ← Java 21 / Spring Boot
+│   │   └── src/main/java/com/hexaorders/
+│   │       ├── domain/         ← Order, OrderDraft, OrderStatus, OrderStatistics
+│   │       ├── application/
+│   │       │   ├── port/in/    ← OrderUseCases
+│   │       │   ├── port/out/   ← RiskAssessmentPort, OrderRepository, OrderTelemetry
+│   │       │   ├── service/    ← OrderService
+│   │       │   └── exception/
+│   │       ├── adapter/in/web/ ← OrderController, ApiExceptionHandler
+│   │       ├── adapter/out/    ← http/, persistence/, metrics/
+│   │       └── config/         ← HexagonalConfiguration (composition root)
+│   │   └── src/main/resources/
+│   │       ├── static/         ← interfaz web: index.html, css/, js/, img/
+│   │       └── db/migration/   ← V1__create_orders.sql (Flyway)
+│   └── risk-engine/            ← Python / FastAPI
+│       └── risk_engine/
+│           ├── domain/         ← risk.py
+│           ├── application/    ← ports.py, score_risk.py
+│           ├── adapters/       ← http.py
+│           └── bootstrap.py    ← composition root
+├── k8s/                        ← 14 objetos Kubernetes (opcional)
+├── tools/
+│   ├── hexaorders.ps1          ← CLI: start, stop, verify, check, test…
+│   ├── generate_delivery.py    ← genera docker-compose.yml y el ConfigMap k8s
+│   ├── validate_delivery.py    ← valida el entregable y los manifiestos
+│   ├── smoke.py                ← prueba HTTP integral
+│   └── ui-e2e/                 ← prueba de la interfaz con Playwright
+├── docs/                       ← documentación en español y guía en inglés
+└── .github/workflows/verify.yml
+```
+
+</details>
+
+## 🧩 Componentes
+
+| Componente | Archivo | Responsabilidad |
+| --- | --- | --- |
+| `OrderDraft` | `domain/OrderDraft.java` | Valida customerId `[A-Za-z0-9_-]{1,64}`, importe > 0 y ≤ 1 000 000.00 con 2 decimales como máximo (sin redondeo) y moneda USD. |
+| `OrderStatus` | `domain/OrderStatus.java` | Regla de decisión: puntaje ≥ 70 → `REVIEW`, < 70 → `APPROVED`. |
+| `Order` | `domain/Order.java` | Entidad; garantiza que el estado corresponde al puntaje. |
+| `OrderStatistics` | `domain/OrderStatistics.java` | Totales por estado; el total siempre es la suma de ambos. |
+| `OrderService` | `application/service/OrderService.java` | Caso de uso: riesgo primero, luego un único `INSERT`; sin riesgo no hay pedido. |
+| `HttpRiskAssessmentAdapter` | `adapter/out/http/…` | Cliente HTTP del motor de riesgo; valida la respuesta. |
+| `JdbcOrderRepository` | `adapter/out/persistence/…` | SQL con `JdbcTemplate`; errores → `PersistenceUnavailableException`. |
+| `MicrometerOrderTelemetry` | `adapter/out/metrics/…` | Contadores `orders_created_total{status}` y `orders_risk_failures_total`. |
+| `risk.py` | `risk_engine/domain/risk.py` | Importe < 500 → 10; 500–999.99 → 40; ≥ 1000 → 75. |
+
+## ✅ Requisitos previos
+
+| Uso | Necesitas |
+| --- | --- |
+| Ejecutar el proyecto | Docker Desktop (Windows/macOS) o Docker Engine (Linux) con **contenedores Linux**, Compose ≥ 2.23.1 y BuildKit. Internet en la primera construcción. Orientativo: 2 vCPU, 8 GB RAM y 30 GB de disco. |
+| Comandos de `hexaorders.cmd` | Windows PowerShell 5.1 (incluido en Windows) o PowerShell 7. |
+| Editar y regenerar el YAML | Python 3.12 (`py -m pip install -r requirements-tools.txt` para validar). |
+| Tests fuera de Docker (opcional) | Java 21 + Maven 3.9 y Python 3.12. |
+
+No necesitas Java ni Python instalados para **ejecutar** el proyecto: los builds Docker compilan y ejecutan las pruebas de ambos servicios.
+
+## 🚀 Inicio rápido
+
+En Windows, con Docker Desktop abierto (*Engine running*), desde **PowerShell o CMD** en la carpeta del proyecto:
 
 ```powershell
 .\hexaorders.cmd start
 ```
 
-`hexaorders.cmd` ejecuta [`tools/hexaorders.ps1`](tools/hexaorders.ps1). Ese comando genera los secretos si faltan, valida el YAML, construye las imágenes (con los tests de Java y Python) y arranca los cinco servicios esperando a que estén sanos. Funciona con Windows PowerShell 5.1, que viene con Windows, y con PowerShell 7. El lanzador usa `-ExecutionPolicy Bypass` solo para ese proceso, así que no hace falta cambiar la política de ejecución del equipo.
+El comando genera los secretos si faltan (`secrets\db_password.txt` y `secrets\grafana_password.txt`, aleatorios y excluidos de Git), valida el YAML, construye las imágenes ejecutando los tests de Java y Python y arranca los cinco servicios, esperando a que estén sanos.
+
+| URL | Qué hay |
+| --- | --- |
+| <http://127.0.0.1:8080> | Interfaz web y API REST |
+| <http://127.0.0.1:3000/d/hexaorders> | Dashboard de Grafana (usuario `admin`, contraseña en `secrets\grafana_password.txt`) |
+| <http://127.0.0.1:9091/targets> | Targets de Prometheus · [alertas](http://127.0.0.1:9091/alerts) |
+
+<details>
+<summary>Todos los comandos de <code>hexaorders.cmd</code></summary>
 
 | Comando | Qué hace |
 | --- | --- |
 | `.\hexaorders.cmd start` | Secretos + validación + build + arranque de los cinco servicios. |
 | `.\hexaorders.cmd status` | Estado de los contenedores. |
 | `.\hexaorders.cmd logs` | Últimas 100 líneas de log de cada servicio. |
-| `.\hexaorders.cmd stop` | Detiene los servicios conservando los datos. |
+| `.\hexaorders.cmd stop` | Detiene los servicios **conservando** los datos. |
 | `.\hexaorders.cmd stop -RemoveData` | Detiene y **elimina** pedidos, métricas y datos de Grafana. |
-| `.\hexaorders.cmd verify` | La misma prueba integral que ejecuta GitHub, en un entorno aislado que se limpia al terminar. |
-| `.\hexaorders.cmd check` | Comprueba que el entregable generado está al día y es válido (requiere Python). |
-| `.\hexaorders.cmd test` | Tests unitarios locales (requiere Python, Java 21 y Maven). |
+| `.\hexaorders.cmd verify` | La misma prueba integral que ejecuta GitHub, en un entorno aislado que se elimina al terminar. |
+| `.\hexaorders.cmd check` | Comprueba que el entregable generado está al día y es válido. |
+| `.\hexaorders.cmd test` | Tests unitarios locales (Python + Maven). |
+| `.\hexaorders.cmd k8s-secrets` | Crea el Secret de Kubernetes desde `secrets\*.txt`. |
 | `.\hexaorders.cmd help` | Ayuda completa. |
 
-Los secretos son `secrets\db_password.txt` y `secrets\grafana_password.txt`, con valores aleatorios y excluidos de Git. Si existe un `.env` de una versión anterior, el script conserva sus contraseñas. Si prefieres los comandos de Docker directamente, son equivalentes a `.\tools\init-env.ps1` seguido de `docker compose config --quiet`, `docker compose build --pull` y `docker compose up -d --wait --wait-timeout 240`. Los mismos comandos funcionan en Linux y macOS con PowerShell 7 (`pwsh ./tools/hexaorders.ps1 start`). Para desplegar en una VM Ubuntu en la nube usa el procedimiento de [despliegue en VM](docs/despliegue-cloud.md).
+En Linux o macOS, los mismos comandos con PowerShell 7: `pwsh ./tools/hexaorders.ps1 start`.
 
-Accesos locales:
+</details>
 
-- Aplicación: <http://127.0.0.1:8080>.
-- Grafana: <http://127.0.0.1:3000/d/hexaorders>; usuario `admin`, contraseña en `secrets\grafana_password.txt`.
-- Prometheus: <http://127.0.0.1:9091/targets> y <http://127.0.0.1:9091/alerts>.
+## 🐳 Ejecución con Docker Compose
 
-Prueba desde PowerShell:
+`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los dos secretos.
 
 ```powershell
-$body = @{ customerId = 'demo-001'; amount = 125.50 } | ConvertTo-Json
+New-Item -ItemType Directory secrets -Force | Out-Null
+# Crea secrets\db_password.txt y secrets\grafana_password.txt con contraseñas aleatorias
+.\tools\init-env.ps1
+docker compose config --quiet
+docker compose build --pull
+docker compose up -d --wait --wait-timeout 240
+docker compose ps
+```
+
+> **No edites `docker-compose.yml` a mano.** Se genera desde `infra/compose.base.yml`, `services/` e `infra/` con `py tools\generate_delivery.py`. `--check` y el CI detectan cualquier divergencia.
+
+<details>
+<summary>Qué incluye el YAML (healthchecks, límites, secretos, volúmenes)</summary>
+
+- **Healthchecks** en los cinco servicios; `order-api` espera a `db` y `risk-engine` sanos (`depends_on: condition: service_healthy`).
+- **Límites** de memoria y CPU (`mem_limit`, `cpus`) y rotación de logs.
+- **Secretos** de tipo archivo montados en `/run/secrets` (Compose solo admite este tipo en servicios `read_only`).
+- **Volúmenes** `postgres_data`, `prometheus_data` y `grafana_data`: `docker compose down` los conserva y `down -v` los elimina.
+- **Endurecimiento**: `read_only`, `cap_drop: ALL`, `no-new-privileges`, `tmpfs` para `/tmp` y usuarios sin privilegios.
+
+</details>
+
+## 🔌 Endpoints
+
+| Método | Ruta | Descripción | Respuestas |
+| --- | --- | --- | --- |
+| `POST` | `/api/orders` | Evalúa el riesgo y crea un pedido | `201` + `Location`, `400`, `503` |
+| `GET` | `/api/orders` | Últimos 50 pedidos (más reciente primero) | `200`, `503` |
+| `GET` | `/api/orders/{id}` | Pedido por UUID | `200`, `400` (UUID mal formado), `404` |
+| `GET` | `/api/orders/statistics` | Totales de **todos** los pedidos persistidos | `200`, `503` |
+| `GET` | `/` | Interfaz web (estáticos servidos por Spring Boot) | `200` |
+| `POST` | `risk-engine:8000/score` | Motor de riesgo (solo red interna) | `200`, `415`, `422` |
+
+Métricas internas: `order-api:9090/actuator/prometheus`, `order-api:9090/actuator/health/{liveness,readiness}`, `risk-engine:8000/metrics`, `risk-engine:8000/health/{live,ready}`.
+
+## 📨 Ejemplos de solicitudes y respuestas
+
+Colección de Postman y archivo `.http` listos para usar: [`docs/demo/`](docs/demo/).
+
+<details open>
+<summary><code>POST /api/orders</code> — pedido aprobado</summary>
+
+```powershell
+$body = @{ customerId = 'cliente_demo'; amount = 125.50; currency = 'USD' } | ConvertTo-Json
 Invoke-RestMethod http://127.0.0.1:8080/api/orders -Method Post -ContentType 'application/json' -Body $body
-$body = @{ customerId = 'demo-001'; amount = 1500 } | ConvertTo-Json
-Invoke-RestMethod http://127.0.0.1:8080/api/orders -Method Post -ContentType 'application/json' -Body $body
-Invoke-RestMethod http://127.0.0.1:8080/api/orders
 ```
 
-Los dos pedidos deben quedar `APPROVED/10` y `REVIEW/75`. Genera tráfico unos 30 segundos para observar tasas e histogramas. Si tienes Python local, `py tools\smoke.py` comprueba creación, consulta, validación, scrapes y dashboard (`.\hexaorders.cmd verify` lo ejecuta automáticamente).
+```http
+HTTP/1.1 201 Created
+Location: /api/orders/0d0c7e2e-…
+Content-Type: application/json
 
-Para evidenciar el manejo de fallos:
+{"id":"0d0c7e2e-…","customerId":"cliente_demo","amount":125.50,"currency":"USD","riskScore":10,"status":"APPROVED","createdAt":"2026-11-01T21:00:00.123Z"}
+```
+
+</details>
+
+<details>
+<summary><code>POST /api/orders</code> — pedido en revisión (importe ≥ 1000)</summary>
+
+```json
+{"customerId": "cliente_demo", "amount": 1500.00, "currency": "USD"}
+```
+
+Respuesta `201` con `"riskScore": 75, "status": "REVIEW"`.
+
+</details>
+
+<details>
+<summary>Validación (400), no encontrado (404) y motor de riesgo caído (503)</summary>
+
+```json
+{"type":"about:blank","title":"Solicitud inválida","status":400,"detail":"amount: debe ser mayor que 0 y menor o igual que 1000000.00"}
+```
+
+```json
+{"type":"about:blank","title":"Motor de riesgo no disponible","status":503,"detail":"No se creó ningún pedido; vuelva a intentar más tarde"}
+```
+
+</details>
+
+<details>
+<summary><code>GET /api/orders/statistics</code></summary>
+
+```json
+{"total": 3, "approved": 2, "review": 1}
+```
+
+</details>
+
+Los valores de los ejemplos son ilustrativos (los `id` y las fechas cambian en cada ejecución). Los campos `title`, `status` y `detail` de los errores son los que fija `ApiExceptionHandler`; Spring puede añadir campos estándar de RFC 9457, como `instance`.
+
+## 🔗 Integración Java ↔ Python
+
+| Aspecto | Implementación |
+| --- | --- |
+| Contrato | `POST /score` · petición `{"customerId": "…", "amount": 125.50}` · respuesta `{"score": 0..100, "decision": "APPROVED"\|"REVIEW"}` |
+| Decimales | Python lee el JSON con `parse_float=Decimal`: no hay pérdida de precisión por `float`. |
+| Timeouts | 2 s de conexión y 3 s de lectura (`HexagonalConfiguration`). |
+| Validación | Java valida la respuesta (puntaje 0..100, decisión conocida); si no es válida → `RiskUnavailableException`. |
+| Autoridad | La decisión final la toma el dominio Java (`OrderStatus.fromRiskScore`), aunque Python devuelva su propia decisión. |
+| Fallo | Si Python no responde: **no se guarda nada**, se incrementa `orders_risk_failures_total` y el cliente recibe `503`. |
+| Red | Solo por la red interna `compute`: `http://risk-engine:8000`. |
+
+## 🐘 Persistencia en PostgreSQL
+
+- **Migración** Flyway `V1__create_orders.sql`: tabla `orders` con restricciones `CHECK` que repiten las invariantes del dominio (formato de cliente, rango del importe, moneda, puntaje 0..100 y estado coherente con el puntaje). `clean-disabled: true` impide borrar el esquema desde Flyway.
+- **Atomicidad**: un único `INSERT`, después de la llamada de riesgo; nunca se mantiene una transacción abierta durante una llamada de red.
+- **Consultas**: por id, los últimos 50 (índice `orders_created_at_idx`) y un conteo agregado por estado (`count(*) FILTER (WHERE status = …)`).
+- **Persistencia**: volumen `postgres_data`. Los pedidos sobreviven a `stop`/`start` y a `docker compose down`.
+- **Credenciales**: contraseña en `secrets/db_password.txt` (fuera de Git), leída desde `/run/secrets/db_password`.
+
+## 📈 Monitoreo con Prometheus
+
+Prometheus recoge métricas cada 10 s (`infra/prometheus/prometheus.yml`).
+
+| Métrica | Origen | Significado |
+| --- | --- | --- |
+| `orders_created_total{status}` | Java · `MicrometerOrderTelemetry` | Pedidos persistidos por decisión. |
+| `orders_risk_failures_total` | Java · `MicrometerOrderTelemetry` | Fallos del motor de riesgo. |
+| `http_server_requests_seconds_*{uri,status}` | Java · Spring Boot Actuator | Peticiones, códigos y latencia (con histograma). |
+| `risk_evaluations_total{decision}` | Python · prometheus_client | Evaluaciones realizadas. |
+| `risk_evaluation_duration_seconds_*` | Python · prometheus_client | Duración del caso de uso de riesgo. |
+| `up{job}` | Prometheus | Disponibilidad de cada target. |
+
+Reglas de alerta (`alerts.yml`): `HexaOrdersServiceDown` (un servicio sin responder durante 30 s) y `RiskRequestsFailing` (fallos de riesgo en los últimos 2 minutos). Se ven en <http://127.0.0.1:9091/alerts>; no hay Alertmanager ni envío de correos.
+
+## 📊 Dashboard de Grafana
+
+El datasource y el dashboard se aprovisionan como código: no hay que configurar nada a mano. Dashboard **«HexaOrders · Puertos, adaptadores y métricas»** en <http://127.0.0.1:3000/d/hexaorders>:
+
+| Panel | PromQL principal |
+| --- | --- |
+| Servicios disponibles | `up{job=~"order-api\|risk-engine"}` |
+| Pedidos creados / fallos de riesgo | `sum(orders_created_total)` · `sum(orders_risk_failures_total)` |
+| Pedidos por estado / segundo | `sum by(status)(rate(orders_created_total[2m]))` |
+| Evaluaciones de riesgo / segundo | `sum by(decision)(rate(risk_evaluations_total[2m]))` |
+| Latencia p95 Java y Python | `histogram_quantile(0.95, …_bucket)` |
+| Respuestas HTTP por código | `sum by(status)(rate(http_server_requests_seconds_count{uri=~"/api/orders.*"}[2m]))` |
+| Errores 5xx | `sum by(uri, status)(rate(http_server_requests_seconds_count{status=~"5.."}[2m]))` |
+
+Las gráficas de tasas necesitan tráfico durante unos 30 segundos y varias muestras.
+
+## ☸️ Despliegue en Kubernetes
+
+Es **opcional y complementario**: el despliegue principal es Docker Compose. Los 14 objetos de `k8s/` (namespace, ConfigMap, Secret externo, StatefulSet de PostgreSQL, Deployments, Services y PVC) mantienen los mismos contratos.
 
 ```powershell
-docker compose stop risk-engine
-# Repite un POST: HTTP 503; el caso de uso no inserta el pedido.
-docker compose start risk-engine
-docker compose up -d --wait --wait-timeout 120
+.\hexaorders.cmd k8s-secrets
+kubectl apply -f k8s/
 ```
 
-[Subir a tu cuenta GitHub: comandos exactos](docs/github.md). [Google Cloud: creación de VM, instalación, SCP, secretos y túnel](docs/despliegue-cloud.md). AWS y Azure utilizan el mismo procedimiento dentro de una VM Ubuntu equivalente. GitHub CLI, BuildKit y Compose V2 cubren este flujo; no se necesita un asistente de programación como dependencia operativa.
+Guía paso a paso (kind, registro, port-forward): [`k8s/README.md`](k8s/README.md). Los manifiestos se han **validado estáticamente** contra el esquema OpenAPI oficial de Kubernetes 1.34.1; **no se han desplegado en un clúster** como parte de este trabajo.
 
-## Editar, verificar y reconstruir la entrega
+## 🖥️ Interfaz web
 
-No necesitas Java ni Python instalados en el host para desplegar: los builds Docker ejecutan sus respectivas pruebas. Para editar el repositorio y regenerar el YAML necesitas [Python 3.12](https://www.python.org/downloads/) local. Desde PowerShell:
+Interfaz en español, servida por Spring Boot desde `src/main/resources/static/` y organizada en `index.html`, `css/` (base, componentes, efectos) y `js/` (módulos ES nativos). No usa frameworks ni librerías.
+
+| Sección | Datos |
+| --- | --- |
+| **Bienvenida** | Comprueba de verdad la API y Prometheus; nunca bloquea (Enter, Escape o clic para entrar). |
+| **Panel** | Totales de `GET /api/orders/statistics` y últimos pedidos de `GET /api/orders`. |
+| **Pedidos** | Alta con validación (el dominio sigue siendo la autoridad), consulta por UUID y listado con filtro y búsqueda. |
+| **Arquitectura** | Explorador interactivo con clases y archivos reales, vistas de dependencias y de ejecución, y una solicitud real cuyo resultado (HTTP, latencia, relectura en PostgreSQL) se muestra junto al recorrido conceptual, identificado como tal. |
+| **Observabilidad** | Targets y métricas reales de Prometheus; avisa si Prometheus o Grafana no responden sin bloquear el resto. |
+
+<details open>
+<summary>Capturas de la interfaz (datos reales)</summary>
+
+Capturas tomadas por la prueba `tools/ui-e2e` con Java, Python y PostgreSQL ejecutándose de verdad (en local, sin Docker); los pedidos que aparecen fueron creados por las propias pruebas.
+
+| Bienvenida | Panel |
+| --- | --- |
+| ![Pantalla de bienvenida con comprobaciones reales](docs/assets/screenshots/bienvenida.png) | ![Panel con estadísticas de PostgreSQL](docs/assets/screenshots/panel.png) |
+| **Gestión de pedidos** | **Explorador de arquitectura** |
+| ![Formulario y listado de pedidos](docs/assets/screenshots/pedidos.png) | ![Explorador con clases y archivos reales](docs/assets/screenshots/arquitectura.png) |
+
+</details>
+
+El fondo es una **cuadrícula interactiva** dibujada en un único `<canvas>`: se ilumina en violeta bajo el cursor y se desvanece en unos 1,7 s. Solo anima mientras hay celdas encendidas y respeta `prefers-reduced-motion`. La interfaz se adapta a móviles y se puede usar con el teclado.
+
+## 🧪 Pruebas
+
+| Tipo | Dónde | Qué comprueba |
+| --- | --- | --- |
+| Dominio (Java) | `OrderDomainTest` | Umbral 70, importes sin redondeo, identificadores, moneda, estadísticas. |
+| Caso de uso | `OrderServiceTest` | Riesgo antes de persistir, cero `INSERT` si falla el riesgo, estadísticas. |
+| API (Java) | `OrderControllerTest`, `HttpRiskAssessmentAdapterTest` | Códigos 201/400/404/503, `Location`, `/statistics`, respuestas inválidas de Python. |
+| Arquitectura | `HexagonalArchitectureTest` (ArchUnit), `test_architecture.py` (AST) | Núcleo sin frameworks; dominio en el centro; adaptadores de entrada sin dependencias de los de salida. |
+| Python | `test_domain.py`, `test_api.py` | Reglas, decimales exactos, validación, métricas. |
+| Integración | `tools/smoke.py` (dentro de `verify`) | Tres pedidos reales, persistencia, estadísticas, 400, recursos del frontend servidos idénticos, targets y dashboard. |
+| Fallo y recuperación | `tools/hexaorders.ps1 verify` | Con `risk-engine` detenido la API responde 503; al volver, todo queda sano. |
+| Interfaz | `tools/ui-e2e/ui-e2e.js` (Playwright) | Navegador real contra el stack real: panel, alta, consulta, explorador, observabilidad y móvil. |
+| Entregable | `generate_delivery.py --check`, `validate_delivery.py` | YAML al día y autosuficiente, `read_only`, secretos, 14 objetos Kubernetes. |
 
 ```powershell
-py tools\generate_delivery.py
-py -m pip install -r requirements-tools.txt
-.\hexaorders.cmd check
-.\hexaorders.cmd verify
+.\hexaorders.cmd check     # entregable + validación
+.\hexaorders.cmd test      # tests unitarios locales
+.\hexaorders.cmd verify    # integración completa con Docker
 ```
 
-Tras modificar `services/` o `infra/`, regenera siempre con `generate_delivery.py`. El archivo `.gitattributes` fija saltos de línea LF y el generador ordena los archivos igual en cualquier sistema operativo, de modo que el YAML generado en Windows es idéntico byte a byte al que comprueba GitHub.
+El workflow [`verify.yml`](.github/workflows/verify.yml) ejecuta todo lo anterior en cada push. En Ubuntu: `verify` y la prueba de interfaz, con capturas descargables como artefacto. En Windows Server: scripts, generador y tests unitarios. Resultados documentados en [`docs/validacion.md`](docs/validacion.md).
 
-La acción [`.github/workflows/verify.yml`](.github/workflows/verify.yml) tiene dos jobs:
+## 🚨 Manejo de errores
 
-- **compose** (Ubuntu): ejecuta `tools/hexaorders.ps1 verify`, el mismo script que usas en Windows. Copia únicamente el YAML a un directorio vacío, genera sus secretos, construye con los tests de ambos lenguajes, valida Prometheus con `promtool`, arranca los cinco servicios, comprueba HTTP, persistencia, métricas y dashboard, y verifica el HTTP 503 cuando cae risk-engine. GitHub solo ejecuta contenedores Linux en runners Ubuntu; es lo mismo que hace Docker Desktop en Windows con WSL 2.
-- **windows** (Windows Server 2022): comprueba `hexaorders.cmd`, los scripts con Windows PowerShell 5.1, la generación de secretos, que el entregable generado en Windows coincide y es válido, y los tests unitarios de Python y Java.
+| Situación | Excepción | HTTP | ¿Se guarda? |
+| --- | --- | --- | --- |
+| Datos inválidos (importe, cliente, moneda, JSON, UUID) | `IllegalArgumentException` / errores de lectura | `400` | No |
+| Pedido inexistente | `OrderNotFoundException` | `404` | — |
+| Motor de riesgo caído, lento o con respuesta inválida | `RiskUnavailableException` | `503` | **No** |
+| PostgreSQL no disponible | `PersistenceUnavailableException` | `503` | No |
 
-Para detener sin eliminar datos: `.\hexaorders.cmd stop`. Conserva `secrets\` para volver a arrancar con las mismas contraseñas. `.\hexaorders.cmd stop -RemoveData` elimina los volúmenes y se reserva para un reinicio deliberado. Consulta los límites y decisiones de la práctica en [arquitectura](docs/arquitectura.md).
+Las respuestas siguen RFC 9457 (`ProblemDetail`) y nunca incluyen trazas (`include-stacktrace: never`).
+
+## 🎬 Demostración
+
+Guion reproducible con resultados esperados y observados: **[`docs/demo/README.md`](docs/demo/README.md)**. En resumen:
+
+1. `.\hexaorders.cmd start` y abrir <http://127.0.0.1:8080>.
+2. Crear pedidos de 125.50 (aprobado, 10), 750.00 (aprobado, 40) y 1500.00 (revisión, 75).
+3. Probar un importe inválido (`10.001`) → error de validación.
+4. Consultar un pedido por ID y ver los totales en el panel.
+5. **Arquitectura → Ejecutar solicitud real**: seguir el recorrido por las capas.
+6. `docker compose stop risk-engine` → crear un pedido → **503** y ningún pedido nuevo; `docker compose start risk-engine` → recuperación.
+7. Ver métricas en **Observabilidad**, Prometheus y Grafana.
+8. `.\hexaorders.cmd stop` + `.\hexaorders.cmd start` → los pedidos siguen ahí.
+
+## ⚠️ Limitaciones conocidas
+
+- La **política de riesgo** es una demostración determinista (tres tramos de importe), no un modelo real.
+- `GET /api/orders` devuelve solo los **50 más recientes** y no tiene paginación; los totales completos están en `/statistics`.
+- Los **contadores de Prometheus** se reinician al reiniciar cada proceso; los totales persistentes están en PostgreSQL.
+- **Sin autenticación** en la API: los puertos solo se publican en `127.0.0.1`.
+- Comunicación Java → Python **síncrona y sin reintentos** ni circuit breaker.
+- Una sola réplica de cada servicio; **sin alta disponibilidad** ni copias de seguridad automáticas.
+- Los **secretos de Compose** son archivos montados, no una bóveda cifrada.
+- **Kubernetes**: validado contra el esquema oficial, no desplegado en un clúster en este trabajo.
+- El **recorrido** del explorador de arquitectura es conceptual: no hay trazas distribuidas (por ejemplo, OpenTelemetry).
+- **Grafana desde el navegador**: solo se puede comprobar que responde (no envía cabeceras CORS).
+
+## 📚 Referencias técnicas
+
+- Alistair Cockburn, [*Hexagonal Architecture*](https://alistair.cockburn.us/hexagonal-architecture) (2005).
+- Netflix TechBlog, [*Ready for changes with Hexagonal Architecture*](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) (2020): caso de un equipo concreto (Studio Workflows).
+- Allegro Tech Blog, [*Hexagonal Architecture by example*](https://blog.allegro.tech/2020/05/hexagonal-architecture-by-example.html) (2020).
+- AWS Prescriptive Guidance, [*Hexagonal architecture pattern*](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/hexagonal-architecture.html).
+- Docker, [Compose Build `dockerfile_inline`](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline) · [Compose secrets](https://docs.docker.com/reference/compose-file/secrets/).
+- Spring Boot, [Actuator metrics](https://docs.spring.io/spring-boot/reference/actuator/metrics.html) · Prometheus, [Querying basics](https://prometheus.io/docs/prometheus/latest/querying/basics/) · Grafana, [Provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/).
+- [ArchUnit](https://www.archunit.org/userguide/html/000_Index.html) · [FastAPI](https://fastapi.tiangolo.com/) · [Flyway](https://documentation.red-gate.com/flyway).
+
+Alcance de cada fuente: [`docs/fuentes.md`](docs/fuentes.md). Más documentación: [arquitectura](docs/arquitectura.md) · [guía para explicar (es)](docs/guia-para-explicar.md) · [**presentation guide (en)**](docs/english/presentation-guide.md) · [despliegue en VM](docs/despliegue-cloud.md) · [GitHub](docs/github.md).

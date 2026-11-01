@@ -3,49 +3,317 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HexaOrders · Pedidos con criterio</title>
-  <style>
-    :root{color-scheme:dark;--bg:#101513;--surface:#18211d;--line:#34443a;--ink:#eaf2e8;--muted:#a8b8ac;--accent:#bbef80;--warn:#ffd58a}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,sans-serif}main{max-width:1180px;margin:auto;padding:36px 30px 64px}header{display:flex;justify-content:space-between;gap:20px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:24px}.brand{font-weight:750;letter-spacing:-1px;font-size:25px}.brand span{color:var(--accent)}.eyebrow{color:var(--accent);font-size:12px;letter-spacing:2px;text-transform:uppercase}.connection{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:7px 12px;border-radius:30px}h1{font-size:clamp(34px,5vw,58px);letter-spacing:-2px;line-height:1.12;max-width:720px;margin:16px 0}p{color:var(--muted)}.intro{padding:38px 0 28px}.intro p{max-width:640px}.flow{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:24px}.flow span{border:1px solid var(--line);border-radius:6px;padding:6px 10px}.workspace{display:grid;grid-template-columns:340px 1fr;gap:24px}.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}h2{font-size:20px;letter-spacing:-.5px;margin:0 0 18px}label{display:block;color:var(--muted);font-size:12px;margin:18px 0 6px}input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px;color:var(--ink);font:inherit}input:focus{outline:2px solid var(--accent);outline-offset:1px}button{font:inherit;cursor:pointer;border:0;border-radius:6px;font-weight:650;padding:12px 18px;background:var(--accent);color:#172013}button:disabled{opacity:.55;cursor:wait}.submit{width:100%;margin-top:22px}.small{font-size:12px;line-height:1.5}.samples{display:flex;gap:8px;margin-top:10px}.samples button,.refresh{background:transparent;color:var(--muted);border:1px solid var(--line);padding:6px 10px;font-size:12px}.table-top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:12px}.table-top h2{margin:0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th{text-align:left;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:500}th,td{padding:15px 12px 15px 0;border-bottom:1px solid var(--line)}td:last-child,th:last-child{text-align:right;padding-right:0}.pill{display:inline-block;padding:4px 8px;border-radius:5px;font-size:10px;font-weight:750;letter-spacing:.4px;background:#263d28;color:var(--accent)}.pill.review{background:#493b24;color:var(--warn)}.id{font:10px ui-monospace,monospace;color:var(--muted);display:block}.score{font-family:ui-monospace,monospace}.empty{color:var(--muted);text-align:center!important;padding:50px 0}.notice{margin-top:18px;padding:12px;border:1px solid var(--line);border-radius:6px;font-size:13px;overflow-wrap:anywhere}.notice.error{color:var(--warn);border-color:#796440}.notice.success{color:var(--accent)}details{margin-top:24px;color:var(--muted);font-size:12px}summary{cursor:pointer}pre{white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:16px;border-radius:6px;font:11px/1.6 ui-monospace,monospace}footer{margin-top:32px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12px;display:flex;gap:18px;justify-content:space-between}a{color:var(--accent)}@media(max-width:850px){.workspace{grid-template-columns:1fr}main{padding:22px 18px}.card{padding:20px}footer{flex-direction:column}h1{letter-spacing:-1px}}
-  </style>
+  <meta name="description" content="HexaOrders — Order Management & Risk Assessment System. Arquitectura hexagonal con Java, Python, PostgreSQL, Prometheus y Grafana.">
+  <meta name="theme-color" content="#0B0F14">
+  <title>HexaOrders · Order Management &amp; Risk Assessment</title>
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/effects.css">
+  <script type="module" src="js/app.js"></script>
 </head>
 <body>
-<main>
-  <header><div class="brand">⬡ Hexa<span>Orders</span></div><div class="connection" id="connection" role="status">Conectando con la API…</div></header>
-  <section class="intro"><div class="eyebrow">Laboratorio de arquitectura hexagonal</div><h1>Cada pedido.<br>Una decisión con criterio.</h1><p>Crea un pedido y observa cómo Java consulta el motor de riesgo en Python, aplica las reglas del negocio y guarda el resultado en PostgreSQL.</p><div class="flow" aria-label="Flujo de un pedido"><span>01 · REST / Java</span>→<span>02 · Riesgo / Python</span>→<span>03 · Dominio</span>→<span>04 · PostgreSQL</span></div></section>
-  <div class="workspace">
-    <section class="card"><h2>Nuevo pedido</h2><form id="order-form"><label for="customer">Identificador del cliente</label><input id="customer" name="customerId" value="cliente_demo" required maxlength="64" pattern="[A-Za-z0-9_-]{1,64}" autocomplete="off"><label for="amount">Importe en USD</label><input id="amount" name="amount" type="number" value="125.50" min="0.01" max="1000000" step="0.01" required><div class="samples"><button type="button" data-amount="25.00">USD 25</button><button type="button" data-amount="95000.00">USD 95 000</button></div><button id="submit" class="submit" type="submit">Evaluar y crear pedido ↗</button><p class="small">Un puntaje desde 70 requiere revisión. Los importes se procesan con precisión decimal y nunca se redondean.</p></form><div id="notice" class="notice" role="status" hidden></div><details><summary>Ver última respuesta de la API</summary><pre id="response">Todavía no hay una respuesta.</pre></details></section>
-    <section class="card"><div class="table-top"><h2>Últimos pedidos</h2><button type="button" id="refresh" class="refresh">Actualizar ↻</button></div><p class="small" id="count">Se muestran hasta 50 pedidos, del más reciente al más antiguo.</p><div class="scroll"><table><thead><tr><th>Cliente / pedido</th><th>Importe</th><th>Riesgo</th><th>Decisión</th></tr></thead><tbody id="orders"><tr><td colspan="4" class="empty">Cargando pedidos…</td></tr></tbody></table></div></section>
+<canvas id="grid-canvas" class="grid-canvas" aria-hidden="true"></canvas>
+
+<!-- Bienvenida: no bloquea; el estado mostrado proviene de consultas reales. -->
+<div id="splash" class="splash" role="dialog" aria-modal="false" aria-labelledby="splash-title">
+  <div class="splash__inner">
+    <img class="splash__logo" src="img/logo.svg" alt="" width="96" height="96">
+    <h1 id="splash-title" class="splash__title">HEXAORDERS</h1>
+    <p class="splash__subtitle">Order Management &amp; Risk Assessment System</p>
+    <ul class="splash__checks" aria-live="polite">
+      <li data-check="api"><span class="dot dot--pending"></span>API Java y PostgreSQL <em>comprobando…</em></li>
+      <li data-check="prometheus"><span class="dot dot--pending"></span>Prometheus <em>comprobando…</em></li>
+    </ul>
+    <button type="button" id="splash-enter" class="btn btn--primary">Entrar <kbd>Enter</kbd></button>
   </div>
-  <footer><span>Java 21 · Python · PostgreSQL · Docker Compose</span><span>Reglas independientes de frameworks. Dependencias hacia el dominio.</span></footer>
+</div>
+
+<a class="skip-link" href="#main">Saltar al contenido</a>
+
+<header class="topbar">
+  <a class="brand" href="#inicio" aria-label="HexaOrders, inicio">
+    <img src="img/logo.svg" alt="" width="34" height="34">
+    <span class="brand__name">HEXA<span>ORDERS</span></span>
+  </a>
+  <nav class="nav" aria-label="Secciones">
+    <a href="#panel" data-nav>Panel</a>
+    <a href="#pedidos" data-nav>Pedidos</a>
+    <a href="#arquitectura" data-nav>Arquitectura</a>
+    <a href="#observabilidad" data-nav>Observabilidad</a>
+  </nav>
+  <div id="api-status" class="status-pill" role="status" aria-live="polite">
+    <span class="dot dot--pending"></span><span class="status-pill__text">Conectando…</span>
+  </div>
+</header>
+
+<main id="main">
+  <!-- INICIO -->
+  <section id="inicio" class="hero">
+    <p class="eyebrow">Order Management &amp; Risk Assessment System</p>
+    <h1 class="hero__title">Pedidos evaluados con <span class="gradient-text">arquitectura hexagonal</span>.</h1>
+    <p class="hero__lead">Cada pedido entra por un adaptador REST en <strong>Java 21</strong>, consulta el motor de riesgo en <strong>Python</strong> a través de un puerto, aplica las reglas del dominio y se guarda en <strong>PostgreSQL</strong>. Prometheus y Grafana observan el sistema completo.</p>
+    <div class="hero__actions">
+      <a class="btn btn--primary" href="#pedidos">Crear un pedido</a>
+      <a class="btn btn--ghost" href="#arquitectura">Explorar la arquitectura</a>
+    </div>
+    <ul class="tech-list" aria-label="Tecnologías">
+      <li>Java 21 · Spring Boot</li><li>Python · FastAPI</li><li>PostgreSQL 17</li>
+      <li>Docker Compose</li><li>Prometheus</li><li>Grafana</li><li>Kubernetes</li>
+    </ul>
+  </section>
+
+  <!-- PANEL -->
+  <section id="panel" class="section" aria-labelledby="panel-title">
+    <div class="section__head">
+      <div>
+        <p class="eyebrow">Dashboard</p>
+        <h2 id="panel-title">Panel de pedidos</h2>
+        <p class="section__lead">Datos reales de PostgreSQL obtenidos con <code>GET /api/orders/statistics</code> y <code>GET /api/orders</code>.</p>
+      </div>
+      <button type="button" class="btn btn--ghost btn--sm" data-refresh>Actualizar <span aria-hidden="true">↻</span></button>
+    </div>
+
+    <div class="stats">
+      <article class="stat card">
+        <span class="stat__label">Total de pedidos</span>
+        <strong class="stat__value" id="stat-total" data-loading>—</strong>
+        <span class="stat__hint">Todos los pedidos persistidos</span>
+      </article>
+      <article class="stat card stat--success">
+        <span class="stat__label">Aprobados</span>
+        <strong class="stat__value" id="stat-approved" data-loading>—</strong>
+        <span class="stat__hint">Puntaje de riesgo &lt; 70</span>
+      </article>
+      <article class="stat card stat--warning">
+        <span class="stat__label">En revisión</span>
+        <strong class="stat__value" id="stat-review" data-loading>—</strong>
+        <span class="stat__hint">Puntaje de riesgo ≥ 70</span>
+      </article>
+      <article class="stat card stat--accent">
+        <span class="stat__label">Tasa de revisión</span>
+        <strong class="stat__value" id="stat-rate" data-loading>—</strong>
+        <span class="stat__hint">En revisión ÷ total</span>
+      </article>
+    </div>
+
+    <div class="panel-grid">
+      <article class="card">
+        <h3 class="card__title">Distribución por decisión</h3>
+        <div class="distribution" id="distribution" role="img" aria-label="Distribución de pedidos por decisión">
+          <span class="distribution__bar distribution__bar--approved" style="width:0%"></span>
+          <span class="distribution__bar distribution__bar--review" style="width:0%"></span>
+        </div>
+        <ul class="legend">
+          <li><span class="dot dot--ok"></span>Aprobados <strong id="legend-approved">—</strong></li>
+          <li><span class="dot dot--warn"></span>En revisión <strong id="legend-review">—</strong></li>
+        </ul>
+        <h3 class="card__title card__title--spaced">Reglas del motor de riesgo</h3>
+        <p class="muted small">Política determinista implementada en <code>risk_engine/domain/risk.py</code>. La decisión final la toma el dominio Java en <code>OrderStatus.fromRiskScore</code> (puntaje ≥ 70 → revisión).</p>
+        <table class="rules">
+          <thead><tr><th scope="col">Importe (USD)</th><th scope="col">Puntaje</th><th scope="col">Decisión</th></tr></thead>
+          <tbody>
+            <tr><td>&lt; 500</td><td class="mono">10</td><td><span class="badge badge--ok">APROBADO</span></td></tr>
+            <tr><td>500 – 999.99</td><td class="mono">40</td><td><span class="badge badge--ok">APROBADO</span></td></tr>
+            <tr><td>≥ 1000</td><td class="mono">75</td><td><span class="badge badge--warn">REVISIÓN</span></td></tr>
+          </tbody>
+        </table>
+      </article>
+      <article class="card">
+        <div class="card__head">
+          <h3 class="card__title">Últimos pedidos registrados</h3>
+          <a class="link" href="#pedidos">Ver todos →</a>
+        </div>
+        <ul class="recent" id="recent-orders" aria-live="polite">
+          <li class="recent__empty">Cargando pedidos…</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- PEDIDOS -->
+  <section id="pedidos" class="section" aria-labelledby="orders-title">
+    <div class="section__head">
+      <div>
+        <p class="eyebrow">Order Management</p>
+        <h2 id="orders-title">Gestión de pedidos</h2>
+        <p class="section__lead">Las validaciones del formulario solo ayudan al usuario: el dominio Java vuelve a validar todo y es la autoridad.</p>
+      </div>
+    </div>
+
+    <div class="orders-grid">
+      <div class="orders-grid__side">
+        <form id="order-form" class="card form" novalidate>
+          <h3 class="card__title">Nuevo pedido</h3>
+          <div class="field">
+            <label for="customer">Identificador del cliente</label>
+            <input id="customer" name="customerId" value="cliente_demo" required maxlength="64" autocomplete="off" spellcheck="false" aria-describedby="customer-help customer-error">
+            <small id="customer-help" class="field__help">1 a 64 caracteres: letras, dígitos, guion o guion bajo.</small>
+            <small id="customer-error" class="field__error" hidden></small>
+          </div>
+          <div class="field">
+            <label for="amount">Importe en USD</label>
+            <input id="amount" name="amount" inputmode="decimal" value="125.50" required autocomplete="off" aria-describedby="amount-help amount-error">
+            <small id="amount-help" class="field__help">Mayor que 0 y hasta 1 000 000.00, con 2 decimales como máximo.</small>
+            <small id="amount-error" class="field__error" hidden></small>
+          </div>
+          <div class="presets" role="group" aria-label="Importes de ejemplo">
+            <button type="button" class="chip" data-amount="125.50">125.50 · riesgo 10</button>
+            <button type="button" class="chip" data-amount="750.00">750.00 · riesgo 40</button>
+            <button type="button" class="chip" data-amount="1500.00">1500.00 · riesgo 75</button>
+          </div>
+          <button type="submit" class="btn btn--primary btn--block" id="order-submit">Evaluar riesgo y crear pedido</button>
+          <div id="order-result" class="result" hidden aria-live="polite"></div>
+        </form>
+
+        <form id="lookup-form" class="card form" novalidate>
+          <h3 class="card__title">Consultar por ID</h3>
+          <div class="field">
+            <label for="lookup-id">UUID del pedido</label>
+            <input id="lookup-id" name="id" autocomplete="off" spellcheck="false" placeholder="ej. 3f2c…" aria-describedby="lookup-error">
+            <small id="lookup-error" class="field__error" hidden></small>
+          </div>
+          <button type="submit" class="btn btn--ghost btn--block">Consultar <code>GET /api/orders/{id}</code></button>
+          <div id="lookup-result" class="result" hidden aria-live="polite"></div>
+        </form>
+      </div>
+
+      <article class="card orders-table">
+        <div class="card__head">
+          <h3 class="card__title">Pedidos recientes</h3>
+          <button type="button" class="btn btn--ghost btn--sm" data-refresh>Actualizar <span aria-hidden="true">↻</span></button>
+        </div>
+        <div class="toolbar">
+          <label class="sr-only" for="order-search">Buscar por cliente</label>
+          <input id="order-search" type="search" placeholder="Buscar por cliente…" autocomplete="off">
+          <div class="segmented" role="group" aria-label="Filtrar por decisión">
+            <button type="button" class="segmented__btn is-active" data-filter="ALL" aria-pressed="true">Todos</button>
+            <button type="button" class="segmented__btn" data-filter="APPROVED" aria-pressed="false">Aprobados</button>
+            <button type="button" class="segmented__btn" data-filter="REVIEW" aria-pressed="false">Revisión</button>
+          </div>
+        </div>
+        <p class="muted small" id="orders-caption">El API devuelve los 50 pedidos más recientes; el filtro y la búsqueda se aplican sobre ellos.</p>
+        <div class="table-scroll">
+          <table class="table">
+            <thead>
+              <tr><th scope="col">Cliente / ID</th><th scope="col">Importe</th><th scope="col">Riesgo</th><th scope="col">Decisión</th><th scope="col">Creado</th></tr>
+            </thead>
+            <tbody id="orders-body">
+              <tr><td colspan="5" class="table__empty">Cargando pedidos…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ARQUITECTURA -->
+  <section id="arquitectura" class="section" aria-labelledby="arch-title">
+    <div class="section__head">
+      <div>
+        <p class="eyebrow">Architecture Explorer</p>
+        <h2 id="arch-title">Explorador de la arquitectura hexagonal</h2>
+        <p class="section__lead">Cada bloque es una clase o módulo real del repositorio. Selecciónalo para ver su responsabilidad, capa y archivo.</p>
+      </div>
+      <div class="segmented" role="group" aria-label="Vista del diagrama">
+        <button type="button" class="segmented__btn is-active" data-arch-mode="dependencies" aria-pressed="true">Dependencias del código</button>
+        <button type="button" class="segmented__btn" data-arch-mode="execution" aria-pressed="false">Flujo de ejecución</button>
+      </div>
+    </div>
+
+    <p class="arch-legend" id="arch-mode-help"></p>
+
+    <div class="arch">
+      <div class="arch__diagram card" id="arch-diagram">
+        <svg class="arch__edges" id="arch-edges" aria-hidden="true"></svg>
+        <div class="arch__col" data-col="actors"><h4>Actor / externo</h4></div>
+        <div class="arch__col" data-col="in"><h4>Adaptadores de entrada</h4></div>
+        <div class="arch__col arch__col--core" data-col="core"><h4>Núcleo: aplicación + dominio</h4></div>
+        <div class="arch__col" data-col="out"><h4>Adaptadores de salida</h4></div>
+        <div class="arch__col" data-col="external"><h4>Servicios externos</h4></div>
+      </div>
+
+      <aside class="arch__detail card" id="arch-detail" aria-live="polite">
+        <p class="muted">Selecciona un componente del diagrama.</p>
+      </aside>
+    </div>
+
+    <div class="arch-run card">
+      <div class="arch-run__head">
+        <div>
+          <h3 class="card__title">Solicitud real a través de la arquitectura</h3>
+          <p class="muted small">Envía un pedido real. Los datos de la derecha (estado HTTP, latencia medida en el navegador, respuesta y lectura posterior desde PostgreSQL) son observaciones auténticas. Los pasos numerados son el <strong>recorrido conceptual</strong> del código para ese resultado: no es una traza instrumentada.</p>
+        </div>
+        <div class="arch-run__controls">
+          <label class="sr-only" for="run-amount">Importe</label>
+          <select id="run-amount">
+            <option value="125.50">125.50 USD → aprobado</option>
+            <option value="1500.00">1500.00 USD → revisión</option>
+            <option value="0">0 USD → validación (400)</option>
+          </select>
+          <button type="button" class="btn btn--primary" id="run-request">Ejecutar solicitud real</button>
+        </div>
+      </div>
+      <div class="arch-run__body">
+        <ol class="steps" id="run-steps"></ol>
+        <div class="evidence" id="run-evidence">
+          <p class="muted small">Aún no se ha ejecutado ninguna solicitud.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OBSERVABILIDAD -->
+  <section id="observabilidad" class="section" aria-labelledby="obs-title">
+    <div class="section__head">
+      <div>
+        <p class="eyebrow">Observability</p>
+        <h2 id="obs-title">Observabilidad</h2>
+        <p class="section__lead">Estado consultado en vivo. El estado de salud de una aplicación no implica que todas sus dependencias funcionen: cada fila indica de dónde procede el dato.</p>
+      </div>
+      <div class="obs-links">
+        <a class="btn btn--ghost btn--sm" id="link-grafana" target="_blank" rel="noopener">Grafana ↗</a>
+        <a class="btn btn--ghost btn--sm" id="link-prometheus" target="_blank" rel="noopener">Prometheus ↗</a>
+      </div>
+    </div>
+
+    <div id="obs-warning" class="alert" hidden role="alert"></div>
+
+    <div class="obs-grid">
+      <article class="card">
+        <h3 class="card__title">Componentes</h3>
+        <ul class="health" id="health-list"></ul>
+      </article>
+      <article class="card">
+        <h3 class="card__title">Métricas reales (Prometheus)</h3>
+        <dl class="metrics" id="metrics-list"></dl>
+        <p class="muted small">Los contadores de Prometheus se reinician cuando se reinicia cada proceso; los totales persistentes están en el panel (PostgreSQL).</p>
+      </article>
+    </div>
+
+    <article class="card">
+      <div class="card__head">
+        <h3 class="card__title">Targets de Prometheus</h3>
+        <span class="muted small" id="targets-updated"></span>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr><th scope="col">Job</th><th scope="col">Endpoint</th><th scope="col">Estado</th><th scope="col">Último scrape</th><th scope="col">Duración</th><th scope="col">Error</th></tr></thead>
+          <tbody id="targets-body"><tr><td colspan="6" class="table__empty">Consultando Prometheus…</td></tr></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
 </main>
-<script>
-  const byId = id => document.getElementById(id);
-  const money = new Intl.NumberFormat('es-PE', {style:'currency',currency:'USD'});
-  const appendCell = (row, value, className) => { const cell = document.createElement('td'); cell.textContent = value; if(className) cell.className = className; row.appendChild(cell); return cell; };
-  async function readResponse(response){ let body;try{body=await response.json();}catch{throw new Error('La API devolvió una respuesta no válida.');} if(!response.ok) throw new Error(body.detail || 'No se pudo completar la operación.');return body; }
-  async function loadOrders(){
-    try{
-      const orders=await readResponse(await fetch('/api/orders',{cache:'no-store'}));
-      byId('orders').replaceChildren();
-      for(const order of orders){
-        const row=document.createElement('tr'); const client=appendCell(row,order.customerId); const id=document.createElement('span');id.className='id';id.textContent=order.id;client.appendChild(id);
-        appendCell(row,money.format(order.amount));appendCell(row,order.riskScore+' / 100','score');
-        const statusCell=appendCell(row,'');const pill=document.createElement('span');pill.className='pill'+(order.status==='REVIEW'?' review':'');pill.textContent=order.status==='REVIEW'?'REVISIÓN':'APROBADO';statusCell.appendChild(pill);byId('orders').appendChild(row);
-      }
-      if(!orders.length){const row=document.createElement('tr');const cell=appendCell(row,'Tu primer pedido empieza aquí.','empty');cell.colSpan=4;byId('orders').appendChild(row);}
-      byId('connection').textContent='● API conectada';byId('count').textContent=orders.length+' pedidos visibles · máximo 50 · datos persistidos';
-    }catch(error){byId('connection').textContent='● API no disponible';const row=document.createElement('tr');const cell=appendCell(row,error.message,'empty');cell.colSpan=4;byId('orders').replaceChildren(row);}
-  }
-  byId('order-form').addEventListener('submit',async event=>{
-    event.preventDefault();const button=byId('submit');button.disabled=true;button.textContent='Evaluando riesgo…';byId('notice').hidden=true;
-    try{
-      const body=await readResponse(await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customerId:byId('customer').value,amount:Number(byId('amount').value),currency:'USD'})}));
-      byId('response').textContent=JSON.stringify(body,null,2);byId('notice').className='notice success';byId('notice').textContent='Pedido creado · '+(body.status==='REVIEW'?'requiere revisión':'aprobado')+' · riesgo '+body.riskScore+'/100';await loadOrders();
-    }catch(error){byId('notice').className='notice error';byId('notice').textContent=error.message;byId('response').textContent=error.message;}
-    finally{byId('notice').hidden=false;button.disabled=false;button.textContent='Evaluar y crear pedido ↗';}
-  });
-  document.querySelectorAll('[data-amount]').forEach(button=>button.addEventListener('click',()=>byId('amount').value=button.dataset.amount));
-  byId('refresh').addEventListener('click',loadOrders);loadOrders();
-</script>
+
+<footer class="footer">
+  <div class="footer__brand">
+    <img src="img/logo.svg" alt="" width="28" height="28">
+    <span><strong>HexaOrders</strong> — Order Management &amp; Risk Assessment System</span>
+  </div>
+  <p class="muted small">Dominio sin frameworks · Dependencias hacia el núcleo · Java 21 · Python · PostgreSQL · Docker Compose · Prometheus · Grafana</p>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 </body>
 </html>

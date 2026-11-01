@@ -8,7 +8,9 @@ import com.hexaorders.application.port.out.OrderTelemetry;
 import com.hexaorders.application.port.out.RiskAssessmentPort;
 import com.hexaorders.domain.Order;
 import com.hexaorders.domain.OrderDraft;
+import com.hexaorders.domain.OrderStatistics;
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,7 +41,9 @@ public final class OrderService implements OrderUseCases {
             telemetry.riskFailure();
             throw error;
         }
-        Order order = Order.create(draft, score, UUID.randomUUID(), clock.instant());
+        // Microsecond precision: the instant returned to the client is exactly the one that can be
+        // persisted (PostgreSQL TIMESTAMPTZ), so POST and a later GET return the same createdAt.
+        Order order = Order.create(draft, score, UUID.randomUUID(), clock.instant().truncatedTo(ChronoUnit.MICROS));
         repository.save(order);
         telemetry.orderCreated(order.status());
         return order;
@@ -53,5 +57,10 @@ public final class OrderService implements OrderUseCases {
     @Override
     public List<Order> latest() {
         return repository.latest(50);
+    }
+
+    @Override
+    public OrderStatistics statistics() {
+        return repository.statistics();
     }
 }

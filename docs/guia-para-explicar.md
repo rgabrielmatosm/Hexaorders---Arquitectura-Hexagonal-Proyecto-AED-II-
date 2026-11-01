@@ -102,7 +102,7 @@ Ejemplos: 125.50 → 10/aprobado; 500 → 40/aprobado; 999.99 → 40/aprobado; 1
 
 Java usa `BigDecimal`, Python `Decimal` y PostgreSQL `NUMERIC(12,2)`. La validación evita redondear silenciosamente entradas con más de dos decimales. El score 75 es un puntaje de la regla, **no demuestra una probabilidad de fraude del 75 %**.
 
-La respuesta contiene: `id` (UUID), `customerId`, `amount`, `currency`, `riskScore`, `status` y `createdAt`. El listado devuelve hasta 50 pedidos, ordenados del más reciente al más antiguo.
+La respuesta contiene: `id` (UUID), `customerId`, `amount`, `currency`, `riskScore`, `status` y `createdAt`. El listado devuelve hasta 50 pedidos, ordenados del más reciente al más antiguo. `GET /api/orders/statistics` devuelve los totales de todos los pedidos persistidos (`total`, `approved`, `review`), que el panel de la interfaz muestra.
 
 | Respuesta HTTP de la API Java | Significado |
 |---|---|
@@ -310,7 +310,7 @@ No uses capturas de contraseñas. Si una comprobación no se ejecutó o falló, 
 ## 13. Orden para abrir archivos durante la enseñanza
 
 1. `README.md`: propósito, accesos y arranque.
-2. `services/order-api/src/main/resources/static/index.html`: formulario que inicia el recorrido.
+2. La interfaz web (`services/order-api/src/main/resources/static/`): `index.html`, `js/orders.js` (formulario que inicia el recorrido) y `js/architecture.js` (explorador con las clases reales). Sección **Arquitectura → Ejecutar solicitud real** para recorrer las capas con un pedido real.
 3. Java `adapter/in/web/OrderController.java`: entrada HTTP.
 4. Java `domain/OrderDraft.java` y `OrderStatus.java`: validación y decisión.
 5. Java `application/service/OrderService.java`: secuencia completa.
