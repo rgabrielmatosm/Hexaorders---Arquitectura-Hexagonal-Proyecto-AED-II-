@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo d440fb14836c3c826214bdbdd51f3e589186f1483f77e32024cefcd4a91ae802
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 6f87763eef1d22135c49a3724b247676e766bf72011599d81aa1e398b14b89e6
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -667,7 +667,20 @@ services:
         </project>
         HEXFILE_0
         RUN mvn -B -ntp dependency:go-offline
-        COPY <<'HEXFILE_1' src/main/java/com/hexaorders/adapter/in/web/ApiExceptionHandler.java
+        COPY <<'HEXFILE_1' src/main/java/com/hexaorders/OrderApiApplication.java
+        package com.hexaorders;
+        
+        import org.springframework.boot.SpringApplication;
+        import org.springframework.boot.autoconfigure.SpringBootApplication;
+        
+        @SpringBootApplication
+        public class OrderApiApplication {
+            public static void main(String[] args) {
+                SpringApplication.run(OrderApiApplication.class, args);
+            }
+        }
+        HEXFILE_1
+        COPY <<'HEXFILE_2' src/main/java/com/hexaorders/adapter/in/web/ApiExceptionHandler.java
         package com.hexaorders.adapter.in.web;
         
         import com.hexaorders.application.exception.OrderNotFoundException;
@@ -713,8 +726,8 @@ services:
                 return problem;
             }
         }
-        HEXFILE_1
-        COPY <<'HEXFILE_2' src/main/java/com/hexaorders/adapter/in/web/OrderController.java
+        HEXFILE_2
+        COPY <<'HEXFILE_3' src/main/java/com/hexaorders/adapter/in/web/OrderController.java
         package com.hexaorders.adapter.in.web;
         
         import com.hexaorders.application.port.in.OrderUseCases;
@@ -754,8 +767,8 @@ services:
         
             public record CreateOrderRequest(String customerId, BigDecimal amount, String currency) {}
         }
-        HEXFILE_2
-        COPY <<'HEXFILE_3' src/main/java/com/hexaorders/adapter/out/http/HttpRiskAssessmentAdapter.java
+        HEXFILE_3
+        COPY <<'HEXFILE_4' src/main/java/com/hexaorders/adapter/out/http/HttpRiskAssessmentAdapter.java
         package com.hexaorders.adapter.out.http;
         
         import com.hexaorders.application.exception.RiskUnavailableException;
@@ -794,8 +807,8 @@ services:
             private record ScoreRequest(String customerId, BigDecimal amount) {}
             private record ScoreResponse(BigDecimal score, String decision) {}
         }
-        HEXFILE_3
-        COPY <<'HEXFILE_4' src/main/java/com/hexaorders/adapter/out/metrics/MicrometerOrderTelemetry.java
+        HEXFILE_4
+        COPY <<'HEXFILE_5' src/main/java/com/hexaorders/adapter/out/metrics/MicrometerOrderTelemetry.java
         package com.hexaorders.adapter.out.metrics;
         
         import com.hexaorders.application.port.out.OrderTelemetry;
@@ -824,8 +837,8 @@ services:
             @Override
             public void riskFailure() { riskFailures.increment(); }
         }
-        HEXFILE_4
-        COPY <<'HEXFILE_5' src/main/java/com/hexaorders/adapter/out/persistence/JdbcOrderRepository.java
+        HEXFILE_5
+        COPY <<'HEXFILE_6' src/main/java/com/hexaorders/adapter/out/persistence/JdbcOrderRepository.java
         package com.hexaorders.adapter.out.persistence;
         
         import com.hexaorders.application.exception.PersistenceUnavailableException;
@@ -882,8 +895,8 @@ services:
                 }
             }
         }
-        HEXFILE_5
-        COPY <<'HEXFILE_6' src/main/java/com/hexaorders/application/exception/OrderNotFoundException.java
+        HEXFILE_6
+        COPY <<'HEXFILE_7' src/main/java/com/hexaorders/application/exception/OrderNotFoundException.java
         package com.hexaorders.application.exception;
         
         import java.util.UUID;
@@ -893,8 +906,8 @@ services:
                 super("No existe el pedido " + id);
             }
         }
-        HEXFILE_6
-        COPY <<'HEXFILE_7' src/main/java/com/hexaorders/application/exception/PersistenceUnavailableException.java
+        HEXFILE_7
+        COPY <<'HEXFILE_8' src/main/java/com/hexaorders/application/exception/PersistenceUnavailableException.java
         package com.hexaorders.application.exception;
         
         public final class PersistenceUnavailableException extends RuntimeException {
@@ -902,16 +915,16 @@ services:
                 super("La base de datos no está disponible", cause);
             }
         }
-        HEXFILE_7
-        COPY <<'HEXFILE_8' src/main/java/com/hexaorders/application/exception/RiskUnavailableException.java
+        HEXFILE_8
+        COPY <<'HEXFILE_9' src/main/java/com/hexaorders/application/exception/RiskUnavailableException.java
         package com.hexaorders.application.exception;
         
         public final class RiskUnavailableException extends RuntimeException {
             public RiskUnavailableException(String message) { super(message); }
             public RiskUnavailableException(String message, Throwable cause) { super(message, cause); }
         }
-        HEXFILE_8
-        COPY <<'HEXFILE_9' src/main/java/com/hexaorders/application/port/in/OrderUseCases.java
+        HEXFILE_9
+        COPY <<'HEXFILE_10' src/main/java/com/hexaorders/application/port/in/OrderUseCases.java
         package com.hexaorders.application.port.in;
         
         import com.hexaorders.domain.Order;
@@ -924,8 +937,8 @@ services:
             Order get(UUID id);
             List<Order> latest();
         }
-        HEXFILE_9
-        COPY <<'HEXFILE_10' src/main/java/com/hexaorders/application/port/out/OrderRepository.java
+        HEXFILE_10
+        COPY <<'HEXFILE_11' src/main/java/com/hexaorders/application/port/out/OrderRepository.java
         package com.hexaorders.application.port.out;
         
         import com.hexaorders.domain.Order;
@@ -938,8 +951,8 @@ services:
             Optional<Order> findById(UUID id);
             List<Order> latest(int limit);
         }
-        HEXFILE_10
-        COPY <<'HEXFILE_11' src/main/java/com/hexaorders/application/port/out/OrderTelemetry.java
+        HEXFILE_11
+        COPY <<'HEXFILE_12' src/main/java/com/hexaorders/application/port/out/OrderTelemetry.java
         package com.hexaorders.application.port.out;
         
         import com.hexaorders.domain.OrderStatus;
@@ -948,8 +961,8 @@ services:
             void orderCreated(OrderStatus status);
             void riskFailure();
         }
-        HEXFILE_11
-        COPY <<'HEXFILE_12' src/main/java/com/hexaorders/application/port/out/RiskAssessmentPort.java
+        HEXFILE_12
+        COPY <<'HEXFILE_13' src/main/java/com/hexaorders/application/port/out/RiskAssessmentPort.java
         package com.hexaorders.application.port.out;
         
         import com.hexaorders.domain.OrderDraft;
@@ -958,8 +971,8 @@ services:
             /** Returns 0..100 or throws RiskUnavailableException. */
             int assess(OrderDraft draft);
         }
-        HEXFILE_12
-        COPY <<'HEXFILE_13' src/main/java/com/hexaorders/application/service/OrderService.java
+        HEXFILE_13
+        COPY <<'HEXFILE_14' src/main/java/com/hexaorders/application/service/OrderService.java
         package com.hexaorders.application.service;
         
         import com.hexaorders.application.exception.OrderNotFoundException;
@@ -1017,8 +1030,8 @@ services:
                 return repository.latest(50);
             }
         }
-        HEXFILE_13
-        COPY <<'HEXFILE_14' src/main/java/com/hexaorders/config/HexagonalConfiguration.java
+        HEXFILE_14
+        COPY <<'HEXFILE_15' src/main/java/com/hexaorders/config/HexagonalConfiguration.java
         package com.hexaorders.config;
         
         import com.hexaorders.adapter.out.http.HttpRiskAssessmentAdapter;
@@ -1093,8 +1106,8 @@ services:
                 return new OrderService(repository, risk, telemetry, clock);
             }
         }
-        HEXFILE_14
-        COPY <<'HEXFILE_15' src/main/java/com/hexaorders/domain/Order.java
+        HEXFILE_15
+        COPY <<'HEXFILE_16' src/main/java/com/hexaorders/domain/Order.java
         package com.hexaorders.domain;
         
         import java.math.BigDecimal;
@@ -1119,8 +1132,8 @@ services:
                         riskScore, OrderStatus.fromRiskScore(riskScore), createdAt);
             }
         }
-        HEXFILE_15
-        COPY <<'HEXFILE_16' src/main/java/com/hexaorders/domain/OrderDraft.java
+        HEXFILE_16
+        COPY <<'HEXFILE_17' src/main/java/com/hexaorders/domain/OrderDraft.java
         package com.hexaorders.domain;
         
         import java.math.BigDecimal;
@@ -1147,8 +1160,8 @@ services:
                 amount = amount.setScale(2);
             }
         }
-        HEXFILE_16
-        COPY <<'HEXFILE_17' src/main/java/com/hexaorders/domain/OrderStatus.java
+        HEXFILE_17
+        COPY <<'HEXFILE_18' src/main/java/com/hexaorders/domain/OrderStatus.java
         package com.hexaorders.domain;
         
         public enum OrderStatus {
@@ -1159,19 +1172,6 @@ services:
                     throw new IllegalArgumentException("El puntaje debe estar entre 0 y 100");
                 }
                 return score >= 70 ? REVIEW : APPROVED;
-            }
-        }
-        HEXFILE_17
-        COPY <<'HEXFILE_18' src/main/java/com/hexaorders/OrderApiApplication.java
-        package com.hexaorders;
-        
-        import org.springframework.boot.SpringApplication;
-        import org.springframework.boot.autoconfigure.SpringBootApplication;
-        
-        @SpringBootApplication
-        public class OrderApiApplication {
-            public static void main(String[] args) {
-                SpringApplication.run(OrderApiApplication.class, args);
             }
         }
         HEXFILE_18
@@ -1649,18 +1649,63 @@ services:
   # 4. Pull de métricas; no forma parte del núcleo ni del camino del pedido.
   prometheus:
     <<: *runtime
-    image: prom/prometheus:v3.5.1
+    image: hexaorders/prometheus:1.0.0
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        # Imagen de configuración: la configuración queda dentro de la imagen para que el
+        # contenedor funcione con read_only: true (Compose no puede inyectar configs.content
+        # en servicios de solo lectura). generate_delivery.py la incorpora inline.
+        FROM prom/prometheus:v3.5.1
+        COPY <<'HEXFILE_0' /etc/prometheus/prometheus.yml
+        global:
+          scrape_interval: 10s
+          evaluation_interval: 10s
+          external_labels:
+            project: hexaorders
+        rule_files:
+          - /etc/prometheus/alerts.yml
+        scrape_configs:
+          - job_name: order-api
+            metrics_path: /actuator/prometheus
+            static_configs:
+              - targets: [order-api:9090]
+          - job_name: risk-engine
+            metrics_path: /metrics
+            static_configs:
+              - targets: [risk-engine:8000]
+          - job_name: prometheus
+            static_configs:
+              - targets: [localhost:9090]
+        HEXFILE_0
+        COPY <<'HEXFILE_1' /etc/prometheus/alerts.yml
+        groups:
+          - name: hexaorders
+            rules:
+              - alert: HexaOrdersServiceDown
+                expr: up{job=~"order-api|risk-engine"} == 0
+                for: 30s
+                labels:
+                  severity: critical
+                annotations:
+                  summary: 'Servicio {{ $$labels.job }} sin respuesta'
+                  description: 'Prometheus no puede recopilar métricas durante al menos 30 segundos.'
+              - alert: RiskRequestsFailing
+                expr: increase(orders_risk_failures_total[2m]) > 0
+                for: 10s
+                labels:
+                  severity: warning
+                annotations:
+                  summary: 'Falló una evaluación de riesgo'
+                  description: 'Revisar risk-engine y los tiempos de espera HTTP de order-api.'
+        HEXFILE_1
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --storage.tsdb.retention.size=1GB
-      - --web.enable-lifecycle=false
-    configs:
-      - source: prometheus_config
-        target: /etc/prometheus/prometheus.yml
-      - source: prometheus_alerts
-        target: /etc/prometheus/alerts.yml
+      - --no-web.enable-lifecycle
     volumes:
       - prometheus_data:/prometheus
     ports:
@@ -1681,7 +1726,108 @@ services:
   # 5. Datasource y dashboard provisionados: cero configuración manual en la demo.
   grafana:
     <<: *runtime
-    image: grafana/grafana:12.4.1
+    image: hexaorders/grafana:1.0.0
+    build:
+      context: .
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1.7
+        # Imagen de configuración: datasource, proveedor y dashboard dentro de la imagen para
+        # funcionar con read_only: true. El dashboard vive fuera de /var/lib/grafana (volumen
+        # de datos) para que una nueva versión de la imagen nunca quede tapada por el volumen.
+        FROM grafana/grafana:12.4.1
+        COPY <<'HEXFILE_0' /etc/grafana/provisioning/datasources/prometheus.yml
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            uid: prometheus
+            type: prometheus
+            access: proxy
+            url: http://prometheus:9090
+            isDefault: true
+            editable: false
+            jsonData:
+              timeInterval: 10s
+        HEXFILE_0
+        COPY <<'HEXFILE_1' /etc/grafana/provisioning/dashboards/default.yml
+        apiVersion: 1
+        providers:
+          - name: HexaOrders
+            orgId: 1
+            folder: HexaOrders
+            type: file
+            disableDeletion: true
+            editable: false
+            options:
+              path: /etc/grafana/dashboards
+        HEXFILE_1
+        COPY <<'HEXFILE_2' /etc/grafana/dashboards/hexaorders.json
+        {
+          "id": null,
+          "uid": "hexaorders",
+          "title": "HexaOrders · Puertos, adaptadores y métricas",
+          "tags": ["hexagonal", "java", "python"],
+          "timezone": "browser",
+          "schemaVersion": 39,
+          "version": 1,
+          "refresh": "10s",
+          "time": {"from": "now-15m", "to": "now"},
+          "panels": [
+            {
+              "id": 1, "title": "Servicios disponibles (1 = UP)", "type": "stat",
+              "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "up{job=~\"order-api|risk-engine\"}", "legendFormat": "{{job}}", "instant": true}],
+              "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+              "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+            },
+            {
+              "id": 2, "title": "Pedidos creados desde el arranque de Java", "type": "stat",
+              "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum(orders_created_total) or vector(0)", "instant": true}],
+              "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+              "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+            },
+            {
+              "id": 3, "title": "Fallos de riesgo desde el arranque de Java", "type": "stat",
+              "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum(orders_risk_failures_total) or vector(0)", "instant": true}],
+              "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+              "options": {"colorMode": "value", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+            },
+            {
+              "id": 4, "title": "Pedidos por estado / segundo", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum by(status)(rate(orders_created_total[2m]))", "legendFormat": "{{status}}"}],
+              "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 5, "title": "Evaluaciones de riesgo / segundo", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "sum by(decision)(rate(risk_evaluations_total[2m]))", "legendFormat": "{{decision}}"}],
+              "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 6, "title": "Latencia p95 API de pedidos", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(http_server_requests_seconds_bucket{uri=~\"/api/orders.*\"}[2m])))", "legendFormat": "p95 REST"}],
+              "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+            },
+            {
+              "id": 7, "title": "Latencia p95 evaluación de riesgo Python", "type": "timeseries",
+              "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))", "legendFormat": "p95 riesgo"}],
+              "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+            }
+          ],
+          "annotations": {"list": []}
+        }
+        HEXFILE_2
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
@@ -1691,13 +1837,6 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
       GF_NEWS_NEWS_FEED_ENABLED: 'false'
     secrets: [grafana_password]
-    configs:
-      - source: grafana_datasource
-        target: /etc/grafana/provisioning/datasources/prometheus.yml
-      - source: grafana_provider
-        target: /etc/grafana/provisioning/dashboards/default.yml
-      - source: grafana_dashboard
-        target: /var/lib/grafana/dashboards/hexaorders.json
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
@@ -1735,147 +1874,12 @@ volumes:
   prometheus_data: {}
   grafana_data: {}
 
-# Los valores se proporcionan al desplegar, nunca se incrustan en el entregable.
-# Compose local monta archivos: no equivale al almacén cifrado de secretos de Swarm.
+# Los valores se generan al desplegar en ./secrets/ (junto a este archivo), nunca se
+# incrustan en el entregable ni en Git. Se usan archivos y no `environment:` porque
+# Compose solo puede montar secretos de archivo en servicios read_only (bind mount de
+# solo lectura). No equivale al almacén cifrado de secretos de Swarm.
 secrets:
   db_password:
-    environment: DB_PASSWORD
+    file: ./secrets/db_password.txt
   grafana_password:
-    environment: GRAFANA_PASSWORD
-
-configs:
-  prometheus_config:
-    content: |
-      global:
-        scrape_interval: 10s
-        evaluation_interval: 10s
-        external_labels:
-          project: hexaorders
-      rule_files:
-        - /etc/prometheus/alerts.yml
-      scrape_configs:
-        - job_name: order-api
-          metrics_path: /actuator/prometheus
-          static_configs:
-            - targets: [order-api:9090]
-        - job_name: risk-engine
-          metrics_path: /metrics
-          static_configs:
-            - targets: [risk-engine:8000]
-        - job_name: prometheus
-          static_configs:
-            - targets: [localhost:9090]
-  prometheus_alerts:
-    content: |
-      groups:
-        - name: hexaorders
-          rules:
-            - alert: HexaOrdersServiceDown
-              expr: up{job=~"order-api|risk-engine"} == 0
-              for: 30s
-              labels:
-                severity: critical
-              annotations:
-                summary: 'Servicio {{ $$labels.job }} sin respuesta'
-                description: 'Prometheus no puede recopilar métricas durante al menos 30 segundos.'
-            - alert: RiskRequestsFailing
-              expr: increase(orders_risk_failures_total[2m]) > 0
-              for: 10s
-              labels:
-                severity: warning
-              annotations:
-                summary: 'Falló una evaluación de riesgo'
-                description: 'Revisar risk-engine y los tiempos de espera HTTP de order-api.'
-  grafana_datasource:
-    content: |
-      apiVersion: 1
-      datasources:
-        - name: Prometheus
-          uid: prometheus
-          type: prometheus
-          access: proxy
-          url: http://prometheus:9090
-          isDefault: true
-          editable: false
-          jsonData:
-            timeInterval: 10s
-  grafana_provider:
-    content: |
-      apiVersion: 1
-      providers:
-        - name: HexaOrders
-          orgId: 1
-          folder: HexaOrders
-          type: file
-          disableDeletion: true
-          editable: false
-          options:
-            path: /var/lib/grafana/dashboards
-  grafana_dashboard:
-    content: |
-      {
-        "id": null,
-        "uid": "hexaorders",
-        "title": "HexaOrders · Puertos, adaptadores y métricas",
-        "tags": ["hexagonal", "java", "python"],
-        "timezone": "browser",
-        "schemaVersion": 39,
-        "version": 1,
-        "refresh": "10s",
-        "time": {"from": "now-15m", "to": "now"},
-        "panels": [
-          {
-            "id": 1, "title": "Servicios disponibles (1 = UP)", "type": "stat",
-            "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "up{job=~\"order-api|risk-engine\"}", "legendFormat": "{{job}}", "instant": true}],
-            "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
-            "options": {"colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
-          },
-          {
-            "id": 2, "title": "Pedidos creados desde el arranque de Java", "type": "stat",
-            "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum(orders_created_total) or vector(0)", "instant": true}],
-            "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
-            "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
-          },
-          {
-            "id": 3, "title": "Fallos de riesgo desde el arranque de Java", "type": "stat",
-            "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum(orders_risk_failures_total) or vector(0)", "instant": true}],
-            "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
-            "options": {"colorMode": "value", "graphMode": "none", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
-          },
-          {
-            "id": 4, "title": "Pedidos por estado / segundo", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum by(status)(rate(orders_created_total[2m]))", "legendFormat": "{{status}}"}],
-            "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
-          },
-          {
-            "id": 5, "title": "Evaluaciones de riesgo / segundo", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "sum by(decision)(rate(risk_evaluations_total[2m]))", "legendFormat": "{{decision}}"}],
-            "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []}
-          },
-          {
-            "id": 6, "title": "Latencia p95 API de pedidos", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(http_server_requests_seconds_bucket{uri=~\"/api/orders.*\"}[2m])))", "legendFormat": "p95 REST"}],
-            "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
-          },
-          {
-            "id": 7, "title": "Latencia p95 evaluación de riesgo Python", "type": "timeseries",
-            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
-            "datasource": {"type": "prometheus", "uid": "prometheus"},
-            "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))", "legendFormat": "p95 riesgo"}],
-            "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
-          }
-        ],
-        "annotations": {"list": []}
-      }
+    file: ./secrets/grafana_password.txt

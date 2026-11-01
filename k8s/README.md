@@ -18,7 +18,7 @@ Necesitas `kubectl`, un clúster Linux amd64 compatible con `apps/v1`, DNS y una
 
 Las imágenes propias se construyen con Compose. En un clúster remoto deben estar en un registry accesible; en kind se pueden cargar desde tu Docker local. Comprueba siempre el contexto antes de aplicar recursos:
 
-```bash
+```powershell
 kubectl config current-context
 kubectl get nodes
 kubectl get storageclass
@@ -26,9 +26,9 @@ kubectl get storageclass
 
 ## 1. Construir y cargar las imágenes en kind
 
-Ejemplo en **Bash**, desde la raíz del proyecto, con Docker, Compose >= 2.23.1, kind y kubectl instalados. Genera primero los archivos de entrega si has modificado fuentes: `python tools/generate_delivery.py`. Prepara las variables de Compose tal como indica el README principal.
+Ejemplo en **PowerShell**, desde la raíz del proyecto, con Docker Desktop, Compose >= 2.23.1, [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) y kubectl instalados (en Windows: `winget install Kubernetes.kind Kubernetes.kubectl`). Los mismos comandos funcionan en Bash. Genera primero los archivos de entrega si has modificado fuentes: `py tools\generate_delivery.py`. Genera los secretos de Compose con `.\hexaorders.cmd secrets`.
 
-```bash
+```powershell
 docker compose build --pull order-api risk-engine
 kind create cluster --name hexaorders
 kind load docker-image hexaorders/order-api:1.0.0 hexaorders/risk-engine:1.0.0 --name hexaorders
@@ -39,17 +39,18 @@ Los manifiestos utilizan `imagePullPolicy: IfNotPresent`, por lo que kind aprove
 
 ## 2. Crear secretos fuera del repositorio
 
-Los valores sensibles no aparecen en ningún manifiesto versionado. En esta terminal se crean archivos en un directorio temporal del sistema y se envían al API de Kubernetes. Conserva ese directorio durante la demostración para consultar la contraseña de Grafana:
+Los valores sensibles no aparecen en ningún manifiesto versionado. Este comando aplica el namespace y crea (o actualiza) el Secret `app-secrets` a partir de `secrets\db_password.txt` y `secrets\grafana_password.txt`, que se generan si no existen y están excluidos de Git. La contraseña de Grafana es la de `secrets\grafana_password.txt`:
 
-```bash
+```powershell
+.\hexaorders.cmd k8s-secrets
+```
+
+Equivale a lo siguiente, que puedes ejecutar a mano en PowerShell (o en Bash, sin la primera línea):
+
+```powershell
+.\tools\init-env.ps1
 kubectl apply -f k8s/00-namespace.yaml
-umask 077
-SECRET_DIR="$(mktemp -d -t hexaorders-secrets.XXXXXX)"
-printf '%s' "$(openssl rand -hex 24)" > "$SECRET_DIR/db_password"
-printf '%s' "$(openssl rand -hex 24)" > "$SECRET_DIR/grafana_password"
-kubectl -n hexaorders create secret generic app-secrets \
-  --from-file=db_password="$SECRET_DIR/db_password" \
-  --from-file=grafana_password="$SECRET_DIR/grafana_password"
+kubectl -n hexaorders create secret generic app-secrets --from-file=db_password=secrets/db_password.txt --from-file=grafana_password=secrets/grafana_password.txt
 ```
 
 En despliegues posteriores reutiliza el Secret existente. Cambiar su contraseña no rota automáticamente la de PostgreSQL ya inicializado ni la cuenta admin almacenada por Grafana. Los volúmenes Secret se montan como archivos de lectura y cada servicio recibe exclusivamente la clave que necesita. La protección del almacén de secretos del clúster depende de su configuración y permisos.
@@ -58,7 +59,7 @@ En despliegues posteriores reutiliza el Secret existente. Cambiar su contraseña
 
 Primero se espera la base de datos para facilitar la demostración inicial; Kubernetes no interpreta `depends_on` de Compose. Si un proceso arranca antes que su dependencia y falla, el controlador lo reinicia; las sondas de readiness impiden enviarle tráfico hasta que esté listo.
 
-```bash
+```powershell
 kubectl apply -f k8s/10-monitoring-config.yaml
 kubectl apply -f k8s/20-data.yaml
 kubectl -n hexaorders rollout status statefulset/db --timeout=300s
@@ -79,52 +80,51 @@ Las aplicaciones se ejecutan como UID 10001, Prometheus como 65534, Grafana como
 
 Ejecuta cada port-forward en una terminal independiente y mantenla abierta:
 
-```bash
+```powershell
 kubectl -n hexaorders port-forward --address=127.0.0.1 service/order-api 8080:8080
 ```
 
-```bash
+```powershell
 kubectl -n hexaorders port-forward --address=127.0.0.1 service/grafana 3000:3000
 ```
 
-```bash
+```powershell
 kubectl -n hexaorders port-forward --address=127.0.0.1 service/prometheus 9091:9090
 ```
 
 Abre [aplicación](http://127.0.0.1:8080), [Grafana](http://127.0.0.1:3000/d/hexaorders) y [Prometheus](http://127.0.0.1:9091). Grafana usa `admin`; consulta su contraseña con `cat "$SECRET_DIR/grafana_password"` en la terminal donde la generaste. No hay LoadBalancer, NodePort ni Ingress público.
 
-```bash
-curl -fsS -X POST http://127.0.0.1:8080/api/orders \
-  -H 'Content-Type: application/json' \
-  -d '{"customerId":"demo-001","amount":125.50}'
+```powershell
+$body = @{ customerId = 'demo-001'; amount = 125.50 } | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8080/api/orders -Method Post -ContentType 'application/json' -Body $body
 ```
 
 ## Alternativa: registry para un clúster remoto
 
 Publica en un namespace de registry que te pertenezca. Las etiquetas predeterminadas `hexaorders/*` sirven para uso local; no debes asumir permiso para publicarlas en Docker Hub. Este ejemplo crea un override Compose temporal y publica en GHCR después de autenticarte mediante `docker login ghcr.io` con tus credenciales y permisos de escritura. Para imágenes públicas no hacen falta credenciales de lectura en el clúster.
 
-```bash
-export REGISTRY_OWNER='TU_USUARIO_EN_MINUSCULAS'
-OVERRIDE_FILE="$(mktemp -t hexaorders-registry.XXXXXX)"
-cat > "$OVERRIDE_FILE" <<EOF
+```powershell
+$REGISTRY_OWNER = 'TU_USUARIO_EN_MINUSCULAS'
+$OVERRIDE_FILE = Join-Path $env:TEMP 'hexaorders-registry.yml'
+@"
 services:
   order-api:
-    image: ghcr.io/${REGISTRY_OWNER}/hexaorders-order-api:1.0.0
+    image: ghcr.io/$REGISTRY_OWNER/hexaorders-order-api:1.0.0
   risk-engine:
-    image: ghcr.io/${REGISTRY_OWNER}/hexaorders-risk-engine:1.0.0
-EOF
+    image: ghcr.io/$REGISTRY_OWNER/hexaorders-risk-engine:1.0.0
+"@ | Set-Content -Path $OVERRIDE_FILE -Encoding ascii
 docker login ghcr.io
-docker compose -f docker-compose.yml -f "$OVERRIDE_FILE" build --pull order-api risk-engine
-docker compose -f docker-compose.yml -f "$OVERRIDE_FILE" push order-api risk-engine
+docker compose -f docker-compose.yml -f $OVERRIDE_FILE build --pull order-api risk-engine
+docker compose -f docker-compose.yml -f $OVERRIDE_FILE push order-api risk-engine
 ```
 
 Con el contexto remoto seleccionado, crea namespace/Secret y aplica los manifiestos según los pasos anteriores. Cambia las imágenes de ambos Deployments inmediatamente después de aplicar `30-apps.yaml`, antes de esperar su rollout:
 
-```bash
-kubectl -n hexaorders set image deployment/order-api \
-  order-api="ghcr.io/${REGISTRY_OWNER}/hexaorders-order-api:1.0.0"
-kubectl -n hexaorders set image deployment/risk-engine \
-  risk-engine="ghcr.io/${REGISTRY_OWNER}/hexaorders-risk-engine:1.0.0"
+```powershell
+kubectl -n hexaorders set image deployment/order-api `
+  "order-api=ghcr.io/$REGISTRY_OWNER/hexaorders-order-api:1.0.0"
+kubectl -n hexaorders set image deployment/risk-engine `
+  "risk-engine=ghcr.io/$REGISTRY_OWNER/hexaorders-risk-engine:1.0.0"
 kubectl -n hexaorders rollout status deployment/order-api --timeout=300s
 kubectl -n hexaorders rollout status deployment/risk-engine --timeout=180s
 ```
@@ -135,7 +135,7 @@ Si el registry es privado, configura primero un `imagePullSecret` y referencia e
 
 El ConfigMap reutiliza los destinos DNS `order-api:9090` y `risk-engine:8000`, las reglas de alerta y el dashboard provisionado. Los archivos se montan mediante `subPath`: los cambios de ConfigMap requieren recrear los Pods consumidores. [ConfigMap y subPath](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/).
 
-```bash
+```powershell
 kubectl apply -f k8s/10-monitoring-config.yaml
 kubectl -n hexaorders rollout restart deployment/prometheus deployment/grafana
 ```
@@ -146,7 +146,7 @@ Las redes `internal: true` de Compose no se convierten automáticamente en aisla
 
 Para diagnosticar:
 
-```bash
+```powershell
 kubectl -n hexaorders get events --sort-by=.lastTimestamp
 kubectl -n hexaorders logs deployment/order-api --tail=100
 kubectl -n hexaorders describe pod -l app=order-api

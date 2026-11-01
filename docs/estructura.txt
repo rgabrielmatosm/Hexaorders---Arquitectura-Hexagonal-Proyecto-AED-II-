@@ -15,11 +15,13 @@ hexaorders/
 │   ├── grafana/
 │   │   ├── dashboards/
 │   │   │   └── hexaorders.json
-│   │   └── provisioning/
-│   │       ├── dashboards.yml
-│   │       └── datasource.yml
+│   │   ├── provisioning/
+│   │   │   ├── dashboards.yml
+│   │   │   └── datasource.yml
+│   │   └── Dockerfile
 │   ├── prometheus/
 │   │   ├── alerts.yml
+│   │   ├── Dockerfile
 │   │   └── prometheus.yml
 │   └── compose.base.yml
 ├── k8s/
@@ -117,12 +119,14 @@ hexaorders/
 │       └── requirements.txt
 ├── tools/
 │   ├── generate_delivery.py
+│   ├── hexaorders.ps1
 │   ├── init-env.ps1
 │   ├── smoke.py
 │   └── validate_delivery.py
 ├── .dockerignore
-├── .env.example
+├── .gitattributes
 ├── .gitignore
 ├── docker-compose.yml
+├── hexaorders.cmd
 ├── README.md
 └── requirements-tools.txt

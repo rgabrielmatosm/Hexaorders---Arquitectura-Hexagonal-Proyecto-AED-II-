@@ -10,11 +10,39 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def read_text(path: Path) -> str:
+    # Normaliza CRLF -> LF: el entregable debe ser idéntico en Windows, Linux y macOS.
+    return path.read_text(encoding='utf-8').replace('\r\n', '\n')
+
+
+def sorted_files(origin: Path) -> list[Path]:
+    # Path.__lt__ ignora mayúsculas en Windows pero no en POSIX; ordenar por la ruta
+    # relativa POSIX (sensible a mayúsculas) garantiza el mismo orden en cualquier SO.
+    return sorted(origin.rglob('*'), key=lambda file: file.relative_to(origin).as_posix())
+
+
+# Servicio -> contexto de build con Dockerfile. Prometheus y Grafana llevan su
+# configuración dentro de la imagen para poder ejecutarse con read_only: true
+# (Compose no puede inyectar configs.content en contenedores de solo lectura).
+BUILD_CONTEXTS = {
+    'order-api': 'services/order-api',
+    'risk-engine': 'services/risk-engine',
+    'prometheus': 'infra/prometheus',
+    'grafana': 'infra/grafana',
+}
+INLINE_MARKERS = {
+    '__INLINE_JAVA__': 'order-api',
+    '__INLINE_RISK__': 'risk-engine',
+    '__INLINE_PROMETHEUS__': 'prometheus',
+    '__INLINE_GRAFANA__': 'grafana',
+}
+
+
 def inline_dockerfile(service: str) -> str:
-    context = ROOT / 'services' / service
+    context = ROOT / BUILD_CONTEXTS[service]
     result: list[str] = []
     index = 0
-    for line in (context / 'Dockerfile').read_text(encoding='utf-8').splitlines():
+    for line in read_text(context / 'Dockerfile').splitlines():
         if not line.startswith('COPY ') or line.startswith('COPY --from='):
             result.append(line)
             continue
@@ -23,7 +51,7 @@ def inline_dockerfile(service: str) -> str:
             raise ValueError(f'COPY no soportado: {line}')
         source, destination = parts[1:]
         origin = context / source
-        files = sorted(origin.rglob('*')) if origin.is_dir() else [origin]
+        files = sorted_files(origin) if origin.is_dir() else [origin]
         for file in files:
             if not file.is_file() or any(part in {'__pycache__', '.pytest_cache', '.venv'} for part in file.parts):
                 continue
@@ -32,7 +60,7 @@ def inline_dockerfile(service: str) -> str:
             else:
                 target = f'{destination.rstrip("/")}/{file.name}' if destination.endswith('/') or destination == '.' else destination
             marker = f'HEXFILE_{index}'
-            content = file.read_text(encoding='utf-8').replace('\r\n', '\n').rstrip('\n')
+            content = read_text(file).rstrip('\n')
             if marker in content:
                 raise ValueError(f'Colisión de heredoc en {file}')
             result.extend([f"COPY <<'{marker}' {target}", content, marker])
@@ -46,20 +74,11 @@ def block(content: str, indent: int) -> str:
 
 
 def compose() -> str:
-    base = (ROOT / 'infra/compose.base.yml').read_text(encoding='utf-8')
-    for marker, service in [('__INLINE_JAVA__', 'order-api'), ('__INLINE_RISK__', 'risk-engine')]:
+    base = read_text(ROOT / 'infra/compose.base.yml')
+    for marker, service in INLINE_MARKERS.items():
+        if base.count(marker) != 1:
+            raise ValueError(f'Marcador {marker} ausente o duplicado en compose.base.yml')
         base = base.replace(marker, '|\n' + block(inline_dockerfile(service), 8))
-    config_files = {
-        'prometheus_config': 'infra/prometheus/prometheus.yml',
-        'prometheus_alerts': 'infra/prometheus/alerts.yml',
-        'grafana_datasource': 'infra/grafana/provisioning/datasource.yml',
-        'grafana_provider': 'infra/grafana/provisioning/dashboards.yml',
-        'grafana_dashboard': 'infra/grafana/dashboards/hexaorders.json',
-    }
-    configs = ['configs:']
-    for name, path in config_files.items():
-        configs.extend([f'  {name}:', '    content: |', block((ROOT / path).read_text(encoding='utf-8'), 6)])
-    base = base.replace('# __INLINE_CONFIGS__', '\n'.join(configs))
     digest = hashlib.sha256(base.encode()).hexdigest()
     return f'# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo {digest}\n' + base
 
@@ -74,7 +93,7 @@ def monitoring_configmap() -> str:
         'hexaorders.json': 'infra/grafana/dashboards/hexaorders.json',
     }
     doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'hexaorders'},
-           'data': {key: (ROOT / value).read_text(encoding='utf-8') for key, value in paths.items()}}
+           'data': {key: read_text(ROOT / value) for key, value in paths.items()}}
     return json.dumps(doc, ensure_ascii=False, indent=2) + '\n'
 
 
@@ -86,7 +105,7 @@ def main() -> None:
     for name, expected in outputs.items():
         target = ROOT / name
         if args.check:
-            if not target.exists() or target.read_text(encoding='utf-8') != expected:
+            if not target.exists() or read_text(target) != expected:
                 raise SystemExit(f'Entregable desactualizado: {name}; ejecutar python tools/generate_delivery.py')
         else:
             target.write_text(expected, encoding='utf-8', newline='\n')

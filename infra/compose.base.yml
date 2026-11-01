@@ -99,18 +99,16 @@ services:
   # 4. Pull de métricas; no forma parte del núcleo ni del camino del pedido.
   prometheus:
     <<: *runtime
-    image: prom/prometheus:v3.5.1
+    image: hexaorders/prometheus:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_PROMETHEUS__
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
       - --storage.tsdb.retention.size=1GB
-      - --web.enable-lifecycle=false
-    configs:
-      - source: prometheus_config
-        target: /etc/prometheus/prometheus.yml
-      - source: prometheus_alerts
-        target: /etc/prometheus/alerts.yml
+      - --no-web.enable-lifecycle
     volumes:
       - prometheus_data:/prometheus
     ports:
@@ -131,7 +129,10 @@ services:
   # 5. Datasource y dashboard provisionados: cero configuración manual en la demo.
   grafana:
     <<: *runtime
-    image: grafana/grafana:12.4.1
+    image: hexaorders/grafana:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_GRAFANA__
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
@@ -141,13 +142,6 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
       GF_NEWS_NEWS_FEED_ENABLED: 'false'
     secrets: [grafana_password]
-    configs:
-      - source: grafana_datasource
-        target: /etc/grafana/provisioning/datasources/prometheus.yml
-      - source: grafana_provider
-        target: /etc/grafana/provisioning/dashboards/default.yml
-      - source: grafana_dashboard
-        target: /var/lib/grafana/dashboards/hexaorders.json
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
@@ -185,12 +179,12 @@ volumes:
   prometheus_data: {}
   grafana_data: {}
 
-# Los valores se proporcionan al desplegar, nunca se incrustan en el entregable.
-# Compose local monta archivos: no equivale al almacén cifrado de secretos de Swarm.
+# Los valores se generan al desplegar en ./secrets/ (junto a este archivo), nunca se
+# incrustan en el entregable ni en Git. Se usan archivos y no `environment:` porque
+# Compose solo puede montar secretos de archivo en servicios read_only (bind mount de
+# solo lectura). No equivale al almacén cifrado de secretos de Swarm.
 secrets:
   db_password:
-    environment: DB_PASSWORD
+    file: ./secrets/db_password.txt
   grafana_password:
-    environment: GRAFANA_PASSWORD
-
-# __INLINE_CONFIGS__
+    file: ./secrets/grafana_password.txt

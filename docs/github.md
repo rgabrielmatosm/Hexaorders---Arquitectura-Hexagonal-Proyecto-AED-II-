@@ -11,14 +11,14 @@ Set-Location 'C:\Users\frank\Downloads\PROYECTO DOCKER'
 git init -b main
 git config user.name 'TU NOMBRE'
 git config user.email 'TU_CORREO_O_NOREPLY_DE_GITHUB'
-git check-ignore .env
+git check-ignore .env secrets/
 git status --short
 git add .
 git diff --cached --name-only
 git diff --cached --check
 ```
 
-La lista preparada no debe contener `.env`, contraseñas, bases de datos ni resultados de compilación. Revisa también los valores de `k8s/` si los has personalizado. Si ya existe un repositorio, conserva su historia y su remoto: utiliza `git status` y `git remote -v` antes de seguir.
+La lista preparada no debe contener `.env`, `secrets/`, contraseñas, bases de datos ni resultados de compilación. Revisa también los valores de `k8s/` si los has personalizado. Si ya existe un repositorio, conserva su historia y su remoto: utiliza `git status` y `git remote -v` antes de seguir.
 
 ```powershell
 git commit -m "Implement HexaOrders with hexagonal architecture and Docker Compose"

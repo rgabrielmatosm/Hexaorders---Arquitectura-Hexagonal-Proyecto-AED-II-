@@ -59,7 +59,7 @@ spec:
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time=7d
             - --storage.tsdb.retention.size=1GB
-            - --web.enable-lifecycle=false
+            - --no-web.enable-lifecycle
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -242,7 +242,7 @@ spec:
               subPath: dashboards.yml
               readOnly: true
             - name: config
-              mountPath: /var/lib/grafana/dashboards/hexaorders.json
+              mountPath: /etc/grafana/dashboards/hexaorders.json
               subPath: hexaorders.json
               readOnly: true
       volumes:

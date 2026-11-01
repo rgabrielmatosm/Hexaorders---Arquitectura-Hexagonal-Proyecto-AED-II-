@@ -2,7 +2,7 @@
 
 Proyecto final: **arquitectura hexagonal estricta con Java y Python, íntegramente orquestado con Docker Compose**. Una interfaz web registra pedidos, consulta riesgo por HTTP y conserva sus decisiones en PostgreSQL. Prometheus y Grafana muestran disponibilidad, volumen, errores y latencias.
 
-**Entrega principal: [docker-compose.yml](docker-compose.yml).** Incluye los fuentes y tests en Dockerfiles inline y toda la configuración de monitoreo en `configs.content`. Puedes copiar únicamente este archivo a otra máquina; genera los secretos en el destino. No necesita los archivos `services/` ni `infra/` para desplegarlo. Requiere Docker con contenedores Linux, Compose >= 2.23.1 y BuildKit. Primera construcción con Internet; capacidad orientativa para la demo: 2 vCPU, 8 GB RAM y 30 GB disco.
+**Entrega principal: [docker-compose.yml](docker-compose.yml).** Incluye los fuentes y tests en Dockerfiles inline, y la configuración de monitoreo (Prometheus, alertas, datasource y dashboard Grafana) dentro de imágenes también construidas inline, para que los cuatro servicios propios (Java, Python, Prometheus y Grafana) funcionen con `read_only: true`. Puedes copiar únicamente este archivo a otra máquina y generar en el destino los dos secretos en `secrets/db_password.txt` y `secrets/grafana_password.txt`. No necesita los archivos `services/` ni `infra/` para desplegarlo. Requiere Docker con contenedores Linux, Compose >= 2.23.1 y BuildKit. Primera construcción con Internet; capacidad orientativa para la demo: 2 vCPU, 8 GB RAM y 30 GB disco.
 
 ## Parte 1 — Exposición sin diapositivas
 
@@ -33,23 +33,32 @@ La hexagonalidad se comprueba con ArchUnit e imports AST, no con el número de c
 
 ## Parte 3 — Arranque y repositorio
 
-En Windows, instala Docker Desktop y activa contenedores Linux. Desde PowerShell en esta carpeta:
+En Windows, instala [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) con contenedores Linux (opción predeterminada, con WSL 2) y ábrelo hasta que indique *Engine running*. Después, desde **PowerShell o CMD** en esta carpeta:
 
 ```powershell
-.\tools\init-env.ps1
-docker compose version
-docker compose config --quiet
-docker compose build --pull
-docker compose up -d --wait --wait-timeout 240
-docker compose ps
+.\hexaorders.cmd start
 ```
 
-Si una política local bloquea scripts, abre el script para revisarlo y genera/carga `DB_PASSWORD` y `GRAFANA_PASSWORD` manualmente en el entorno de la sesión. No es necesario cambiar la política de ejecución de todo el equipo. En Linux y en la modalidad de entrega de un solo YAML, usa el procedimiento exacto de [despliegue en VM](docs/despliegue-cloud.md).
+`hexaorders.cmd` ejecuta [`tools/hexaorders.ps1`](tools/hexaorders.ps1). Ese comando genera los secretos si faltan, valida el YAML, construye las imágenes (con los tests de Java y Python) y arranca los cinco servicios esperando a que estén sanos. Funciona con Windows PowerShell 5.1, que viene con Windows, y con PowerShell 7. El lanzador usa `-ExecutionPolicy Bypass` solo para ese proceso, así que no hace falta cambiar la política de ejecución del equipo.
+
+| Comando | Qué hace |
+| --- | --- |
+| `.\hexaorders.cmd start` | Secretos + validación + build + arranque de los cinco servicios. |
+| `.\hexaorders.cmd status` | Estado de los contenedores. |
+| `.\hexaorders.cmd logs` | Últimas 100 líneas de log de cada servicio. |
+| `.\hexaorders.cmd stop` | Detiene los servicios conservando los datos. |
+| `.\hexaorders.cmd stop -RemoveData` | Detiene y **elimina** pedidos, métricas y datos de Grafana. |
+| `.\hexaorders.cmd verify` | La misma prueba integral que ejecuta GitHub, en un entorno aislado que se limpia al terminar. |
+| `.\hexaorders.cmd check` | Comprueba que el entregable generado está al día y es válido (requiere Python). |
+| `.\hexaorders.cmd test` | Tests unitarios locales (requiere Python, Java 21 y Maven). |
+| `.\hexaorders.cmd help` | Ayuda completa. |
+
+Los secretos son `secrets\db_password.txt` y `secrets\grafana_password.txt`, con valores aleatorios y excluidos de Git. Si existe un `.env` de una versión anterior, el script conserva sus contraseñas. Si prefieres los comandos de Docker directamente, son equivalentes a `.\tools\init-env.ps1` seguido de `docker compose config --quiet`, `docker compose build --pull` y `docker compose up -d --wait --wait-timeout 240`. Los mismos comandos funcionan en Linux y macOS con PowerShell 7 (`pwsh ./tools/hexaorders.ps1 start`). Para desplegar en una VM Ubuntu en la nube usa el procedimiento de [despliegue en VM](docs/despliegue-cloud.md).
 
 Accesos locales:
 
 - Aplicación: <http://127.0.0.1:8080>.
-- Grafana: <http://127.0.0.1:3000/d/hexaorders>; usuario `admin`, contraseña `GRAFANA_PASSWORD` de `.env`.
+- Grafana: <http://127.0.0.1:3000/d/hexaorders>; usuario `admin`, contraseña en `secrets\grafana_password.txt`.
 - Prometheus: <http://127.0.0.1:9091/targets> y <http://127.0.0.1:9091/alerts>.
 
 Prueba desde PowerShell:
@@ -62,7 +71,7 @@ Invoke-RestMethod http://127.0.0.1:8080/api/orders -Method Post -ContentType 'ap
 Invoke-RestMethod http://127.0.0.1:8080/api/orders
 ```
 
-Los dos pedidos deben quedar `APPROVED/10` y `REVIEW/75`. Genera tráfico unos 30 segundos para observar tasas e histogramas. Si tienes Python local, `python tools/smoke.py` comprueba creación, consulta, validación, scrapes y dashboard.
+Los dos pedidos deben quedar `APPROVED/10` y `REVIEW/75`. Genera tráfico unos 30 segundos para observar tasas e histogramas. Si tienes Python local, `py tools\smoke.py` comprueba creación, consulta, validación, scrapes y dashboard (`.\hexaorders.cmd verify` lo ejecuta automáticamente).
 
 Para evidenciar el manejo de fallos:
 
@@ -77,16 +86,20 @@ docker compose up -d --wait --wait-timeout 120
 
 ## Editar, verificar y reconstruir la entrega
 
-No necesitas Java ni Python instalados en el host para desplegar: los builds Docker ejecutan sus respectivas pruebas. Para editar el repositorio y actualizar el YAML sí puedes usar Python 3.12 local:
+No necesitas Java ni Python instalados en el host para desplegar: los builds Docker ejecutan sus respectivas pruebas. Para editar el repositorio y regenerar el YAML necesitas [Python 3.12](https://www.python.org/downloads/) local. Desde PowerShell:
 
-```bash
-python tools/generate_delivery.py
-python tools/generate_delivery.py --check
-docker compose config --quiet
-docker compose build
-docker compose up -d --wait --wait-timeout 240
+```powershell
+py tools\generate_delivery.py
+py -m pip install -r requirements-tools.txt
+.\hexaorders.cmd check
+.\hexaorders.cmd verify
 ```
 
-La acción `.github/workflows/verify.yml` copia únicamente el YAML a un directorio vacío, lo construye, ejecuta las pruebas de ambos lenguajes, valida Prometheus con `promtool`, arranca los cinco servicios y comprueba HTTP, persistencia y dashboard. Su resultado solo se conocerá cuando ejecutes el workflow en GitHub.
+Tras modificar `services/` o `infra/`, regenera siempre con `generate_delivery.py`. El archivo `.gitattributes` fija saltos de línea LF y el generador ordena los archivos igual en cualquier sistema operativo, de modo que el YAML generado en Windows es idéntico byte a byte al que comprueba GitHub.
 
-Para detener sin eliminar datos: `docker compose down`. Conserva `.env` para volver a arrancar con las mismas contraseñas. `docker compose down -v` elimina los volúmenes y se reserva para un reinicio deliberado. Consulta los límites y decisiones de la práctica en [arquitectura](docs/arquitectura.md).
+La acción [`.github/workflows/verify.yml`](.github/workflows/verify.yml) tiene dos jobs:
+
+- **compose** (Ubuntu): ejecuta `tools/hexaorders.ps1 verify`, el mismo script que usas en Windows. Copia únicamente el YAML a un directorio vacío, genera sus secretos, construye con los tests de ambos lenguajes, valida Prometheus con `promtool`, arranca los cinco servicios, comprueba HTTP, persistencia, métricas y dashboard, y verifica el HTTP 503 cuando cae risk-engine. GitHub solo ejecuta contenedores Linux en runners Ubuntu; es lo mismo que hace Docker Desktop en Windows con WSL 2.
+- **windows** (Windows Server 2022): comprueba `hexaorders.cmd`, los scripts con Windows PowerShell 5.1, la generación de secretos, que el entregable generado en Windows coincide y es válido, y los tests unitarios de Python y Java.
+
+Para detener sin eliminar datos: `.\hexaorders.cmd stop`. Conserva `secrets\` para volver a arrancar con las mismas contraseñas. `.\hexaorders.cmd stop -RemoveData` elimina los volúmenes y se reserva para un reinicio deliberado. Consulta los límites y decisiones de la práctica en [arquitectura](docs/arquitectura.md).

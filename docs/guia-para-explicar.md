@@ -156,7 +156,7 @@ Cambiar PostgreSQL por otro almacenamiento exigiría otro adaptador, consultas y
 | `networks` | Conecta los servicios que necesitan comunicarse. |
 | `volumes` | Conserva datos aunque se recree un contenedor. |
 | `secrets` | Concede a servicios archivos con contraseñas suministradas por el operador. |
-| `configs.content` | Incluye los archivos de configuración de monitoreo. |
+| Imágenes de monitoreo inline | Prometheus y Grafana se construyen con su configuración dentro, compatibles con `read_only`. |
 | `restart` | Política al terminar el proceso; no reinicia por sí sola un proceso vivo que está unhealthy. |
 | `mem_limit`, `cpus` | Límites de recursos por servicio. |
 | `read_only`, `cap_drop`, `security_opt` | Reducen permisos de las aplicaciones y herramientas de monitoreo. |
@@ -169,12 +169,18 @@ El archivo generado es grande porque incluye código, tests y configuración par
 
 ## 10. Preparar una demostración antes de enseñarla
 
-El registro de validación disponible documenta 32 pruebas Java y 59 Python aprobadas, además de validación Compose y Kubernetes. En esa validación no se ejecutaron los cinco contenedores porque faltaba motor Docker. **Ensaya la integración en una máquina con Docker antes de presentarla como comprobada.** No se ha vuelto a ejecutar ese despliegue al preparar esta guía.
+El registro de validación documenta 32 pruebas Java y 59 Python aprobadas, además de validación Compose y Kubernetes. Desde el 1 de noviembre de 2026, GitHub Actions ejecuta en cada push la integración completa de los cinco contenedores (smoke HTTP y HTTP 503 incluidos) y comprueba los scripts en Windows. Aun así, **ensaya la demostración en la máquina donde vas a presentarla**.
 
-En una máquina con Docker Desktop iniciado, contenedores Linux, Compose >= 2.23.1 y BuildKit, abre PowerShell en la carpeta del proyecto:
+En una máquina con Docker Desktop iniciado (contenedores Linux, Compose >= 2.23.1 y BuildKit), abre PowerShell o CMD en la carpeta del proyecto:
 
 ```powershell
 Set-Location 'C:\Users\frank\Downloads\PROYECTO DOCKER'
+.\hexaorders.cmd start
+```
+
+`hexaorders.cmd start` muestra cada etapa en pantalla; explica cada una: generar las contraseñas si faltan, validar la configuración, construir las imágenes ejecutando los tests, arrancar esperando a que los servicios estén sanos y mostrar el estado y las direcciones. Si quieres enseñar los comandos de Docker uno a uno, son estos:
+
+```powershell
 .\tools\init-env.ps1
 docker compose version
 docker compose config --quiet
@@ -183,9 +189,9 @@ docker compose up -d --wait --wait-timeout 240
 docker compose ps
 ```
 
-Explica cada acción: generar/cargar contraseñas; verificar versión; validar configuración; construir y ejecutar tests; arrancar esperando salud; mostrar estado. El primer build descarga imágenes y dependencias: hazlo antes de la sesión para no depender del tiempo de descarga durante la explicación.
+Antes de la sesión puedes ejecutar `.\hexaorders.cmd verify` para repetir en tu equipo la misma prueba integral que pasa en GitHub (requiere tener detenido el entorno con `.\hexaorders.cmd stop`). El primer build descarga imágenes y dependencias: hazlo antes de la sesión para no depender del tiempo de descarga durante la explicación.
 
-El script conserva un `.env` existente y carga sus dos contraseñas en el entorno de esa terminal. En una terminal nueva debes cargarlo otra vez. Si una política de PowerShell impide ejecutarlo, revisa esa restricción antes de la sesión; no cambies políticas de todo el equipo sin necesidad. `.env` debe conservarse privado y está excluido de Git. No lo proyectes ni lo incluyas en capturas.
+El script crea `secrets\db_password.txt` y `secrets\grafana_password.txt` si no existen (reutiliza las contraseñas de un `.env` anterior). Compose los monta como archivos de solo lectura; no hace falta cargar nada en cada terminal nueva. Si una política de PowerShell impide ejecutarlo, revisa esa restricción antes de la sesión; no cambies políticas de todo el equipo sin necesidad. `secrets/` debe conservarse privado y está excluido de Git. No lo proyectes ni lo incluyas en capturas.
 
 Accesos: aplicación `http://127.0.0.1:8080`; Grafana `http://127.0.0.1:3000/d/hexaorders`; targets Prometheus `http://127.0.0.1:9091/targets`; alertas `http://127.0.0.1:9091/alerts`. Grafana utiliza `admin` y la contraseña generada para esa instalación.
 
@@ -257,12 +263,12 @@ Si deseas observar la alerta de servicio caído, mantén Python detenido hasta q
 ### F. Mostrar conservación de datos
 
 ```powershell
-docker compose down
-docker compose up -d --wait --wait-timeout 240
+.\hexaorders.cmd stop
+.\hexaorders.cmd start
 Invoke-RestMethod http://127.0.0.1:8080/api/orders
 ```
 
-Resultado esperado: los pedidos siguen presentes en el volumen. No añadas `-v`: `down -v` elimina los datos. Reiniciar o recrear un contenedor no equivale a eliminar su volumen. Conserva las contraseñas de `.env`: cambiarlas no rota automáticamente una base ya inicializada.
+Resultado esperado: los pedidos siguen presentes en el volumen. No añadas `-RemoveData` (equivale a `docker compose down -v`): elimina los datos. Reiniciar o recrear un contenedor no equivale a eliminar su volumen. Conserva las contraseñas de `secrets/`: cambiarlas no rota automáticamente una base ya inicializada.
 
 ### G. Ver métricas y diferenciarlas de los datos del negocio
 
