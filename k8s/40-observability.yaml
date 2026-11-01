@@ -245,6 +245,26 @@ spec:
               mountPath: /etc/grafana/dashboards/hexaorders.json
               subPath: hexaorders.json
               readOnly: true
+            - name: config
+              mountPath: /etc/grafana/dashboards/hexaorders-business.json
+              subPath: hexaorders-business.json
+              readOnly: true
+            - name: config
+              mountPath: /etc/grafana/dashboards/hexaorders-risk.json
+              subPath: hexaorders-risk.json
+              readOnly: true
+            - name: config
+              mountPath: /etc/grafana/dashboards/hexaorders-api.json
+              subPath: hexaorders-api.json
+              readOnly: true
+            - name: config
+              mountPath: /etc/grafana/dashboards/hexaorders-infrastructure.json
+              subPath: hexaorders-infrastructure.json
+              readOnly: true
+            - name: config
+              mountPath: /etc/grafana/dashboards/hexaorders-security.json
+              subPath: hexaorders-security.json
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:

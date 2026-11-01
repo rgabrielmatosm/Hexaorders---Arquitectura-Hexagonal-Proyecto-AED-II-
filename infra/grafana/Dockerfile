@@ -6,3 +6,9 @@ FROM grafana/grafana:12.4.1
 COPY provisioning/datasource.yml /etc/grafana/provisioning/datasources/prometheus.yml
 COPY provisioning/dashboards.yml /etc/grafana/provisioning/dashboards/default.yml
 COPY dashboards/hexaorders.json /etc/grafana/dashboards/hexaorders.json
+# v3: dashboards añadidos (el original hexaorders.json se conserva sin cambios).
+COPY dashboards/hexaorders-business.json /etc/grafana/dashboards/hexaorders-business.json
+COPY dashboards/hexaorders-risk.json /etc/grafana/dashboards/hexaorders-risk.json
+COPY dashboards/hexaorders-api.json /etc/grafana/dashboards/hexaorders-api.json
+COPY dashboards/hexaorders-infrastructure.json /etc/grafana/dashboards/hexaorders-infrastructure.json
+COPY dashboards/hexaorders-security.json /etc/grafana/dashboards/hexaorders-security.json

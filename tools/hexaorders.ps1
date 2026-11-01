@@ -212,6 +212,7 @@ function Invoke-K8sSecrets {
     $yaml = & kubectl -n hexaorders create secret generic app-secrets `
         "--from-file=db_password=$(Join-Path $secrets 'db_password.txt')" `
         "--from-file=grafana_password=$(Join-Path $secrets 'grafana_password.txt')" `
+        "--from-file=demo_password=$(Join-Path $secrets 'demo_password.txt')" `
         --dry-run=client -o yaml
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar el Secret app-secrets.' }
     $yaml | & kubectl apply -f -

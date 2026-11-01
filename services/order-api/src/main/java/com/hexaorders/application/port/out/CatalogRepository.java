@@ -1,0 +1,25 @@
+package com.hexaorders.application.port.out;
+
+import com.hexaorders.domain.catalog.Category;
+import com.hexaorders.domain.catalog.Product;
+import com.hexaorders.domain.catalog.ProductDetails;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public interface CatalogRepository {
+    List<Category> categories();
+    Optional<Category> category(long id);
+    Category createCategory(String slug, String name);
+    List<Product> products(String query, Long categoryId, boolean onlyActive);
+    Optional<Product> product(long id);
+    Map<Long, Product> productsByIds(Collection<Long> ids);
+    Product createProduct(ProductDetails details, int initialStock);
+    Optional<Product> updateProduct(long id, ProductDetails details);
+    /** Atomic: fails (empty) when the result would be negative. */
+    Optional<Product> adjustStock(long id, int delta);
+    List<Product> lowStock(int threshold);
+    long countProducts();
+    boolean skuExists(String sku, Long excludingId);
+}

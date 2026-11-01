@@ -145,6 +145,9 @@ spec:
               value: orders
             - name: DB_PASSWORD_FILE
               value: /run/secrets/db_password
+            # v3: contraseña de las cuentas de demostración (clave opcional del Secret app-secrets).
+            - name: DEMO_PASSWORD_FILE
+              value: /run/demo-secrets/demo_password
             - name: RISK_BASE_URL
               value: http://risk-engine:8000
             - name: JAVA_TOOL_OPTIONS
@@ -188,6 +191,9 @@ spec:
             - name: db-secret
               mountPath: /run/secrets
               readOnly: true
+            - name: demo-secret
+              mountPath: /run/demo-secrets
+              readOnly: true
       volumes:
         - name: temp
           emptyDir:
@@ -199,3 +205,12 @@ spec:
             items:
               - key: db_password
                 path: db_password
+        # optional: los Secrets creados antes de la v3 (sin demo_password) siguen siendo válidos.
+        - name: demo-secret
+          secret:
+            secretName: app-secrets
+            defaultMode: 0440
+            optional: true
+            items:
+              - key: demo_password
+                path: demo_password

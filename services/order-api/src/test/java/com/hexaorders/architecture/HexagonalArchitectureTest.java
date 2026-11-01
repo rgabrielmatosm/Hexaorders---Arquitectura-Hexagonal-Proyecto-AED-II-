@@ -23,4 +23,9 @@ class HexagonalArchitectureTest {
     @ArchTest
     static final ArchRule ADAPTERS_ARE_INDEPENDENT = noClasses().that().resideInAPackage("..adapter.in..")
             .should().dependOnClassesThat().resideInAPackage("..adapter.out..");
+
+    /** New rule (v3): driving adapters talk to the core only through input ports, never to output ports. */
+    @ArchTest
+    static final ArchRule DRIVING_ADAPTERS_USE_INPUT_PORTS_ONLY = noClasses().that().resideInAPackage("..adapter.in..")
+            .should().dependOnClassesThat().resideInAPackage("..application.port.out..");
 }

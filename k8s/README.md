@@ -50,7 +50,7 @@ Equivale a lo siguiente, que puedes ejecutar a mano en PowerShell (o en Bash, si
 ```powershell
 .\tools\init-env.ps1
 kubectl apply -f k8s/00-namespace.yaml
-kubectl -n hexaorders create secret generic app-secrets --from-file=db_password=secrets/db_password.txt --from-file=grafana_password=secrets/grafana_password.txt
+kubectl -n hexaorders create secret generic app-secrets --from-file=db_password=secrets/db_password.txt --from-file=grafana_password=secrets/grafana_password.txt --from-file=demo_password=secrets/demo_password.txt
 ```
 
 En despliegues posteriores reutiliza el Secret existente. Cambiar su contraseña no rota automáticamente la de PostgreSQL ya inicializado ni la cuenta admin almacenada por Grafana. Los volúmenes Secret se montan como archivos de lectura y cada servicio recibe exclusivamente la clave que necesita. La protección del almacén de secretos del clúster depende de su configuración y permisos.
