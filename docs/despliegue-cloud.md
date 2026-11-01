@@ -64,32 +64,28 @@ sudo docker compose version
 sudo docker run --rm hello-world
 ```
 
-Exige **Docker Compose >= 2.23.1**, y BuildKit, porque el entregable construye sus cuatro imágenes con Dockerfiles en línea y heredocs `COPY <<EOF`. Docker Desktop reciente permite el mismo Compose en tu máquina local. [Instalación oficial](https://docs.docker.com/engine/install/ubuntu/), [configs.content](https://docs.docker.com/reference/compose-file/configs/), [dockerfile_inline](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline).
+Exige **Docker Compose >= 2.23.1**, y BuildKit, porque el entregable construye sus cuatro imágenes con Dockerfiles en línea y heredocs `COPY <<EOF`. Docker Desktop reciente permite el mismo Compose en tu máquina local. [Instalación oficial](https://docs.docker.com/engine/install/ubuntu/), [dockerfile_inline](https://docs.docker.com/reference/compose-file/build/#dockerfile_inline).
 
 ## 3. Generar secretos y arrancar
 
-Dentro de la VM, mueve el YAML a su directorio estable y genera secretos una sola vez. Conserva `.env`: PostgreSQL mantiene sus credenciales dentro del volumen existente y cambiar este archivo por sí solo no rota la contraseña de una base ya inicializada.
+Dentro de la VM, mueve el YAML a su directorio estable y genera los secretos una sola vez. Conserva `secrets/`: PostgreSQL mantiene sus credenciales dentro del volumen existente y cambiar estos archivos por sí solo no rota la contraseña de una base ya inicializada.
 
 ```bash
-mkdir -p ~/hexaorders
+mkdir -p ~/hexaorders/secrets
 mv ~/docker-compose.yml ~/hexaorders/docker-compose.yml
 cd ~/hexaorders
-umask 077
-if [ ! -e .env ]; then
-  printf 'DB_PASSWORD=%s\nGRAFANA_PASSWORD=%s\n' \
-    "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > .env
-fi
-chmod 600 .env
-set -a
-. ./.env
-set +a
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose config --quiet
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose build --pull
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose up -d --wait --wait-timeout 240
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose ps
+chmod 700 secrets
+for name in db_password grafana_password; do
+  [ -s "secrets/$name.txt" ] || openssl rand -hex 24 | tr -d '\n' > "secrets/$name.txt"
+done
+chmod 644 secrets/*.txt
+sudo docker compose config --quiet
+sudo docker compose build --pull
+sudo docker compose up -d --wait --wait-timeout 240
+sudo docker compose ps
 ```
 
-Las variables se exportan explícitamente para alimentar `secrets.environment`; `sudo --preserve-env` las conserva al ejecutar Compose. No se incluyen en el YAML entregable ni en Git. La construcción se ejecuta antes de `up`, por lo que el tiempo máximo de espera corresponde al arranque. [Compose secrets](https://docs.docker.com/reference/compose-file/secrets/), [compose up](https://docs.docker.com/reference/cli/docker/compose/up/).
+Compose monta cada archivo de `secrets/` como secreto de solo lectura en `/run/secrets` de los servicios que lo declaran; es la única fuente que admite en servicios `read_only`. El directorio con modo 700 impide que otros usuarios de la VM lean las contraseñas; los archivos quedan con modo 644 porque los contenedores leen el secreto con usuarios sin privilegios. No se incluyen en el YAML entregable ni en Git. La construcción se ejecuta antes de `up`, por lo que el tiempo máximo de espera corresponde al arranque. [Compose secrets](https://docs.docker.com/reference/compose-file/secrets/), [compose up](https://docs.docker.com/reference/cli/docker/compose/up/).
 
 Comprueba una operación desde la VM:
 
@@ -100,7 +96,7 @@ curl -fsS -X POST http://127.0.0.1:8080/api/orders \
 curl -fsS http://127.0.0.1:8080/api/orders
 ```
 
-El pedido de importe 125.50 debe quedar aprobado con score 10. Un pedido de importe 1500 debe quedar en revisión con score 75. Si `up --wait` falla, inspecciona `docker compose ps` y `docker compose logs --tail=100` usando el mismo prefijo `sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD`.
+El pedido de importe 125.50 debe quedar aprobado con score 10. Un pedido de importe 1500 debe quedar en revisión con score 75. Si `up --wait` falla, inspecciona `docker compose ps` y `docker compose logs --tail=100` con `sudo`.
 
 ## 4. Ver la aplicación y Grafana mediante túnel SSH
 
@@ -114,27 +110,24 @@ gcloud compute ssh hexaorders-demo --zone=us-central1-a -- \
   -L 127.0.0.1:9091:127.0.0.1:9091
 ```
 
-Abre [aplicación/API](http://127.0.0.1:8080), [Grafana](http://127.0.0.1:3000/d/hexaorders) y [Prometheus](http://127.0.0.1:9091) en tu navegador local. Grafana utiliza `admin` y el valor de `GRAFANA_PASSWORD` generado en la VM. Consulta `.env` en tu sesión privada cuando necesites iniciar sesión. Si alguno de los puertos locales está ocupado, cambia únicamente el primer número del reenvío correspondiente. [Reenvío SSH con gcloud](https://docs.cloud.google.com/sdk/gcloud/reference/compute/ssh).
+Abre [aplicación/API](http://127.0.0.1:8080), [Grafana](http://127.0.0.1:3000/d/hexaorders) y [Prometheus](http://127.0.0.1:9091) en tu navegador local. Grafana utiliza `admin` y la contraseña generada en la VM. Consulta `~/hexaorders/secrets/grafana_password.txt` en tu sesión privada cuando necesites iniciar sesión. Si alguno de los puertos locales está ocupado, cambia únicamente el primer número del reenvío correspondiente. [Reenvío SSH con gcloud](https://docs.cloud.google.com/sdk/gcloud/reference/compute/ssh).
 
 ## 5. Reinicio, actualización y conservación de datos
 
-En cada nueva sesión, entra a `~/hexaorders` y vuelve a exportar `.env` antes de ejecutar Compose. `restart: unless-stopped` permite reiniciar servicios con Docker; un contenedor parado explícitamente permanece parado.
+En cada nueva sesión, entra a `~/hexaorders` antes de ejecutar Compose; los secretos se leen de `secrets/` sin pasos adicionales. `restart: unless-stopped` permite reiniciar servicios con Docker; un contenedor parado explícitamente permanece parado.
 
 ```bash
 cd ~/hexaorders
-set -a
-. ./.env
-set +a
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose logs --tail=100
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose down
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose up -d --wait --wait-timeout 240
+sudo docker compose logs --tail=100
+sudo docker compose down
+sudo docker compose up -d --wait --wait-timeout 240
 ```
 
 `down` conserva los volúmenes por defecto. `down -v` elimina los datos y debe reservarse para un reinicio deliberado de la demostración. Copia de seguridad mínima de pedidos:
 
 ```bash
 umask 077
-sudo --preserve-env=DB_PASSWORD,GRAFANA_PASSWORD docker compose exec -T db \
+sudo docker compose exec -T db \
   pg_dump -U orders -d orders > "orders-$(date +%Y%m%d-%H%M%S).sql"
 ```
 

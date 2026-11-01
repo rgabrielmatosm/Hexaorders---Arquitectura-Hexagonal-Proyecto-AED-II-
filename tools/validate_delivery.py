@@ -33,6 +33,9 @@ for definition in document.get('configs', {}).values():
     assert set(definition) == {'content'}, 'Config depende de un archivo externo'
 for name in ['order-api', 'risk-engine', 'prometheus', 'grafana']:
     assert document['services'][name].get('read_only') is True, f'{name} debe ser read_only'
+for name, definition in document['secrets'].items():
+    # Compose solo admite secretos de archivo en servicios read_only.
+    assert set(definition) == {'file'} and definition['file'] == f'./secrets/{name}.txt', f'Secreto {name}: usar ./secrets/{name}.txt'
 for service in document['services'].values():
     for mount in service.get('volumes', []):
         assert not mount.startswith(('./', '../', '/')), f'Bind mount no autosuficiente: {mount}'

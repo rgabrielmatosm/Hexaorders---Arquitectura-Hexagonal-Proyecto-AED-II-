@@ -185,7 +185,7 @@ docker compose ps
 
 Explica cada acción: generar/cargar contraseñas; verificar versión; validar configuración; construir y ejecutar tests; arrancar esperando salud; mostrar estado. El primer build descarga imágenes y dependencias: hazlo antes de la sesión para no depender del tiempo de descarga durante la explicación.
 
-El script conserva un `.env` existente y carga sus dos contraseñas en el entorno de esa terminal. En una terminal nueva debes cargarlo otra vez. Si una política de PowerShell impide ejecutarlo, revisa esa restricción antes de la sesión; no cambies políticas de todo el equipo sin necesidad. `.env` debe conservarse privado y está excluido de Git. No lo proyectes ni lo incluyas en capturas.
+El script crea `secrets\db_password.txt` y `secrets\grafana_password.txt` si no existen (reutiliza las contraseñas de un `.env` anterior). Compose los monta como archivos de solo lectura; no hace falta cargar nada en cada terminal nueva. Si una política de PowerShell impide ejecutarlo, revisa esa restricción antes de la sesión; no cambies políticas de todo el equipo sin necesidad. `secrets/` debe conservarse privado y está excluido de Git. No lo proyectes ni lo incluyas en capturas.
 
 Accesos: aplicación `http://127.0.0.1:8080`; Grafana `http://127.0.0.1:3000/d/hexaorders`; targets Prometheus `http://127.0.0.1:9091/targets`; alertas `http://127.0.0.1:9091/alerts`. Grafana utiliza `admin` y la contraseña generada para esa instalación.
 
@@ -262,7 +262,7 @@ docker compose up -d --wait --wait-timeout 240
 Invoke-RestMethod http://127.0.0.1:8080/api/orders
 ```
 
-Resultado esperado: los pedidos siguen presentes en el volumen. No añadas `-v`: `down -v` elimina los datos. Reiniciar o recrear un contenedor no equivale a eliminar su volumen. Conserva las contraseñas de `.env`: cambiarlas no rota automáticamente una base ya inicializada.
+Resultado esperado: los pedidos siguen presentes en el volumen. No añadas `-v`: `down -v` elimina los datos. Reiniciar o recrear un contenedor no equivale a eliminar su volumen. Conserva las contraseñas de `secrets/`: cambiarlas no rota automáticamente una base ya inicializada.
 
 ### G. Ver métricas y diferenciarlas de los datos del negocio
 

@@ -121,7 +121,7 @@ hexaorders/
 │   ├── smoke.py
 │   └── validate_delivery.py
 ├── .dockerignore
-├── .env.example
+├── .gitattributes
 ├── .gitignore
 ├── docker-compose.yml
 ├── README.md

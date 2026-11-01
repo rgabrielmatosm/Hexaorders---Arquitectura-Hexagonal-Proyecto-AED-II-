@@ -26,6 +26,13 @@ jobs:
         run: |
           cp docker-compose.yml "$RUNNER_TEMP/hexaorders-delivery/docker-compose.yml"
           cd "$RUNNER_TEMP/hexaorders-delivery"
+          # Mismo procedimiento que un despliegue real: secretos como archivos en ./secrets/.
+          # Directorio 700; archivos legibles por los UID sin privilegios de los contenedores.
+          mkdir -p secrets
+          chmod 700 secrets
+          printf '%s' "$DB_PASSWORD" > secrets/db_password.txt
+          printf '%s' "$GRAFANA_PASSWORD" > secrets/grafana_password.txt
+          chmod 644 secrets/db_password.txt secrets/grafana_password.txt
           docker compose config --quiet
           docker compose build --pull
       - name: Validate Prometheus configuration and rules

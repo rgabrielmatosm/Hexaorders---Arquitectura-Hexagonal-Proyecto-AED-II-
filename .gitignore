@@ -1,6 +1,6 @@
 .env
+secrets/
 .env.*
-!.env.example
 .tools/
 .venv/
 **/.venv/
@@ -17,4 +17,3 @@ artifacts/
 .vscode/
 *.pem
 *.key
-

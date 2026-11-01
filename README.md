@@ -2,7 +2,7 @@
 
 Proyecto final: **arquitectura hexagonal estricta con Java y Python, íntegramente orquestado con Docker Compose**. Una interfaz web registra pedidos, consulta riesgo por HTTP y conserva sus decisiones en PostgreSQL. Prometheus y Grafana muestran disponibilidad, volumen, errores y latencias.
 
-**Entrega principal: [docker-compose.yml](docker-compose.yml).** Incluye los fuentes y tests en Dockerfiles inline, y la configuración de monitoreo (Prometheus, alertas, datasource y dashboard Grafana) dentro de imágenes también construidas inline, para que los cuatro servicios propios (Java, Python, Prometheus y Grafana) funcionen con `read_only: true`. Puedes copiar únicamente este archivo a otra máquina; genera los secretos en el destino. No necesita los archivos `services/` ni `infra/` para desplegarlo. Requiere Docker con contenedores Linux, Compose >= 2.23.1 y BuildKit. Primera construcción con Internet; capacidad orientativa para la demo: 2 vCPU, 8 GB RAM y 30 GB disco.
+**Entrega principal: [docker-compose.yml](docker-compose.yml).** Incluye los fuentes y tests en Dockerfiles inline, y la configuración de monitoreo (Prometheus, alertas, datasource y dashboard Grafana) dentro de imágenes también construidas inline, para que los cuatro servicios propios (Java, Python, Prometheus y Grafana) funcionen con `read_only: true`. Puedes copiar únicamente este archivo a otra máquina y generar en el destino los dos secretos en `secrets/db_password.txt` y `secrets/grafana_password.txt`. No necesita los archivos `services/` ni `infra/` para desplegarlo. Requiere Docker con contenedores Linux, Compose >= 2.23.1 y BuildKit. Primera construcción con Internet; capacidad orientativa para la demo: 2 vCPU, 8 GB RAM y 30 GB disco.
 
 ## Parte 1 — Exposición sin diapositivas
 
@@ -44,12 +44,12 @@ docker compose up -d --wait --wait-timeout 240
 docker compose ps
 ```
 
-Si una política local bloquea scripts, abre el script para revisarlo y genera/carga `DB_PASSWORD` y `GRAFANA_PASSWORD` manualmente en el entorno de la sesión. No es necesario cambiar la política de ejecución de todo el equipo. En Linux y en la modalidad de entrega de un solo YAML, usa el procedimiento exacto de [despliegue en VM](docs/despliegue-cloud.md).
+El script crea `secrets\db_password.txt` y `secrets\grafana_password.txt` con valores aleatorios (si existe un `.env` de una versión anterior, conserva sus contraseñas). Si una política local bloquea scripts, abre el script para revisarlo y crea esos dos archivos manualmente, cada uno con una contraseña aleatoria. No es necesario cambiar la política de ejecución de todo el equipo. En Linux y en la modalidad de entrega de un solo YAML, usa el procedimiento exacto de [despliegue en VM](docs/despliegue-cloud.md).
 
 Accesos locales:
 
 - Aplicación: <http://127.0.0.1:8080>.
-- Grafana: <http://127.0.0.1:3000/d/hexaorders>; usuario `admin`, contraseña `GRAFANA_PASSWORD` de `.env`.
+- Grafana: <http://127.0.0.1:3000/d/hexaorders>; usuario `admin`, contraseña en `secrets\grafana_password.txt`.
 - Prometheus: <http://127.0.0.1:9091/targets> y <http://127.0.0.1:9091/alerts>.
 
 Prueba desde PowerShell:
@@ -87,6 +87,6 @@ docker compose build
 docker compose up -d --wait --wait-timeout 240
 ```
 
-La acción `.github/workflows/verify.yml` copia únicamente el YAML a un directorio vacío, lo construye, ejecuta las pruebas de ambos lenguajes, valida Prometheus con `promtool`, arranca los cinco servicios y comprueba HTTP, persistencia y dashboard. Su resultado solo se conocerá cuando ejecutes el workflow en GitHub.
+La acción `.github/workflows/verify.yml` copia únicamente el YAML a un directorio vacío, genera sus secretos en `secrets/`, lo construye, ejecuta las pruebas de ambos lenguajes, valida Prometheus con `promtool`, arranca los cinco servicios y comprueba HTTP, persistencia y dashboard. Su resultado solo se conocerá cuando ejecutes el workflow en GitHub.
 
-Para detener sin eliminar datos: `docker compose down`. Conserva `.env` para volver a arrancar con las mismas contraseñas. `docker compose down -v` elimina los volúmenes y se reserva para un reinicio deliberado. Consulta los límites y decisiones de la práctica en [arquitectura](docs/arquitectura.md).
+Para detener sin eliminar datos: `docker compose down`. Conserva `secrets/` para volver a arrancar con las mismas contraseñas. `docker compose down -v` elimina los volúmenes y se reserva para un reinicio deliberado. Consulta los límites y decisiones de la práctica en [arquitectura](docs/arquitectura.md).

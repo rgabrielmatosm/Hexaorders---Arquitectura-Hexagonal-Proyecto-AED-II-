@@ -179,10 +179,12 @@ volumes:
   prometheus_data: {}
   grafana_data: {}
 
-# Los valores se proporcionan al desplegar, nunca se incrustan en el entregable.
-# Compose local monta archivos: no equivale al almacén cifrado de secretos de Swarm.
+# Los valores se generan al desplegar en ./secrets/ (junto a este archivo), nunca se
+# incrustan en el entregable ni en Git. Se usan archivos y no `environment:` porque
+# Compose solo puede montar secretos de archivo en servicios read_only (bind mount de
+# solo lectura). No equivale al almacén cifrado de secretos de Swarm.
 secrets:
   db_password:
-    environment: DB_PASSWORD
+    file: ./secrets/db_password.txt
   grafana_password:
-    environment: GRAFANA_PASSWORD
+    file: ./secrets/grafana_password.txt

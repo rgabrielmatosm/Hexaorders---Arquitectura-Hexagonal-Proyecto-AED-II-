@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 2408307da42dbfd9ea09a0c92128d0834a04d6c2bedb0d4d8d1dc33064c2e59f
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 6f87763eef1d22135c49a3724b247676e766bf72011599d81aa1e398b14b89e6
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -1874,10 +1874,12 @@ volumes:
   prometheus_data: {}
   grafana_data: {}
 
-# Los valores se proporcionan al desplegar, nunca se incrustan en el entregable.
-# Compose local monta archivos: no equivale al almacén cifrado de secretos de Swarm.
+# Los valores se generan al desplegar en ./secrets/ (junto a este archivo), nunca se
+# incrustan en el entregable ni en Git. Se usan archivos y no `environment:` porque
+# Compose solo puede montar secretos de archivo en servicios read_only (bind mount de
+# solo lectura). No equivale al almacén cifrado de secretos de Swarm.
 secrets:
   db_password:
-    environment: DB_PASSWORD
+    file: ./secrets/db_password.txt
   grafana_password:
-    environment: GRAFANA_PASSWORD
+    file: ./secrets/grafana_password.txt
