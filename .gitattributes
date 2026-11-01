@@ -1,6 +1,9 @@
 # Fuentes y entregables generados siempre con LF: tools/generate_delivery.py --check
 # compara byte a byte y debe dar el mismo resultado en Windows, Linux y macOS.
 * text=auto eol=lf
+# cmd.exe interpreta mal etiquetas y bloques en archivos .cmd/.bat con solo LF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
 *.png binary
 *.jpg binary
 *.ico binary

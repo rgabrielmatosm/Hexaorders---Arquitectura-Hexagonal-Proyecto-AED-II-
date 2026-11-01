@@ -5,9 +5,15 @@ on:
 permissions:
   contents: read
 jobs:
+  # Prueba integral con Docker. GitHub solo ofrece contenedores Linux en runners Ubuntu
+  # (los runners Windows no ejecutan contenedores Linux), así que este job usa Ubuntu, pero
+  # ejecuta EXACTAMENTE el mismo script PowerShell que usas en Windows: tools/hexaorders.ps1.
   compose:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
     env:
       DB_PASSWORD: ci-only-ephemeral-db-password
       GRAFANA_PASSWORD: ci-only-ephemeral-grafana-password
@@ -16,59 +22,75 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # Se crea antes de cualquier verificación: los pasos if: failure()/always()
-      # usan este directorio como working-directory y deben poder arrancar siempre.
-      - name: Prepare delivery workspace
-        run: mkdir -p "$RUNNER_TEMP/hexaorders-delivery"
-      - name: Check generated delivery is up to date
-        run: python tools/generate_delivery.py --check
-      - name: Validate and build the single-file delivery
-        run: |
-          cp docker-compose.yml "$RUNNER_TEMP/hexaorders-delivery/docker-compose.yml"
-          cd "$RUNNER_TEMP/hexaorders-delivery"
-          # Mismo procedimiento que un despliegue real: secretos como archivos en ./secrets/.
-          # Directorio 700; archivos legibles por los UID sin privilegios de los contenedores.
-          mkdir -p secrets
-          chmod 700 secrets
-          printf '%s' "$DB_PASSWORD" > secrets/db_password.txt
-          printf '%s' "$GRAFANA_PASSWORD" > secrets/grafana_password.txt
-          chmod 644 secrets/db_password.txt secrets/grafana_password.txt
-          docker compose config --quiet
-          docker compose build --pull
-      - name: Validate Prometheus configuration and rules
-        working-directory: ${{ runner.temp }}/hexaorders-delivery
-        run: docker compose run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yml
-      - name: Start all five services
-        working-directory: ${{ runner.temp }}/hexaorders-delivery
-        run: docker compose up -d --wait --wait-timeout 240
-      - name: Verify orders, persistence, metrics and provisioned dashboard
-        run: python tools/smoke.py
-      - name: Verify risk failure is HTTP 503
-        working-directory: ${{ runner.temp }}/hexaorders-delivery
-        run: |
-          docker compose stop risk-engine
-          code=$(curl -sS -o /tmp/risk-failure.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"customerId":"demo-001","amount":125.50}' http://127.0.0.1:8080/api/orders)
-          test "$code" = 503
-          docker compose start risk-engine
-          docker compose up -d --wait --wait-timeout 120
+      # Pasos 1-8: entregable al día, build con tests, promtool, cinco servicios sanos,
+      # smoke HTTP (pedidos, persistencia, métricas, dashboard) y HTTP 503 sin risk-engine.
+      - name: Verify delivery end to end (tools/hexaorders.ps1 verify)
+        run: ./tools/hexaorders.ps1 verify -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery') -KeepRunning
+      # Seguros aunque falle cualquier paso anterior: si no existe el entregable, terminan sin error.
       - name: Show diagnostics on failure
         if: failure()
-        run: |
-          delivery="$RUNNER_TEMP/hexaorders-delivery"
-          if [ ! -f "$delivery/docker-compose.yml" ]; then
-            echo "::notice::Sin diagnósticos de contenedores: el entregable no llegó a copiarse (falló un paso previo)."
-            exit 0
-          fi
-          cd "$delivery"
-          docker compose ps -a
-          docker compose logs --no-color --tail=100
+        run: ./tools/hexaorders.ps1 diagnose -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery')
       - name: Cleanup ephemeral CI resources
         if: always()
+        run: ./tools/hexaorders.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery')
+
+  # Lo que se ejecuta en un PC con Windows: lanzador .cmd, scripts en Windows PowerShell 5.1,
+  # generación de secretos, generador determinista y tests unitarios de Python y Java.
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Parse PowerShell scripts with Windows PowerShell 5.1
         run: |
-          delivery="$RUNNER_TEMP/hexaorders-delivery"
-          if [ ! -f "$delivery/docker-compose.yml" ]; then
-            echo "Nada que limpiar: no se creó ningún recurso de Compose."
-            exit 0
-          fi
-          cd "$delivery"
-          docker compose down -v --remove-orphans
+          $failed = $false
+          Get-ChildItem tools -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors)
+            if ($errors) { $failed = $true; $errors | ForEach-Object { Write-Host "::error file=tools/$($_.Extent.File | Split-Path -Leaf),line=$($_.Extent.StartLineNumber)::$($_.Message)" } }
+            else { Write-Host "OK $($_.Name)" }
+          }
+          if ($failed) { exit 1 }
+      - name: Windows launcher shows help (hexaorders.cmd)
+        shell: cmd
+        run: hexaorders.cmd help
+      # Este paso y "check" se ejecutan con Windows PowerShell 5.1 (powershell.exe), el que
+      # trae Windows; hexaorders.cmd usa PowerShell 7 si está instalado, como en este runner.
+      - name: Generate secrets with Windows PowerShell 5.1 (idempotent, no trailing newline)
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'secrets-test'
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\hexaorders.ps1 secrets -WorkDir $dir
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $first = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\hexaorders.ps1 secrets -WorkDir $dir
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $second = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
+          if ($first -ne $second) { throw 'secrets no es idempotente' }
+          foreach ($f in 'db_password.txt', 'grafana_password.txt') {
+            $value = [IO.File]::ReadAllText((Join-Path $dir "secrets\$f"))
+            if ($value -notmatch '^[0-9a-f]{48}$') { throw "Secreto inválido en ${f}: longitud $($value.Length)" }
+          }
+          Write-Host 'Secretos correctos.'
+      - name: Install Python tooling
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-tools.txt -r services/risk-engine/requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Delivery up to date and valid on Windows (Windows PowerShell 5.1 check)
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\hexaorders.ps1 check
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Unit tests on Windows (hexaorders.cmd test)
+        run: |
+          .\hexaorders.cmd test
+          if ($LASTEXITCODE -ne 0) { exit 1 }
