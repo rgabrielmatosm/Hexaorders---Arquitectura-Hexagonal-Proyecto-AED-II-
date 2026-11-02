@@ -53,6 +53,12 @@ def create_app(score_risk: ScoreRiskPort) -> FastAPI:
     )
     for decision in ("APPROVED", "REVIEW"):
         evaluations.labels(decision=decision)
+    # v3: requests rejected before reaching the use case (low-cardinality reasons, pre-registered).
+    rejected = Counter(
+        "risk_requests_rejected_total", "Requests rejected by validation", ["reason"], registry=registry
+    )
+    for reason in ("unsupported_media_type", "invalid_payload"):
+        rejected.labels(reason=reason)
 
     @app.post(
         "/score",
@@ -63,6 +69,7 @@ def create_app(score_risk: ScoreRiskPort) -> FastAPI:
     )
     async def score(request: Request) -> ScoreResponse:
         if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+            rejected.labels(reason="unsupported_media_type").inc()
             raise HTTPException(status_code=415, detail="Content-Type must be application/json")
         try:
             # JSON -> Decimal directly: a float intermediate would lose monetary precision.
@@ -70,6 +77,7 @@ def create_app(score_risk: ScoreRiskPort) -> FastAPI:
             dto = ScoreRequest.model_validate(payload)
             evaluation = Evaluation(dto.customerId, dto.amount)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+            rejected.labels(reason="invalid_payload").inc()
             detail = exc.errors(include_input=False, include_context=False) if isinstance(exc, ValidationError) else "Invalid JSON body"
             raise HTTPException(status_code=422, detail=detail) from exc
         started = perf_counter()

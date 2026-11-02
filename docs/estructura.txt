@@ -3,6 +3,12 @@ hexaorders/
 │   └── workflows/
 │       └── verify.yml
 ├── docs/
+│   ├── demo/
+│   │   ├── HexaOrders.postman_collection.json
+│   │   ├── README.md
+│   │   └── requests.http
+│   ├── english/
+│   │   └── presentation-guide.md
 │   ├── arquitectura.md
 │   ├── despliegue-cloud.md
 │   ├── estructura.txt
@@ -76,6 +82,9 @@ hexaorders/
 │   │   │   │       │   └── migration/
 │   │   │   │       │       └── V1__create_orders.sql
 │   │   │   │       ├── static/
+│   │   │   │       │   ├── css/          (base, components, effects)
+│   │   │   │       │   ├── img/logo.svg
+│   │   │   │       │   ├── js/           (app, api, ui, dashboard, orders, architecture, observability, grid-effect)
 │   │   │   │       │   └── index.html
 │   │   │   │       └── application.yml
 │   │   │   └── test/
@@ -122,6 +131,9 @@ hexaorders/
 │   ├── hexaorders.ps1
 │   ├── init-env.ps1
 │   ├── smoke.py
+│   ├── ui-e2e/
+│   │   ├── package.json
+│   │   └── ui-e2e.js
 │   └── validate_delivery.py
 ├── .dockerignore
 ├── .gitattributes

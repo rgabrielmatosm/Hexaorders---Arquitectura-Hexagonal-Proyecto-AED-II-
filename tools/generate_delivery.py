@@ -52,18 +52,38 @@ def inline_dockerfile(service: str) -> str:
         source, destination = parts[1:]
         origin = context / source
         files = sorted_files(origin) if origin.is_dir() else [origin]
-        for file in files:
-            if not file.is_file() or any(part in {'__pycache__', '.pytest_cache', '.venv'} for part in file.parts):
-                continue
-            if origin.is_dir():
-                target = str(Path(destination) / file.relative_to(origin)).replace('\\', '/')
-            else:
-                target = f'{destination.rstrip("/")}/{file.name}' if destination.endswith('/') or destination == '.' else destination
+        files = [file for file in files if file.is_file()
+                 and not any(part in {'__pycache__', '.pytest_cache', '.venv'} for part in file.parts)]
+        if not origin.is_dir():
+            file = files[0]
+            target = f'{destination.rstrip("/")}/{file.name}' if destination.endswith('/') or destination == '.' else destination
             marker = f'HEXFILE_{index}'
             content = read_text(file).rstrip('\n')
             if marker in content:
                 raise ValueError(f'Colisión de heredoc en {file}')
             result.extend([f"COPY <<'{marker}' {target}", content, marker])
+            index += 1
+            continue
+        # Un COPY por directorio con heredocs con nombre (el delimitador es el nombre del
+        # archivo): cada instrucción COPY es una capa y overlayfs admite como máximo ~125
+        # capas por imagen, así que un COPY por archivo deja de construir al crecer el proyecto.
+        groups: dict[str, list[Path]] = {}
+        for file in files:
+            relative = file.relative_to(origin)
+            directory = str(Path(destination) / relative.parent).replace('\\', '/')
+            groups.setdefault(directory, []).append(file)
+        for directory, members in groups.items():
+            heredocs, bodies = [], []
+            for file in members:
+                if not all(ch.isalnum() or ch in '._-' for ch in file.name):
+                    raise ValueError(f'Nombre de archivo no soportado en heredoc: {file}')
+                content = read_text(file).rstrip('\n')
+                if file.name in content.split('\n'):
+                    raise ValueError(f'Colisión de heredoc en {file}')
+                heredocs.append(f"<<'{file.name}'")
+                bodies.extend([content, file.name])
+            result.append(f"COPY {' '.join(heredocs)} {directory.rstrip('/')}/")
+            result.extend(bodies)
             index += 1
     return '\n'.join(result) + '\n'
 
@@ -91,6 +111,12 @@ def monitoring_configmap() -> str:
         'datasource.yml': 'infra/grafana/provisioning/datasource.yml',
         'dashboards.yml': 'infra/grafana/provisioning/dashboards.yml',
         'hexaorders.json': 'infra/grafana/dashboards/hexaorders.json',
+        'hexaorders-business.json': 'infra/grafana/dashboards/hexaorders-business.json',
+        'hexaorders-risk.json': 'infra/grafana/dashboards/hexaorders-risk.json',
+        'hexaorders-api.json': 'infra/grafana/dashboards/hexaorders-api.json',
+        'hexaorders-infrastructure.json': 'infra/grafana/dashboards/hexaorders-infrastructure.json',
+        'hexaorders-security.json': 'infra/grafana/dashboards/hexaorders-security.json',
+        'hexaorders-logistics.json': 'infra/grafana/dashboards/hexaorders-logistics.json',
     }
     doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'hexaorders'},
            'data': {key: read_text(ROOT / value) for key, value in paths.items()}}

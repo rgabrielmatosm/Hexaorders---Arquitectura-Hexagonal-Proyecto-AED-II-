@@ -1,0 +1,38 @@
+### HexaOrders — solicitudes de demostración (VS Code REST Client / JetBrains HTTP Client)
+@baseUrl = http://127.0.0.1:8080
+
+### 1. Pedido aprobado: 125.50 → riesgo 10, APPROVED
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{"customerId": "demo_http", "amount": 125.50, "currency": "USD"}
+
+### 2. Pedido aprobado: 750.00 → riesgo 40, APPROVED
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{"customerId": "demo_http", "amount": 750.00, "currency": "USD"}
+
+### 3. Pedido en revisión: 1500.00 → riesgo 75, REVIEW
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{"customerId": "demo_http", "amount": 1500.00, "currency": "USD"}
+
+### 4. Últimos pedidos (máximo 50)
+GET {{baseUrl}}/api/orders
+
+### 5. Estadísticas de todos los pedidos persistidos
+GET {{baseUrl}}/api/orders/statistics
+
+### 6. Validación: 3 decimales → 400
+POST {{baseUrl}}/api/orders
+Content-Type: application/json
+
+{"customerId": "demo_http", "amount": 10.001, "currency": "USD"}
+
+### 7. Pedido inexistente → 404
+GET {{baseUrl}}/api/orders/00000000-0000-0000-0000-000000000000
+
+### 8. UUID mal formado → 400
+GET {{baseUrl}}/api/orders/no-es-un-uuid

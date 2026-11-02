@@ -85,3 +85,13 @@ def test_openapi_exposes_input_and_output_contract(client):
     operation = client.get("/openapi.json").json()["paths"]["/score"]["post"]
     assert operation["requestBody"]["content"]["application/json"]["schema"]["required"] == ["customerId", "amount"]
     assert "200" in operation["responses"]
+
+
+def test_rejected_requests_are_counted_without_affecting_evaluations(client):
+    client.post("/score", content="{}", headers={"Content-Type": "text/plain"})
+    client.post("/score", json={"customerId": "x", "amount": 0})
+    metrics = client.get("/metrics").text
+    assert 'risk_requests_rejected_total{reason="unsupported_media_type"} 1.0' in metrics
+    assert 'risk_requests_rejected_total{reason="invalid_payload"} 1.0' in metrics
+    assert 'risk_evaluations_total{decision="APPROVED"} 0.0' in metrics
+

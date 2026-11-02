@@ -6,6 +6,8 @@ secrets/
 **/.venv/
 **/__pycache__/
 **/.pytest_cache/
+**/node_modules/
+tools/ui-e2e/screenshots/
 **/target/
 *.pyc
 *.log

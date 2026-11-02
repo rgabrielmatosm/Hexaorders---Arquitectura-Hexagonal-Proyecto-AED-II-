@@ -3,6 +3,7 @@ package com.hexaorders.adapter.in.web;
 import com.hexaorders.application.port.in.OrderUseCases;
 import com.hexaorders.domain.Order;
 import com.hexaorders.domain.OrderDraft;
+import com.hexaorders.domain.OrderStatistics;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
@@ -28,6 +29,10 @@ public final class OrderController {
         Order created = orders.create(new OrderDraft(request.customerId(), request.amount(), currency));
         return ResponseEntity.created(URI.create("/api/orders/" + created.id())).body(created);
     }
+
+    /** Totals over all persisted orders (the list endpoint returns only the latest 50). */
+    @GetMapping("/statistics")
+    public OrderStatistics statistics() { return orders.statistics(); }
 
     @GetMapping("/{id}")
     public Order get(@PathVariable UUID id) { return orders.get(id); }

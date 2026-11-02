@@ -1,0 +1,148 @@
+{
+  "captured_from_commit": "604394a",
+  "grafana_dashboards": [
+    {
+      "file": "infra/grafana/dashboards/hexaorders.json",
+      "uid": "hexaorders",
+      "title": "HexaOrders · Puertos, adaptadores y métricas",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Servicios disponibles (1 = UP)",
+          "type": "stat",
+          "exprs": [
+            "up{job=~\"order-api|risk-engine\"}"
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Pedidos creados desde el arranque de Java",
+          "type": "stat",
+          "exprs": [
+            "sum(orders_created_total) or vector(0)"
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Fallos de riesgo desde el arranque de Java",
+          "type": "stat",
+          "exprs": [
+            "sum(orders_risk_failures_total) or vector(0)"
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Pedidos por estado / segundo",
+          "type": "timeseries",
+          "exprs": [
+            "sum by(status)(rate(orders_created_total[2m]))"
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Evaluaciones de riesgo / segundo",
+          "type": "timeseries",
+          "exprs": [
+            "sum by(decision)(rate(risk_evaluations_total[2m]))"
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Latencia p95 API de pedidos",
+          "type": "timeseries",
+          "exprs": [
+            "histogram_quantile(0.95, sum by(le)(rate(http_server_requests_seconds_bucket{uri=~\"/api/orders.*\"}[2m])))"
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Latencia p95 evaluación de riesgo Python",
+          "type": "timeseries",
+          "exprs": [
+            "histogram_quantile(0.95, sum by(le)(rate(risk_evaluation_duration_seconds_bucket[2m])))"
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Respuestas HTTP /api/orders por código / segundo",
+          "type": "timeseries",
+          "exprs": [
+            "sum by(status)(rate(http_server_requests_seconds_count{uri=~\"/api/orders.*\"}[2m]))"
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Errores HTTP 5xx / segundo (p. ej. 503 si cae el motor de riesgo)",
+          "type": "timeseries",
+          "exprs": [
+            "sum by(uri, status)(rate(http_server_requests_seconds_count{status=~\"5..\"}[2m])) or vector(0)"
+          ]
+        }
+      ]
+    }
+  ],
+  "grafana_datasources": [
+    {
+      "name": "Prometheus",
+      "uid": "prometheus",
+      "type": "prometheus",
+      "url": "http://prometheus:9090"
+    }
+  ],
+  "prometheus": {
+    "global": {
+      "scrape_interval": "10s",
+      "evaluation_interval": "10s",
+      "external_labels": {
+        "project": "hexaorders"
+      }
+    },
+    "rule_files": [
+      "/etc/prometheus/alerts.yml"
+    ],
+    "scrape_jobs": [
+      {
+        "job_name": "order-api",
+        "metrics_path": "/actuator/prometheus",
+        "targets": [
+          "order-api:9090"
+        ]
+      },
+      {
+        "job_name": "risk-engine",
+        "metrics_path": "/metrics",
+        "targets": [
+          "risk-engine:8000"
+        ]
+      },
+      {
+        "job_name": "prometheus",
+        "metrics_path": "/metrics",
+        "targets": [
+          "localhost:9090"
+        ]
+      }
+    ]
+  },
+  "alert_rules": [
+    {
+      "alert": "HexaOrdersServiceDown",
+      "expr": "up{job=~\"order-api|risk-engine\"} == 0",
+      "for": "30s"
+    },
+    {
+      "alert": "RiskRequestsFailing",
+      "expr": "increase(orders_risk_failures_total[2m]) > 0",
+      "for": "10s"
+    }
+  ],
+  "instrumented_metrics": [
+    "orders_created_total",
+    "orders_risk_failures_total",
+    "http_server_requests_seconds_count",
+    "http_server_requests_seconds_bucket",
+    "risk_evaluations_total",
+    "risk_evaluation_duration_seconds_bucket",
+    "up"
+  ]
+}

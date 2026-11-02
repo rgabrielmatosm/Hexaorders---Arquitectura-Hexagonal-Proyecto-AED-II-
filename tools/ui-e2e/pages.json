@@ -1,0 +1,341 @@
+[
+  {
+    "path": "/index.html",
+    "route": "/inicio",
+    "title": "Inicio",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/catalogo.html",
+    "route": "/tienda",
+    "title": "Catálogo",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/producto.html",
+    "route": "/producto/:id",
+    "title": "Producto",
+    "roles": [],
+    "needsId": true
+  },
+  {
+    "path": "/carrito.html",
+    "route": "/carrito",
+    "title": "Carrito",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/checkout.html",
+    "route": "/checkout",
+    "title": "Checkout",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/login.html",
+    "route": "/entrar",
+    "title": "Iniciar sesión",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/registro.html",
+    "route": "/registro",
+    "title": "Crear cuenta",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/nosotros.html",
+    "route": "/nosotros",
+    "title": "Nosotros",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/contacto.html",
+    "route": "/contacto",
+    "title": "Contacto",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/403.html",
+    "route": "/error/403",
+    "title": "Acceso restringido",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/404.html",
+    "route": "/error/404",
+    "title": "Página no encontrada",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/cliente/dashboard.html",
+    "route": "/cliente",
+    "title": "Mi cuenta",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/cliente/pedidos.html",
+    "route": "/mis-pedidos",
+    "title": "Mis pedidos",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/cliente/pedido-detalle.html",
+    "route": "/mis-pedidos/:id",
+    "title": "Detalle del pedido",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": true
+  },
+  {
+    "path": "/cliente/seguimiento.html",
+    "route": "/seguimiento/:id",
+    "title": "Seguimiento",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": true
+  },
+  {
+    "path": "/cliente/perfil.html",
+    "route": "/perfil",
+    "title": "Perfil y seguridad",
+    "roles": [
+      "auth"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/dashboard.html",
+    "route": "/admin/:tab",
+    "title": "Panel de administración",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/productos.html",
+    "route": "/admin/:tab",
+    "title": "Productos",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/categorias.html",
+    "route": "/admin/:tab",
+    "title": "Categorías",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/inventario.html",
+    "route": "/admin/:tab",
+    "title": "Inventario",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/pedidos.html",
+    "route": "/admin/:tab",
+    "title": "Pedidos",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/usuarios.html",
+    "route": "/admin/:tab",
+    "title": "Usuarios y roles",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/incidencias.html",
+    "route": "/admin/:tab",
+    "title": "Incidencias",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/reportes.html",
+    "route": "/admin/:tab",
+    "title": "Reportes",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/auditoria.html",
+    "route": "/admin/:tab",
+    "title": "Auditoría",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/operaciones/dashboard.html",
+    "route": "/operaciones",
+    "title": "Operaciones",
+    "roles": [
+      "ORDER_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/operaciones/pedidos.html",
+    "route": "/operaciones/pedidos",
+    "title": "Bandeja de pedidos",
+    "roles": [
+      "ORDER_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/operaciones/revisiones.html",
+    "route": "/operaciones/revisiones",
+    "title": "Revisiones de riesgo",
+    "roles": [
+      "ORDER_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/operaciones/incidencias.html",
+    "route": "/operaciones/incidencias",
+    "title": "Incidencias",
+    "roles": [
+      "ORDER_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/logistica/dashboard.html",
+    "route": "/logistica",
+    "title": "Logística",
+    "roles": [
+      "LOGISTICS_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/logistica/calendario.html",
+    "route": "/logistica/calendario",
+    "title": "Calendario logístico",
+    "roles": [
+      "LOGISTICS_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/logistica/entregas.html",
+    "route": "/logistica/entregas",
+    "title": "Entregas",
+    "roles": [
+      "LOGISTICS_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/logistica/asignaciones.html",
+    "route": "/logistica/asignaciones",
+    "title": "Asignaciones",
+    "roles": [
+      "LOGISTICS_OPERATOR",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/monitoreo/dashboard.html",
+    "route": "/observabilidad-tecnica",
+    "title": "Monitoreo",
+    "roles": [
+      "OBSERVABILITY_VIEWER",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/monitoreo/servicios.html",
+    "route": "/monitoreo/servicios",
+    "title": "Servicios",
+    "roles": [
+      "OBSERVABILITY_VIEWER",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/monitoreo/metricas.html",
+    "route": "/monitoreo/metricas",
+    "title": "Métricas",
+    "roles": [
+      "OBSERVABILITY_VIEWER",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/monitoreo/alertas.html",
+    "route": "/monitoreo/alertas",
+    "title": "Alertas",
+    "roles": [
+      "OBSERVABILITY_VIEWER",
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/arquitectura/overview.html",
+    "route": "/arquitectura/overview",
+    "title": "Arquitectura",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/arquitectura/flujo-pedidos.html",
+    "route": "/arquitectura/flujo-pedidos",
+    "title": "Flujo de pedidos",
+    "roles": [],
+    "needsId": false
+  }
+]

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="hexaorders-logo-title">
+  <title id="hexaorders-logo-title">HexaOrders</title>
+  <defs>
+    <linearGradient id="hexaorders-logo-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#C4B5FD"/>
+      <stop offset="0.5" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#6D28D9"/>
+    </linearGradient>
+  </defs>
+  <!-- Anillo exterior: adaptadores. Seis vértices: puertos. Núcleo: dominio. -->
+  <polygon points="32,4 56.25,18 56.25,46 32,60 7.75,46 7.75,18" fill="none" stroke="url(#hexaorders-logo-gradient)" stroke-width="3" stroke-linejoin="round"/>
+  <g stroke="#A78BFA" stroke-width="1.6" stroke-linecap="round" opacity="0.6">
+    <line x1="32" y1="20" x2="32" y2="4"/>
+    <line x1="42.39" y1="26" x2="56.25" y2="18"/>
+    <line x1="42.39" y1="38" x2="56.25" y2="46"/>
+    <line x1="32" y1="44" x2="32" y2="60"/>
+    <line x1="21.61" y1="38" x2="7.75" y2="46"/>
+    <line x1="21.61" y1="26" x2="7.75" y2="18"/>
+  </g>
+  <polygon points="32,20 42.39,26 42.39,38 32,44 21.61,38 21.61,26" fill="url(#hexaorders-logo-gradient)"/>
+  <path d="M26.6 32.4 L30.4 36.1 L37.6 28.6" fill="none" stroke="#0B0F14" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#0B0F14" stroke="#A78BFA" stroke-width="2">
+    <circle cx="32" cy="4" r="3"/>
+    <circle cx="56.25" cy="18" r="3"/>
+    <circle cx="56.25" cy="46" r="3"/>
+    <circle cx="32" cy="60" r="3"/>
+    <circle cx="7.75" cy="46" r="3"/>
+  </g>
+  <circle cx="7.75" cy="18" r="3" fill="#10B981" stroke="#0B0F14" stroke-width="1.2"/>
+</svg>

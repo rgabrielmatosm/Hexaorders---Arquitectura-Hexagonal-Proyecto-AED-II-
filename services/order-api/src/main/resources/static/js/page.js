@@ -1,0 +1,41 @@
+// Punto de entrada de TODAS las páginas HTML del sitio multipágina (salvo laboratorio.html, que
+// conserva su app.js original). Orden: compatibilidad de URLs antiguas → sesión → layout → vista.
+
+import { initGrid } from './grid-effect.js';
+import { renderLayout } from './layout.js';
+import { redirectLegacyHash, startPage } from './router.js';
+import { session } from './session.js';
+import { $, toast } from './ui.js';
+// Vistas: cada módulo registra sus rutas lógicas (las mismas que usaba la v3).
+import './views/home.js';
+import './views/shop.js';
+import './views/customer.js';
+import './views/admin.js';
+import './views/operations.js';
+import './views/logistics.js';
+import './views/ops.js';
+import './views/architecture-pages.js';
+
+const LAB_ANCHORS = ['#inicio', '#panel', '#pedidos', '#arquitectura', '#observabilidad'];
+
+async function start() {
+  // v3 → v4: /#/tienda redirige a /catalogo.html y /#panel al laboratorio, sin romper enlaces.
+  const isHome = window.location.pathname === '/' || window.location.pathname === '/index.html';
+  if (isHome && LAB_ANCHORS.includes(window.location.hash)) { window.location.replace(`/laboratorio.html${window.location.hash}`); return; }
+  if (redirectLegacyHash()) return;
+
+  const canvas = $('#grid-canvas');
+  if (canvas) initGrid(canvas);
+  window.addEventListener('hexa:unauthenticated', () => {
+    if (session.isAuthenticated()) {
+      session.expire();
+      toast('Tu sesión ha caducado: vuelve a iniciar sesión', 'warn');
+    }
+  });
+  await session.load();
+  renderLayout();
+  document.body.classList.add('is-ready');
+  await startPage(document.body.dataset.route);
+}
+
+start();

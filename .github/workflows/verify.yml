@@ -17,6 +17,7 @@ jobs:
     env:
       DB_PASSWORD: ci-only-ephemeral-db-password
       GRAFANA_PASSWORD: ci-only-ephemeral-grafana-password
+      DEMO_PASSWORD: ci-only-demo-password-2026
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,6 +27,49 @@ jobs:
       # smoke HTTP (pedidos, persistencia, métricas, dashboard) y HTTP 503 sin risk-engine.
       - name: Verify delivery end to end (tools/hexaorders.ps1 verify)
         run: ./tools/hexaorders.ps1 verify -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery') -KeepRunning
+      # Interfaz web contra el stack REAL que verify deja en marcha: formulario, panel,
+      # explorador de arquitectura, observabilidad con Prometheus/Grafana y vista móvil.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check frontend JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in services/order-api/src/main/resources/static/js/*.js services/order-api/src/main/resources/static/js/views/*.js; do
+            cp "$f" "$RUNNER_TEMP/check.mjs"; node --check "$RUNNER_TEMP/check.mjs" || { echo "::error file=$f::sintaxis JavaScript no válida"; exit 1; }
+          done
+      - name: Static multipage checks (pages, routes, links, CSP, role rules)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/generate_pages.py --check
+          python tools/check_frontend.py
+      - name: UI end to end against the real stack (Playwright)
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node ui-e2e.js
+      # v4: recorre las 39 páginas HTML como visitante y con cada rol (200/302/403/404), enlaces,
+      # recargas, formularios reales, monitoreo leído de Prometheus y vista móvil.
+      - name: Multipage site end to end (every page, every role)
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: node pages-e2e.js
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hexaorders-ui-screenshots
+          path: ${{ runner.temp }}/ui-screenshots
+          if-no-files-found: ignore
       # Seguros aunque falle cualquier paso anterior: si no existe el entregable, terminan sin error.
       - name: Show diagnostics on failure
         if: failure()
@@ -77,7 +121,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $second = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
           if ($first -ne $second) { throw 'secrets no es idempotente' }
-          foreach ($f in 'db_password.txt', 'grafana_password.txt') {
+          foreach ($f in 'db_password.txt', 'grafana_password.txt', 'demo_password.txt') {
             $value = [IO.File]::ReadAllText((Join-Path $dir "secrets\$f"))
             if ($value -notmatch '^[0-9a-f]{48}$') { throw "Secreto inválido en ${f}: longitud $($value.Length)" }
           }

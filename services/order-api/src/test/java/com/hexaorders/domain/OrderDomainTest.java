@@ -54,4 +54,13 @@ class OrderDomainTest {
         assertThatThrownBy(() -> new Order(UUID.randomUUID(), "demo", BigDecimal.ONE, "USD", 80,
                 OrderStatus.APPROVED, Instant.now())).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void statisticsTotalIsAlwaysTheSumOfBothStatuses() {
+        OrderStatistics statistics = OrderStatistics.of(7, 3);
+        assertThat(statistics.total()).isEqualTo(10);
+        assertThat(OrderStatistics.of(0, 0).total()).isZero();
+        assertThatThrownBy(() -> new OrderStatistics(5, 1, 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> OrderStatistics.of(-1, 2)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

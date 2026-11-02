@@ -16,6 +16,7 @@ import com.hexaorders.application.exception.RiskUnavailableException;
 import com.hexaorders.application.port.in.OrderUseCases;
 import com.hexaorders.domain.Order;
 import com.hexaorders.domain.OrderDraft;
+import com.hexaorders.domain.OrderStatistics;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -59,6 +60,16 @@ class OrderControllerTest {
         http.perform(post("/api/orders").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"customerId\":\"demo\",\"amount\":10.00}"))
                 .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void statisticsEndpointIsNotMistakenForAnOrderId() throws Exception {
+        when(useCases.statistics()).thenReturn(OrderStatistics.of(3, 1));
+        http.perform(get("/api/orders/statistics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(4))
+                .andExpect(jsonPath("$.approved").value(3))
+                .andExpect(jsonPath("$.review").value(1));
     }
 
     @Test
