@@ -2,6 +2,60 @@
 
 Este registro separa cuatro tipos de evidencia: **ejecución real**, **pruebas automáticas**, **revisión estática** y **pendiente de verificación**. Un resultado esperado nunca se presenta como observado.
 
+## Versión 5 — plataforma de 13 contenedores (2 de noviembre de 2026)
+
+Entorno local: contenedor Linux de desarrollo **sin motor Docker ni Windows**. Para probar las integraciones sin Docker se usaron los **binarios reales** de cada servicio:
+
+- PostgreSQL 16, `redis-server` y `rabbitmq-server` (paquetes del sistema);
+- Mailpit, Tempo, `otelcol-contrib` y Loki (binarios oficiales);
+- Nginx con `infra/frontend/nginx.conf`, el motor de riesgo con trazas y el JAR con `HEXAORDERS_INTEGRATIONS=on`.
+
+Prometheus, Grafana y Alloy no se ejecutaron en local: los cubre el job `compose` del CI, que levanta el stack Docker real.
+
+### Ejecución real local (binarios, sin Docker)
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| `platform_smoke.py` a través del gateway Nginx | 35 comprobaciones correctas, sin regresiones. |
+| Estáticos a través de Nginx | 28 archivos idénticos byte a byte a los del repositorio. |
+| Eventos y correos | 15 eventos publicados con confirmación, 15 consumidos y 15 correos en Mailpit. DLQ vacía. |
+| Redis | Aciertos registrados en `hexaorders_cache_requests_total{result="hit"}`. |
+| Tempo | Traza de un checkout con 15 spans de `order-api` y `risk-engine`: HTTP, caso de uso, repositorio, puerto de riesgo, `POST /score` y `ScoreRisk.execute`. |
+| Degradación | Con Redis y RabbitMQ detenidos: el catálogo respondió en 0,3 s, `platform_smoke.py` pasó (35 OK) y quedaron 15 eventos en el outbox. Al rearrancarlos: outbox en 0 y 15 correos más. |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn verify` | **97 pruebas**, cero fallos (antes 81). Nuevas: `BusinessEventTest`, `IntegrationServicesTest` e `InfrastructureAdaptersTest` (contrato, publicador con *ack* y *nack*, Redis real, degradación contra un Redis inalcanzable y modos de `IntegrationEnvironment`). |
+| Python: `pytest` | **62 pruebas** aprobadas (antes 60), incluida `test_tracing.py`. |
+| `check_observability.py` | `OK: observabilidad previa conservada (9 paneles, 2 alertas, 3 jobs) · 8 dashboards en total, 9 alertas en total`. |
+| `check_frontend.py` | `OK: frontend multipágina coherente (39 páginas generadas + laboratorio, 32 rutas, 13 transiciones, CSP sin estilos ni scripts en línea)`. |
+| `generate_delivery.py --check`, `validate_delivery.py` | `OK: Compose autosuficiente y 14 objetos Kubernetes`. Se valida `read_only`, perfiles, healthchecks, imágenes fijadas, puertos solo en `127.0.0.1` y servicios internos sin puertos. |
+
+### CI con Docker real (GitHub Actions)
+
+| Job | Resultado |
+| --- | --- |
+| `windows` (PowerShell 5.1, cuatro secretos, `check`, `test`) | Correcto. |
+| `compose-basic` (`verify -Mode basic`: 6 contenedores) | Correcto. |
+| `compose` (`verify -Mode full`: 13 contenedores) | Ver el estado final en el Pull Request. Se corrigieron los errores de la tabla siguiente. |
+
+### Errores del CI encontrados y corregidos
+
+| Error | Causa | Corrección |
+| --- | --- | --- |
+| Alloy: `mkdir /var/lib/alloy/data: permission denied` | `COPY --chown` no cambia un directorio que ya existe en la imagen, y `cap_drop: ALL` impide escribir como otro usuario | El almacenamiento de Alloy pasa a `/var/lib/hexaorders-alloy`, creado con el usuario correcto |
+| `integration_smoke.py`: comprobación de la DLQ | RabbitMQ 4 añade `x-queue-type: classic` a los argumentos de toda cola | Solo se exige que la DLQ sea durable, esté vacía y no tenga a su vez otra DLX |
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Docker Desktop en Windows 10/11 | No hay Windows con Docker en este entorno. Lista manual: [`WINDOWS_DOCKER_GUIDE.md`](WINDOWS_DOCKER_GUIDE.md). |
+| Alloy leyendo `/var/run/docker.sock` en Docker Desktop | Solo probado en Linux (CI). Docker Desktop expone el socket a los contenedores Linux, pero no se ha comprobado aquí. |
+| Kubernetes | Solo el núcleo y solo validación de esquema; no incluye los servicios v5. |
+
 ## Versión 4 — sitio web multipágina (2 de noviembre de 2026)
 
 Entorno local: contenedor Linux de desarrollo **sin motor Docker ni Windows** (Java 21, Maven, Python 3.13, PostgreSQL 16, Node 22, Chromium con Playwright). Sin Prometheus ni Grafana en local: su parte la ejecuta el job `compose` de GitHub Actions.
