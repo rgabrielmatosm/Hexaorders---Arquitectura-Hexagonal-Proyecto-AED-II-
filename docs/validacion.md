@@ -2,6 +2,44 @@
 
 Este registro separa cuatro tipos de evidencia: **ejecución real**, **pruebas automáticas**, **revisión estática** y **pendiente de verificación**. Un resultado esperado nunca se presenta como observado.
 
+## Versión 3 — plataforma comercial y operaciones (2 de noviembre de 2026)
+
+Entorno: el mismo contenedor de desarrollo **sin motor Docker** (Java 21, Maven, Python 3.13, PostgreSQL 16 local, Node 22, Chromium con Playwright). Prometheus y Grafana no estaban disponibles en local; su parte la ejecuta el job `compose` de GitHub Actions.
+
+### Ejecución real (Java + Python + PostgreSQL 16, sin Docker)
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| **Actualización desde la v2 con datos** | Se arrancó el JAR de la v2 (`604394a`), se crearon 3 pedidos y luego se arrancó la v3 sobre la misma base: Flyway aplicó `V2` y `V3`; los 3 pedidos siguieron intactos (`channel = LAB`, estado derivado de su decisión), con 3 filas de historial de migración; 18 productos, 6 categorías y 6 cuentas demo creadas; `/api/orders/statistics` sin cambios. |
+| `tools/platform_smoke.py` | `OK plataforma: 35 comprobaciones` (catálogo, precio del servidor, `400` con precio del cliente, `401`, registro e inicio de sesión, checkout idempotente, stock, historial, aislamiento entre clientes, cancelación con devolución de stock, transiciones por rol, `409`, calendario con conflicto y reprogramación, entrega, incidencias, panel y auditoría de admin, salud y `403` del observador, `401` con contraseña incorrecta). |
+| `tools/smoke.py` (original) | Todas las aserciones correctas hasta la consulta a Prometheus, que falla por no haber Prometheus en local (esperado). |
+| `tools/ui-e2e/ui-e2e.js` con `SKIP_PROMETHEUS=1` y `DEMO_PASSWORD` | `UI E2E correcta: 21 comprobaciones` (laboratorio original y flujos de cliente, admin, operador, logística y observador). |
+| Revisión visual con capturas | 23 capturas revisadas. Se corrigieron 3 defectos: contorno de foco visible en el contenedor de vistas, desbordamiento de la barra de navegación con el rol admin y nombres vacíos en «stock bajo» (el JSON anida `details.name`). |
+| Métricas expuestas en `/actuator/prometheus` | Presentes las métricas nuevas `hexaorders_*`, `orders_total` y las de JVM/HikariCP. |
+| **Defecto previo encontrado** | `orders_created` se exporta como `orders_total` (sufijo `_created` reservado por el cliente Prometheus 1.x), así que dos paneles originales no tenían datos. Corregido con la regla de registro `orders_created_total` (ver [`OBSERVABILITY_PRESERVATION.md`](OBSERVABILITY_PRESERVATION.md)). La fila de «Revisión estática» de la v2 que daba ese nombre por bueno estaba equivocada. |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn verify` | **66 pruebas**, cero fallos (antes 36), incluidas `LifecycleDomainTest`, `CommerceServiceTest`, `OperationsAndLogisticsTest`, `SecurityRulesTest` y la nueva regla ArchUnit. |
+| Python: `pytest` | **60 pruebas** aprobadas (antes 59; nueva métrica `risk_requests_rejected_total`). |
+| Sintaxis JavaScript | `node --check` sobre los 17 módulos: correcto. |
+| `check_observability.py` | `OK: observabilidad previa conservada (9 paneles, 2 alertas, 3 jobs) · 6 dashboards en total, 9 alertas en total`. |
+| `generate_delivery.py --check` y `validate_delivery.py` con esquemas oficiales | Correcto (Compose Specification y Kubernetes 1.34.1, 14 objetos). |
+
+### Error del CI encontrado y corregido
+
+El primer CI de la v3 falló en `docker compose build` con `max depth exceeded`: el generador emitía **un `COPY` por archivo** (141 en `order-api`) y cada uno es una capa; overlayfs no admite tantas. El generador agrupa ahora los archivos de cada directorio en un único `COPY` con heredocs con nombre (33 capas en `order-api`). Se comprobó que todos los archivos se reconstruyen byte a byte desde el YAML generado.
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| `verify` completo con Docker, Prometheus y Grafana (incluidos `platform_smoke.py` con métricas en Prometheus y los 6 dashboards en Grafana) | Sin Docker en local; lo ejecuta el job `compose` del CI. El resultado se indica en el Pull Request. |
+| Scripts PowerShell en Windows | No hay PowerShell en local; los ejecuta el job `windows` del CI. |
+| Kubernetes | Solo validación de esquema; no se desplegó. |
+
 ## Versión 2 — interfaz rediseñada (1 de noviembre de 2026)
 
 Entorno: contenedor Linux de desarrollo **sin motor Docker**, con Java 21.0.12, Maven, Python 3.13 (pruebas de Python), PostgreSQL 16.15 local, Node 22 y Chromium (Playwright 1.63.0).

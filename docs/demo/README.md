@@ -46,3 +46,22 @@ Las ejecuciones automáticas reproducen la mayoría de los pasos sin intervenci�
 | 8, 9 y 12 (versión 2) | `503` con el motor detenido y estadísticas sin cambios (12 → 12); `201` tras recuperarlo; 13 pedidos antes y después de reiniciar el proceso Java. | Ejecución local manual, 01/11/2026. |
 | 10 con interfaz, Docker Compose de la versión 2 | Pendiente: lo ejecuta el CI al publicar la rama (Prometheus, Grafana y las capturas en el artefacto `hexaorders-ui-screenshots`). | CI pendiente de autorización para el push. |
 | 11 | No automatizado: verificación visual de Grafana durante la demostración. | — |
+
+## Plataforma v3 (portal y roles)
+
+Contraseña de las cuentas demo: `secrets\demo_password.txt`.
+
+| # | Acción | Resultado esperado (según el código) |
+| --- | --- | --- |
+| P1 | Abrir `#/tienda`, buscar y filtrar por categoría | Catálogo de PostgreSQL (18 productos, 6 categorías). |
+| P2 | Añadir al carrito e ir a **Checkout** sin sesión | Pide iniciar sesión; el carrito se conserva. |
+| P3 | Entrar como `cliente` y **Confirmar pedido** | `201`; seguimiento con `CREATED` → `RISK_APPROVED` o `RISK_REVIEW`; el stock baja. |
+| P4 | Repetir `POST /api/shop/orders` con la misma `Idempotency-Key` (lo automatiza `tools/platform_smoke.py`) | `200` + `Idempotent-Replay: true`; no se crea otro pedido. |
+| P5 | Entrar como `operador`, **Gestionar** el pedido → Confirmar → Preparar → Listo | Solo aparecen los botones permitidos; el historial crece. |
+| P6 | Entrar como `logistica`, programar la entrega en el calendario; intentar otra a la misma hora para el mismo repartidor | La segunda da `409 SCHEDULE_CONFLICT`. |
+| P7 | Marcar **En tránsito** y **Entregado** | El cliente ve el pedido entregado en `#/mis-pedidos`. |
+| P8 | Entrar como `admin`: KPIs, usuarios y roles, auditoría, informe CSV | Los eventos de los pasos anteriores aparecen en la auditoría. |
+| P9 | Entrar como `observador` e ir a `#/admin` | «Acceso restringido»; en su área ve la salud de PostgreSQL y del motor de riesgo. |
+| P10 | Abrir Grafana `/d/hexaorders-business` y `/d/hexaorders-security` | Pedidos por estado, transiciones, inicios de sesión. El dashboard original `/d/hexaorders` sigue igual. |
+
+Resultados observados: [`../validacion.md`](../validacion.md#versión-3--plataforma-comercial-y-operaciones-2-de-noviembre-de-2026).

@@ -2,6 +2,8 @@
 
 **HexaOrders — Order Management & Risk Assessment System.** This guide prepares the oral defense: concepts, a short and a full speaking script, the live demonstration and difficult questions with answers grounded in the code. The explanation is verbal (no slides); the technical part is explained on `docker-compose.yml` and on the running application.
 
+> Version 3 (commerce platform, roles, lifecycle, logistics): see the 5–8 minute [interview explanation](interview-explanation.md).
+
 > Tip: keep `docker-compose.yml`, the web UI (<http://127.0.0.1:8080>) and Grafana (<http://127.0.0.1:3000/d/hexaorders>) open in three tabs before you start.
 
 ---

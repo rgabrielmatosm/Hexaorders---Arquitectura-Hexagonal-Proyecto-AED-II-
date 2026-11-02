@@ -8,7 +8,7 @@
 
 Gestión de pedidos con evaluación determinista de riesgo, construida con **arquitectura hexagonal** (puertos y adaptadores) en **Java 21** y **Python**, persistida en **PostgreSQL**, orquestada con **Docker Compose** y observada con **Prometheus** y **Grafana**.
 
-[Inicio rápido](#-inicio-rápido) · [Arquitectura](#-arquitectura-hexagonal) · [API](#-endpoints) · [Demostración](#-demostración) · [Guía en inglés](docs/english/presentation-guide.md)
+[Plataforma v3](#-plataforma-comercial-v3) · [Inicio rápido](#-inicio-rápido) · [Arquitectura](#-arquitectura-hexagonal) · [API](#-endpoints) · [Demostración](#-demostración) · [Guía en inglés](docs/english/presentation-guide.md)
 
 </div>
 
@@ -20,6 +20,7 @@ Gestión de pedidos con evaluación determinista de riesgo, construida con **arq
 <summary>Mostrar el índice completo</summary>
 
 1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+1. [**Plataforma comercial v3**](#-plataforma-comercial-v3): [roles](#roles-y-permisos) · [funcionalidades](#funcionalidades) · [ciclo de vida](#ciclo-de-vida-del-pedido) · [modelo de datos](#modelo-de-datos) · [seguridad](#seguridad) · [capturas](#capturas-de-la-plataforma-datos-reales) · [ADR](docs/adr/)
 2. [Tecnologías](#-tecnologías)
 3. [Arquitectura hexagonal](#-arquitectura-hexagonal) · [Diagrama hexagonal](#diagrama-1--estructura-hexagonal-dependencias-vs-ejecución) · [Secuencia](#diagrama-2--secuencia-de-post-apiorders) · [Infraestructura](#diagrama-3--infraestructura-docker-compose)
 4. [Estructura de carpetas](#-estructura-de-carpetas) · [Componentes](#-componentes)
@@ -53,6 +54,153 @@ El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma
 | Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
 | Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
 | Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## 🏢 Plataforma comercial v3
+
+La versión 3 convierte el laboratorio en una **plataforma de comercio y operaciones** sin eliminar nada de lo anterior: el formulario de pedidos, el panel, el explorador de arquitectura, `POST /api/orders`, el dashboard original de Grafana, sus métricas y alertas siguen funcionando igual (lo comprueban `tools/smoke.py`, `tools/check_observability.py` y la prueba de interfaz).
+
+| Antes (v2) | Ahora (v3) |
+| --- | --- |
+| Un formulario de laboratorio y un panel | Portal público (catálogo, búsqueda, filtros, ficha, carrito, checkout de demostración, seguimiento, perfil) **y** el laboratorio original en `#inicio` |
+| Sin usuarios | Spring Security con sesión, CSRF, BCrypt y **5 roles** |
+| Pedido = aprobado / en revisión | Ciclo de vida de 10 estados con historial, auditoría, idempotencia y control de concurrencia |
+| — | Administración, operaciones, calendario logístico, incidencias, informes y auditoría |
+| 1 dashboard, 2 alertas | 6 dashboards, 9 alertas + 1 regla de compatibilidad, nuevas métricas de negocio y seguridad |
+
+### Roles y permisos
+
+Las cuentas de demostración se crean al arrancar con la contraseña de `secrets/demo_password.txt` (generada aleatoriamente por `init-env.ps1`, nunca en Git). Cualquiera puede registrarse como cliente desde **Crear cuenta**.
+
+| Usuario demo | Rol | Área | API protegida |
+| --- | --- | --- | --- |
+| `cliente` | `CUSTOMER` | Tienda, checkout, mis pedidos, perfil | `/api/shop/**`, `/api/account/**` |
+| `admin` | `ADMIN` | Centro de control: productos, categorías, inventario, pedidos, usuarios y roles, incidencias, informes, auditoría | todo |
+| `operador` | `ORDER_OPERATOR` | Operaciones: revisión de riesgo, confirmación, preparación, incidencias | `/api/operations/**`, `/api/incidents/**` |
+| `logistica`, `logistica2` | `LOGISTICS_OPERATOR` | Calendario logístico, asignación, despacho y entrega | `/api/logistics/**`, `/api/incidents/**` |
+| `observador` | `OBSERVABILITY_VIEWER` | Salud técnica (PostgreSQL, motor de riesgo) y accesos a Prometheus/Grafana | `/api/ops/**` |
+
+Público sin sesión: `GET /api/catalog/**`, `POST /api/shop/quote`, `/api/auth/**` y la API original `/api/orders/**` (se mantiene pública por compatibilidad). Cualquier otra ruta `/api/**` no declarada se deniega (`denyAll`). Los errores son JSON: `401` sin sesión y `403` sin rol.
+
+### Funcionalidades
+
+- **Portal**: catálogo leído de PostgreSQL (18 productos, 6 categorías), búsqueda, filtro por categoría, orden por nombre o precio, ficha de producto, carrito persistente en el navegador, **precio calculado en el servidor** (el cliente no puede enviar precios), checkout de demostración sin pagos reales con `Idempotency-Key`, seguimiento con línea de tiempo y cancelación cuando la política lo permite.
+- **Administración** (`#/admin`): KPIs reales, ventas por categoría, alta y edición de productos y categorías, ajuste de inventario, gestión de usuarios (roles, activar/desactivar, con protección contra autobloqueo), incidencias, informes exportables a CSV y registro de auditoría.
+- **Operaciones** (`#/operaciones`): bandeja de pedidos por estado, detalle con historial y solo las transiciones que el rol puede ejecutar.
+- **Logística** (`#/logistica`): calendario **mensual, semanal y diario** persistido en PostgreSQL; programar, reasignar y reprogramar entregas (ventana máxima de 8 h, nunca en el pasado), **detección de conflictos** por repartidor (`409 SCHEDULE_CONFLICT`), historial de cambios y paso a `IN_TRANSIT`/`DELIVERED`.
+- **Incidencias**: dañado, retraso, dirección, stock u otro; abiertas y resueltas (con texto de resolución) por operación, logística o administración.
+- **Salud técnica** (`#/observabilidad-tecnica`): estado real de PostgreSQL y del motor de riesgo, y enlaces a Prometheus y Grafana.
+
+### Ciclo de vida del pedido
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED
+    CREATED --> RISK_APPROVED: SYSTEM (riesgo < 70)
+    CREATED --> RISK_REVIEW: SYSTEM (riesgo ≥ 70)
+    RISK_APPROVED --> CONFIRMED: operador · admin
+    RISK_REVIEW --> CONFIRMED: operador · admin
+    RISK_REVIEW --> REJECTED: operador · admin
+    CONFIRMED --> PREPARING: operador · admin
+    PREPARING --> READY_FOR_DISPATCH: operador · admin
+    READY_FOR_DISPATCH --> IN_TRANSIT: logística · admin (requiere entrega programada)
+    IN_TRANSIT --> DELIVERED: logística · admin
+    RISK_APPROVED --> CANCELLED: cliente · operador · admin
+    RISK_REVIEW --> CANCELLED: cliente · admin
+    CONFIRMED --> CANCELLED: cliente · operador · admin
+    PREPARING --> CANCELLED: operador · admin
+    DELIVERED --> [*]
+    REJECTED --> [*]
+    CANCELLED --> [*]
+```
+
+La política vive en el dominio (`domain/fulfillment/TransitionPolicy`) y no depende de Spring. Cada transición:
+
+- se valida contra la política y el rol (`403` si el rol no puede, `409` si la transición no existe);
+- es **idempotente** (repetir el mismo estado devuelve el pedido sin duplicar historial);
+- usa **bloqueo optimista** (`version`): dos operadores a la vez → uno recibe `409 CONCURRENT_UPDATE`;
+- escribe historial (`order_status_history`) y auditoría (`audit_events`), y emite `hexaorders_order_transitions_total{from,to}`;
+- **devuelve el stock** al cancelar o rechazar un pedido de la tienda.
+
+El checkout evalúa el riesgo con el **mismo** motor Python y el mismo puerto `RiskAssessmentPort` que el laboratorio, **antes** de abrir la transacción; el stock se descuenta con un `UPDATE … WHERE stock >= ?` condicional, así que nunca queda negativo.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Navegador (cliente)
+    participant S as ShopController
+    participant C as CommerceService
+    participant R as Motor de riesgo (Python)
+    participant DB as PostgreSQL
+    B->>S: POST /api/shop/orders + Idempotency-Key + X-CSRF-TOKEN
+    S->>C: placeOrder(usuario, artículos, clave)
+    C->>DB: ¿clave ya usada? → 200 Idempotent-Replay
+    C->>DB: precios y stock del catálogo (Quote)
+    C->>R: POST /score (importe total)
+    R-->>C: puntaje y decisión
+    C->>DB: transacción: pedido + líneas + stock condicional + historial + auditoría
+    C-->>S: PlacementResult
+    S-->>B: 201 Created (o 409 OUT_OF_STOCK)
+```
+
+### Modelo de datos
+
+Migraciones Flyway **no destructivas**: `V2__commerce_platform.sql` solo añade tablas y columnas (con valores por defecto y relleno de los pedidos existentes como `channel = 'LAB'`) y `V3__seed_catalog.sql` carga el catálogo. Se probó la actualización real: pedidos creados con la v2 siguen intactos tras migrar.
+
+```mermaid
+erDiagram
+    app_users ||--o{ app_user_roles : tiene
+    app_users ||--o{ orders : realiza
+    categories ||--o{ products : agrupa
+    orders ||--o{ order_lines : contiene
+    products ||--o{ order_lines : "se vende en"
+    orders ||--o{ order_status_history : registra
+    orders ||--o| deliveries : "se entrega en"
+    deliveries ||--o{ delivery_changes : registra
+    orders ||--o{ incidents : genera
+    app_users ||--o{ audit_events : provoca
+    orders {
+        uuid id PK
+        text channel "LAB | SHOP"
+        text status "APPROVED | REVIEW (v1)"
+        text fulfillment_status "ciclo de vida v3"
+        bigint version "bloqueo optimista"
+        text idempotency_key UK
+    }
+```
+
+Los pedidos del laboratorio (`LAB`) y de la tienda (`SHOP`) comparten la tabla `orders`, pero `GET /api/orders` y `/api/orders/{id}` siguen mostrando solo los de laboratorio, para no exponer pedidos de clientes en una API pública. `/api/orders/statistics` conserva su significado original.
+
+### Seguridad
+
+- Sesión HTTP con cookie `HttpOnly`, regeneración del identificador al iniciar sesión y **CSRF** (`GET /api/auth/csrf` → cabecera `X-CSRF-TOKEN`).
+- Contraseñas con **BCrypt (coste 12)**; validación de usuario, correo y contraseña en el dominio.
+- Cabecera **Content-Security-Policy** (sin estilos ni scripts en línea), `X-Content-Type-Options`, `Referrer-Policy`.
+- Autorización en dos niveles: reglas de URL en `SecurityConfiguration` **y** comprobaciones de rol en los casos de uso (`Guards`), probadas en `SecurityRulesTest` y en los tests de servicio.
+- Un cliente solo ve sus pedidos (`404` para pedidos ajenos, sin revelar su existencia).
+- Métricas de seguridad: `hexaorders_auth_logins_total{outcome}`, `hexaorders_access_denied_total{reason}` y alerta `HexaOrdersAuthFailuresSpike`.
+- Secretos en archivos (`secrets/*.txt`) excluidos de Git; los del CI son efímeros y solo válidos en el runner.
+
+### Capturas de la plataforma (datos reales)
+
+Tomadas con Playwright contra el backend real (Java + Python + PostgreSQL 16 en local, sin Docker). Los productos proceden de la migración `V3`, y los pedidos, entregas e incidencias los crearon las propias pruebas.
+
+| Tienda | Ficha de producto |
+| --- | --- |
+| ![Catálogo de la tienda](docs/assets/screenshots/v3-tienda.png) | ![Ficha de producto](docs/assets/screenshots/v3-producto.png) |
+| **Checkout de demostración** | **Seguimiento del pedido** |
+| ![Checkout con precio calculado en el servidor](docs/assets/screenshots/v3-checkout.png) | ![Línea de tiempo del pedido](docs/assets/screenshots/v3-seguimiento.png) |
+| **Centro de control (admin)** | **Usuarios y roles** |
+| ![KPIs y ventas por categoría](docs/assets/screenshots/v3-admin-panel.png) | ![Gestión de usuarios y roles](docs/assets/screenshots/v3-admin-usuarios.png) |
+| **Detalle con transiciones permitidas** | **Operaciones** |
+| ![Detalle del pedido con historial](docs/assets/screenshots/v3-pedido-detalle.png) | ![Bandeja de operaciones](docs/assets/screenshots/v3-operaciones.png) |
+| **Calendario logístico (mes)** | **Calendario logístico (semana)** |
+| ![Calendario mensual](docs/assets/screenshots/v3-logistica-mes.png) | ![Calendario semanal](docs/assets/screenshots/v3-logistica-semana.png) |
+| **Informes** | **Salud técnica** |
+| ![Informes exportables](docs/assets/screenshots/v3-admin-reportes.png) | ![Salud de PostgreSQL y del motor de riesgo](docs/assets/screenshots/v3-salud-tecnica.png) |
+
+<p align="center"><img src="docs/assets/screenshots/v3-movil-tienda.png" alt="Tienda en un móvil de 390 px" width="260"></p>
+
+Decisiones de diseño documentadas como ADR en [`docs/adr/`](docs/adr/). Guía para futuras herramientas o equipos: [`docs/ANTIGRAVITY_HANDOFF.md`](docs/ANTIGRAVITY_HANDOFF.md). Inventario de observabilidad conservada: [`docs/OBSERVABILITY_PRESERVATION.md`](docs/OBSERVABILITY_PRESERVATION.md).
 
 ## 🧰 Tecnologías
 
@@ -292,12 +440,13 @@ En Windows, con Docker Desktop abierto (*Engine running*), desde **PowerShell o 
 .\hexaorders.cmd start
 ```
 
-El comando genera los secretos si faltan (`secrets\db_password.txt` y `secrets\grafana_password.txt`, aleatorios y excluidos de Git), valida el YAML, construye las imágenes ejecutando los tests de Java y Python y arranca los cinco servicios, esperando a que estén sanos.
+El comando genera los secretos si faltan (`secrets\db_password.txt`, `secrets\grafana_password.txt` y `secrets\demo_password.txt`, aleatorios y excluidos de Git; nunca sobrescribe uno existente), valida el YAML, construye las imágenes ejecutando los tests de Java y Python y arranca los cinco servicios, esperando a que estén sanos.
 
 | URL | Qué hay |
 | --- | --- |
-| <http://127.0.0.1:8080> | Interfaz web y API REST |
-| <http://127.0.0.1:3000/d/hexaorders> | Dashboard de Grafana (usuario `admin`, contraseña en `secrets\grafana_password.txt`) |
+| <http://127.0.0.1:8080> | Laboratorio, interfaz web y API REST |
+| <http://127.0.0.1:8080/#/tienda> | Portal comercial · <http://127.0.0.1:8080/#/entrar> para entrar con una cuenta demo (contraseña en `secrets\demo_password.txt`) |
+| <http://127.0.0.1:3000/d/hexaorders> | Dashboard original de Grafana (usuario `admin`, contraseña en `secrets\grafana_password.txt`) · nuevos: `/d/hexaorders-business`, `/d/hexaorders-risk`, `/d/hexaorders-api`, `/d/hexaorders-infrastructure`, `/d/hexaorders-security` |
 | <http://127.0.0.1:9091/targets> | Targets de Prometheus · [alertas](http://127.0.0.1:9091/alerts) |
 
 <details>
@@ -322,11 +471,11 @@ En Linux o macOS, los mismos comandos con PowerShell 7: `pwsh ./tools/hexaorders
 
 ## 🐳 Ejecución con Docker Compose
 
-`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los dos secretos.
+`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los tres secretos.
 
 ```powershell
 New-Item -ItemType Directory secrets -Force | Out-Null
-# Crea secrets\db_password.txt y secrets\grafana_password.txt con contraseñas aleatorias
+# Crea secrets\db_password.txt, grafana_password.txt y demo_password.txt (aleatorios; no sobrescribe)
 .\tools\init-env.ps1
 docker compose config --quiet
 docker compose build --pull
@@ -357,6 +506,23 @@ docker compose ps
 | `GET` | `/api/orders/statistics` | Totales de **todos** los pedidos persistidos | `200`, `503` |
 | `GET` | `/` | Interfaz web (estáticos servidos por Spring Boot) | `200` |
 | `POST` | `risk-engine:8000/score` | Motor de riesgo (solo red interna) | `200`, `415`, `422` |
+
+**API de la plataforma v3** (sesión + cabecera `X-CSRF-TOKEN` en las peticiones que modifican datos):
+
+| Ruta | Acceso | Operaciones |
+| --- | --- | --- |
+| `/api/auth/{csrf,me,login,logout,register}` | público | Token CSRF, sesión actual, entrar, salir, registro de clientes |
+| `GET /api/catalog/{categories,products,products/{id}}` | público | Catálogo con búsqueda (`q`) y filtro por categoría (`category`) |
+| `POST /api/shop/quote` | público | Presupuesto calculado en el servidor |
+| `/api/shop/orders[/{id}[/cancel]]` | `CUSTOMER` | Checkout (`Idempotency-Key` obligatorio; `201` o `200` + `Idempotent-Replay`), mis pedidos, cancelar |
+| `/api/account/{me,profile,password}` | con sesión | Perfil y contraseña |
+| `/api/operations/orders[/{id}[/transitions]]` | `ORDER_OPERATOR`, `ADMIN` | Bandeja y transiciones |
+| `/api/logistics/{deliveries,assignees,schedulable-orders}`, `/deliveries/{id}[/history]`, `/orders/{id}/transitions` | `LOGISTICS_OPERATOR`, `ADMIN` | Calendario, programación, reprogramación, historial, despacho y entrega |
+| `/api/incidents[/{id}/resolve]` | `ORDER_OPERATOR`, `LOGISTICS_OPERATOR`, `ADMIN` | Listar, reportar y resolver incidencias |
+| `/api/admin/{dashboard,users,audit,products,categories}` | `ADMIN` | Administración completa |
+| `GET /api/ops/health` | `OBSERVABILITY_VIEWER`, `ADMIN` | Salud de dependencias |
+
+Códigos: `400` validación, `401` sin sesión, `403` sin rol o CSRF ausente, `404` inexistente o ajeno, `409` (con `code` en los conflictos de negocio: `OUT_OF_STOCK`, `CONCURRENT_UPDATE`, `SCHEDULE_CONFLICT`, `IDEMPOTENCY_KEY_REUSED`, `SELF_LOCKOUT`…), `503` motor de riesgo o PostgreSQL no disponible.
 
 Métricas internas: `order-api:9090/actuator/prometheus`, `order-api:9090/actuator/health/{liveness,readiness}`, `risk-engine:8000/metrics`, `risk-engine:8000/health/{live,ready}`.
 
@@ -450,7 +616,21 @@ Prometheus recoge métricas cada 10 s (`infra/prometheus/prometheus.yml`).
 | `risk_evaluation_duration_seconds_*` | Python · prometheus_client | Duración del caso de uso de riesgo. |
 | `up{job}` | Prometheus | Disponibilidad de cada target. |
 
-Reglas de alerta (`alerts.yml`): `HexaOrdersServiceDown` (un servicio sin responder durante 30 s) y `RiskRequestsFailing` (fallos de riesgo en los últimos 2 minutos). Se ven en <http://127.0.0.1:9091/alerts>; no hay Alertmanager ni envío de correos.
+Métricas nuevas de la v3 (las anteriores no cambian):
+
+| Métrica | Significado |
+| --- | --- |
+| `hexaorders_shop_orders_placed_total{risk_decision}` | Pedidos de la tienda por decisión de riesgo. |
+| `hexaorders_checkout_failures_total{reason}` | Checkouts fallidos (`invalid`, `out_of_stock`, `risk_unavailable`). |
+| `hexaorders_order_transitions_total{from,to}` | Transiciones del ciclo de vida. |
+| `hexaorders_orders_by_status{status}` | Pedidos actuales por estado (gauge leído de PostgreSQL con caché de 15 s). |
+| `hexaorders_deliveries_total{type}` · `hexaorders_delivery_conflicts_total` | Entregas programadas/reprogramadas y conflictos detectados. |
+| `hexaorders_incidents_reported_total{category}` · `hexaorders_incidents_open` | Incidencias reportadas y abiertas. |
+| `hexaorders_products_low_stock` | Productos activos con stock bajo. |
+| `hexaorders_auth_logins_total{outcome}` · `hexaorders_access_denied_total{reason}` | Inicios de sesión y accesos denegados. |
+| `risk_requests_rejected_total{reason}` | Peticiones rechazadas por el motor Python (validación). |
+
+Reglas de alerta (`alerts.yml`): `HexaOrdersServiceDown` (un servicio sin responder durante 30 s) y `RiskRequestsFailing` (fallos de riesgo en los últimos 2 minutos), **sin cambios**; la v3 añade `RiskEngineDown`, `HexaOrdersHighErrorRate`, `HexaOrdersHighLatency`, `HexaOrdersCheckoutFailures`, `HexaOrdersPendingReviewGrowing`, `HexaOrdersAuthFailuresSpike` y `HexaOrdersLowStock`, y la regla de registro `orders_created_total` (ver [defecto corregido](docs/OBSERVABILITY_PRESERVATION.md#10-defectos-encontrados-y-corregidos)). Se ven en <http://127.0.0.1:9091/alerts>; no hay Alertmanager ni envío de correos.
 
 ## 📊 Dashboard de Grafana
 
@@ -467,6 +647,16 @@ El datasource y el dashboard se aprovisionan como código: no hay que configurar
 | Errores 5xx | `sum by(uri, status)(rate(http_server_requests_seconds_count{status=~"5.."}[2m]))` |
 
 Las gráficas de tasas necesitan tráfico durante unos 30 segundos y varias muestras.
+
+Dashboards añadidos en la v3 (el original se conserva sin cambios y `check_observability.py` lo vigila):
+
+| Dashboard | URL | Contenido |
+| --- | --- | --- |
+| Negocio | `/d/hexaorders-business` | Pedidos de la tienda, embudo por estado, transiciones, entregas, incidencias, stock bajo |
+| Riesgo | `/d/hexaorders-risk` | Evaluaciones, decisiones, latencia del motor, rechazos y fallos |
+| API | `/d/hexaorders-api` | Tráfico por ruta, códigos, p50/p95/p99, errores 4xx/5xx |
+| Infraestructura | `/d/hexaorders-infrastructure` | Disponibilidad, JVM (memoria, GC, hilos), HikariCP, proceso Python, Prometheus |
+| Seguridad | `/d/hexaorders-security` | Inicios de sesión por resultado, accesos denegados, 401/403 |
 
 ## ☸️ Despliegue en Kubernetes
 
@@ -519,6 +709,13 @@ El fondo es una **cuadrícula interactiva** dibujada en un único `<canvas>`: se
 | Fallo y recuperación | `tools/hexaorders.ps1 verify` | Con `risk-engine` detenido la API responde 503; al volver, todo queda sano. |
 | Interfaz | `tools/ui-e2e/ui-e2e.js` (Playwright) | Navegador real contra el stack real: panel, alta, consulta, explorador, observabilidad y móvil. |
 | Entregable | `generate_delivery.py --check`, `validate_delivery.py` | YAML al día y autosuficiente, `read_only`, secretos, 14 objetos Kubernetes. |
+| Dominio v3 | `LifecycleDomainTest` | Política de transiciones por rol, validación de usuarios, productos, entregas y presupuestos. |
+| Casos de uso v3 | `CommerceServiceTest`, `OperationsAndLogisticsTest` | Riesgo antes de la transacción, idempotencia, stock, concurrencia, conflictos de calendario, autobloqueo. |
+| Seguridad y roles | `SecurityRulesTest` | 401/403 por rol, CSRF, rutas públicas y API original sin cambios. |
+| Arquitectura v3 | `HexagonalArchitectureTest` | Nueva regla: los adaptadores de entrada solo usan puertos de entrada. |
+| Plataforma | `tools/platform_smoke.py` (dentro de `verify`) | 35 comprobaciones HTTP reales: catálogo, precios del servidor, registro, checkout idempotente, stock, aislamiento entre clientes, transiciones, 409, calendario, incidencias, auditoría, roles y métricas en Prometheus. |
+| Observabilidad | `tools/check_observability.py` (dentro de `check`) | Ningún dashboard, panel, consulta, datasource, job, alerta o métrica previa desaparece o cambia. |
+| Interfaz v3 | `tools/ui-e2e/ui-e2e.js` | Checkout de cliente, KPIs de admin, usuarios, detalle de operador, calendario logístico y restricciones del observador. |
 
 ```powershell
 .\hexaorders.cmd check     # entregable + validación
@@ -557,13 +754,18 @@ Guion reproducible con resultados esperados y observados: **[`docs/demo/README.m
 - La **política de riesgo** es una demostración determinista (tres tramos de importe), no un modelo real.
 - `GET /api/orders` devuelve solo los **50 más recientes** y no tiene paginación; los totales completos están en `/statistics`.
 - Los **contadores de Prometheus** se reinician al reiniciar cada proceso; los totales persistentes están en PostgreSQL.
-- **Sin autenticación** en la API: los puertos solo se publican en `127.0.0.1`.
+- La API original `/api/orders` sigue **pública** por compatibilidad (la v3 añade autenticación al resto); los puertos solo se publican en `127.0.0.1`.
+- **Sin límite de intentos** de inicio de sesión (rate limiting); sí hay métrica y alerta de fallos.
+- El **checkout es de demostración**: no hay pagos, envío de correos ni facturación.
+- **Sin cAdvisor ni node-exporter**: el dashboard de infraestructura muestra métricas de JVM, HikariCP y procesos, no de contenedores.
 - Comunicación Java → Python **síncrona y sin reintentos** ni circuit breaker.
 - Una sola réplica de cada servicio; **sin alta disponibilidad** ni copias de seguridad automáticas.
 - Los **secretos de Compose** son archivos montados, no una bóveda cifrada.
 - **Kubernetes**: validado contra el esquema oficial, no desplegado en un clúster en este trabajo.
 - El **recorrido** del explorador de arquitectura es conceptual: no hay trazas distribuidas (por ejemplo, OpenTelemetry).
 - **Grafana desde el navegador**: solo se puede comprobar que responde (no envía cabeceras CORS).
+
+**Mejoras futuras**: rate limiting y bloqueo temporal de cuentas, recuperación de contraseña por correo, paginación en todas las listas, OpenTelemetry para trazas reales Java → Python, Alertmanager con notificaciones, cAdvisor, copias de seguridad de PostgreSQL y despliegue real en Kubernetes con Ingress y TLS.
 
 ## 📚 Referencias técnicas
 
@@ -575,4 +777,4 @@ Guion reproducible con resultados esperados y observados: **[`docs/demo/README.m
 - Spring Boot, [Actuator metrics](https://docs.spring.io/spring-boot/reference/actuator/metrics.html) · Prometheus, [Querying basics](https://prometheus.io/docs/prometheus/latest/querying/basics/) · Grafana, [Provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/).
 - [ArchUnit](https://www.archunit.org/userguide/html/000_Index.html) · [FastAPI](https://fastapi.tiangolo.com/) · [Flyway](https://documentation.red-gate.com/flyway).
 
-Alcance de cada fuente: [`docs/fuentes.md`](docs/fuentes.md). Más documentación: [arquitectura](docs/arquitectura.md) · [guía para explicar (es)](docs/guia-para-explicar.md) · [**presentation guide (en)**](docs/english/presentation-guide.md) · [despliegue en VM](docs/despliegue-cloud.md) · [GitHub](docs/github.md).
+Alcance de cada fuente: [`docs/fuentes.md`](docs/fuentes.md). Más documentación: [arquitectura](docs/arquitectura.md) · [guía para explicar (es)](docs/guia-para-explicar.md) · [**presentation guide (en)**](docs/english/presentation-guide.md) · [**interview explanation v3 (en)**](docs/english/interview-explanation.md) · [ADR](docs/adr/) · [handoff](docs/ANTIGRAVITY_HANDOFF.md) · [observabilidad conservada](docs/OBSERVABILITY_PRESERVATION.md) · [despliegue en VM](docs/despliegue-cloud.md) · [GitHub](docs/github.md).
