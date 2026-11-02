@@ -233,6 +233,8 @@ function Invoke-Check {
         throw "Faltan dependencias de validación. Ejecuta: $($python -join ' ') -m pip install -r requirements-tools.txt"
     }
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'validate_delivery.py'))
+    Write-Step 'Preservación de la observabilidad (dashboards, paneles, alertas, jobs y métricas previas)'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_observability.py'))
 }
 
 function Invoke-Test {
@@ -295,6 +297,10 @@ function Invoke-Verify {
         Write-Step '[6/8] Smoke HTTP: pedidos, persistencia, validación, métricas y dashboard'
         $env:GRAFANA_PASSWORD = Get-GrafanaPassword
         Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'smoke.py'))
+        Write-Step '[6b/8] Plataforma: portal, roles, ciclo de vida, logística, auditoría y métricas nuevas'
+        $env:PROMETHEUS_URL = 'http://127.0.0.1:9091'
+        Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'platform_smoke.py'),
+                        '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
 
         Write-Step '[7/8] Si risk-engine cae, la API responde HTTP 503'
         [void](Invoke-Compose @('stop', 'risk-engine'))

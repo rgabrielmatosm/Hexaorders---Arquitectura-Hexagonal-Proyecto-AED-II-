@@ -37,7 +37,7 @@ async function panel(root) {
   const kpi = (label, value, tone = '') => el('div', { class: `kpi${tone ? ` kpi--${tone}` : ''}` }, el('span', { text: label }), el('strong', { text: value }));
   const alerts = [];
   if (s.RISK_REVIEW > 0) alerts.push(['warn', `${s.RISK_REVIEW} pedido(s) esperan revisión de riesgo`, '#/admin/pedidos']);
-  if (d.lowStock.length) alerts.push(['warn', `${d.lowStock.length} producto(s) con stock ≤ 5: ${d.lowStock.slice(0, 3).map((p) => p.name).join(', ')}`, '#/admin/productos']);
+  if (d.lowStock.length) alerts.push(['warn', `${d.lowStock.length} producto(s) con stock ≤ 5: ${d.lowStock.slice(0, 3).map((p) => p.details.name).join(', ')}`, '#/admin/productos']);
   if (d.openIncidents > 0) alerts.push(['error', `${d.openIncidents} incidencia(s) abierta(s)`, '#/admin/incidencias']);
   if (!alerts.length) alerts.push(['ok', 'Sin alertas operativas: no hay revisiones pendientes, stock bajo ni incidencias abiertas.', null]);
   body.replaceChildren(

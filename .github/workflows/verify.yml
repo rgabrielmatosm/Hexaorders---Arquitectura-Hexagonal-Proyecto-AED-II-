@@ -17,6 +17,7 @@ jobs:
     env:
       DB_PASSWORD: ci-only-ephemeral-db-password
       GRAFANA_PASSWORD: ci-only-ephemeral-grafana-password
+      DEMO_PASSWORD: ci-only-demo-password-2026
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,6 +32,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check frontend JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in services/order-api/src/main/resources/static/js/*.js services/order-api/src/main/resources/static/js/views/*.js; do
+            cp "$f" "$RUNNER_TEMP/check.mjs"; node --check "$RUNNER_TEMP/check.mjs" || { echo "::error file=$f::sintaxis JavaScript no válida"; exit 1; }
+          done
       - name: UI end to end against the real stack (Playwright)
         shell: bash
         working-directory: tools/ui-e2e
@@ -99,7 +107,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $second = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
           if ($first -ne $second) { throw 'secrets no es idempotente' }
-          foreach ($f in 'db_password.txt', 'grafana_password.txt') {
+          foreach ($f in 'db_password.txt', 'grafana_password.txt', 'demo_password.txt') {
             $value = [IO.File]::ReadAllText((Join-Path $dir "secrets\$f"))
             if ($value -notmatch '^[0-9a-f]{48}$') { throw "Secreto inválido en ${f}: longitud $($value.Length)" }
           }

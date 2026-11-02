@@ -34,6 +34,7 @@ export async function handle() {
     if (currentCleanup) { currentCleanup(); currentCleanup = null; }
     root.hidden = true;
     lab.hidden = false;
+    document.body.dataset.mode = 'lab';
     document.title = 'HexaOrders · Order Management & Risk Assessment';
     window.dispatchEvent(new CustomEvent('hexa:route', { detail: { path: hash } }));
     return;
@@ -42,6 +43,7 @@ export async function handle() {
   const match = routes.map((r) => ({ r, m: path.match(r.pattern) })).find((x) => x.m);
   lab.hidden = true;
   root.hidden = false;
+  document.body.dataset.mode = 'app';
   if (currentCleanup) { currentCleanup(); currentCleanup = null; }
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
   window.dispatchEvent(new CustomEvent('hexa:route', { detail: { path } }));

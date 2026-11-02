@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 691d3e6423ba97f140982b11e296b96f589a32e016d8627b5d2f3e92b84231ee
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 6126927d7ff1af819c2cb579aaa7784d09d9ba7e2ad9d9f44d87f4969101dbaa
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -5645,7 +5645,309 @@ services:
           .reveal { opacity: 1; transform: none; }
         }
         HEXFILE_107
-        COPY <<'HEXFILE_108' src/main/resources/static/img/logo.svg
+        COPY <<'HEXFILE_108' src/main/resources/static/css/platform.css
+        /* HexaOrders v3 — plataforma: portal, roles, administración, operaciones y calendario logístico. */
+        :root {
+          --blue: #3B82F6;
+          --blue-2: #60A5FA;
+          --blue-soft: rgba(59, 130, 246, 0.14);
+          --accent-gradient: linear-gradient(120deg, #8B5CF6 0%, #6366F1 45%, #3B82F6 100%);
+        }
+        
+        /* Vista enrutada vs. laboratorio original */
+        .view-root { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0 24px 64px; }
+        .view-root[hidden], [data-view="lab"][hidden] { display: none !important; }
+        .view { padding-top: 40px; }
+        .view__head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+        .view__title { font-size: clamp(1.7rem, 3.4vw, 2.4rem); }
+        .breadcrumbs { display: flex; gap: 8px; color: var(--text-2); font-size: 0.82rem; margin-bottom: 10px; }
+        .breadcrumbs a { color: var(--text-2); }
+        .breadcrumbs a:hover { color: var(--text); }
+        
+        /* Barra superior ampliada: en el laboratorio se ven sus secciones; en la aplicación, las áreas del rol. */
+        .view-root:focus { outline: none; }
+        .nav a { white-space: nowrap; }
+        body[data-mode="lab"] #role-nav, body[data-mode="lab"] [data-lab-link] { display: none; }
+        body[data-mode="app"] .nav [data-nav] { display: none; }
+        .topbar__actions { display: flex; align-items: center; gap: 8px; }
+        .nav__group { display: flex; gap: 4px; padding-left: 8px; margin-left: 4px; border-left: 1px solid var(--line); }
+        .nav__group:empty { display: none; }
+        .icon-btn {
+          position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+          height: 36px; min-width: 36px; padding: 0 10px; border-radius: 10px; cursor: pointer;
+          border: 1px solid var(--line); background: rgba(21, 27, 35, 0.8); color: var(--text); font: inherit; font-size: 0.85rem;
+        }
+        .icon-btn:hover { border-color: var(--violet-2); }
+        .icon-btn svg { width: 18px; height: 18px; }
+        .icon-btn__badge {
+          position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+          background: var(--accent-gradient); color: #fff; font-size: 0.68rem; font-weight: 700; display: grid; place-items: center;
+        }
+        .icon-btn__badge[hidden] { display: none; }
+        .user-chip { display: inline-flex; align-items: center; gap: 8px; }
+        .avatar {
+          width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 0.72rem; font-weight: 800;
+          background: var(--accent-gradient); color: #fff;
+        }
+        .menu { position: relative; }
+        .menu__panel {
+          position: absolute; right: 0; top: calc(100% + 8px); min-width: 230px; padding: 8px; z-index: 30;
+          background: rgba(21, 27, 35, 0.98); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow);
+        }
+        .menu__panel[hidden] { display: none; }
+        .menu__panel a, .menu__panel button {
+          display: flex; width: 100%; gap: 8px; align-items: center; padding: 9px 10px; border-radius: 8px; border: 0;
+          background: transparent; color: var(--text); font: inherit; font-size: 0.88rem; cursor: pointer; text-align: left;
+        }
+        .menu__panel a:hover, .menu__panel button:hover { background: var(--violet-soft); color: var(--text); }
+        .menu__meta { padding: 8px 10px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+        .menu__meta small { display: block; color: var(--text-2); }
+        
+        /* Banner del portal */
+        .shop-hero {
+          position: relative; overflow: hidden; border-radius: 22px; padding: clamp(28px, 5vw, 56px);
+          background:
+            radial-gradient(60% 120% at 100% 0%, rgba(59, 130, 246, 0.28), transparent 60%),
+            radial-gradient(50% 100% at 0% 100%, rgba(139, 92, 246, 0.3), transparent 60%),
+            linear-gradient(180deg, rgba(28, 36, 48, 0.9), rgba(21, 27, 35, 0.95));
+          border: 1px solid var(--line);
+        }
+        .shop-hero h1 { font-size: clamp(2rem, 5vw, 3.4rem); max-width: 720px; letter-spacing: -0.03em; }
+        .shop-hero p { color: var(--text-2); max-width: 620px; margin-top: 14px; font-size: 1.02rem; }
+        .shop-hero__stats { display: flex; gap: 28px; margin-top: 26px; flex-wrap: wrap; }
+        .shop-hero__stats strong { display: block; font-size: 1.4rem; }
+        .shop-hero__stats span { color: var(--text-2); font-size: 0.8rem; }
+        .feature-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0 30px; }
+        .feature { padding: 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(21, 27, 35, 0.6); }
+        .feature strong { display: block; font-size: 0.92rem; margin: 8px 0 4px; }
+        .feature p { color: var(--text-2); font-size: 0.8rem; }
+        .feature__icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--violet-soft); color: var(--violet-2); }
+        .feature__icon svg { width: 18px; height: 18px; }
+        
+        /* Catálogo */
+        .catalog-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+        .catalog-toolbar input[type="search"] { flex: 1 1 260px; width: auto; }
+        .catalog-toolbar select { width: auto; }
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .chip.is-active { border-color: var(--violet-2); color: var(--text); background: var(--violet-soft); }
+        .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+        .product-card {
+          display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; border: 1px solid var(--line);
+          background: linear-gradient(180deg, rgba(28, 36, 48, 0.85), rgba(21, 27, 35, 0.92));
+          transition: transform 0.25s var(--ease), border-color 0.25s, box-shadow 0.25s;
+        }
+        .product-card:hover { transform: translateY(-3px); border-color: rgba(167, 139, 250, 0.5); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); }
+        .product-card__media { position: relative; aspect-ratio: 16 / 10; display: grid; place-items: center; overflow: hidden; }
+        .product-card__media svg { width: 34%; height: auto; color: rgba(255, 255, 255, 0.92); filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.35)); }
+        .product-card__tag { position: absolute; left: 10px; top: 10px; }
+        .product-card__body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .product-card__body h3 { font-size: 0.98rem; }
+        .product-card__body h3 a { color: var(--text); }
+        .product-card__desc { color: var(--text-2); font-size: 0.8rem; flex: 1; }
+        .product-card__foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 10px; }
+        .price { font-weight: 750; font-size: 1.08rem; font-variant-numeric: tabular-nums; }
+        .stock-note { font-size: 0.74rem; color: var(--text-2); }
+        .stock-note--low { color: var(--amber); }
+        .stock-note--out { color: var(--red); }
+        
+        .product-detail { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: start; }
+        .product-detail__media { border-radius: 20px; aspect-ratio: 4 / 3; display: grid; place-items: center; border: 1px solid var(--line); }
+        .product-detail__media svg { width: 30%; color: #fff; filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.35)); }
+        .product-detail h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); }
+        .product-detail .price { font-size: 1.8rem; display: block; margin: 14px 0; }
+        .qty { display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
+        .qty button { width: 36px; height: 38px; border: 0; background: transparent; color: var(--text); cursor: pointer; font-size: 1.1rem; }
+        .qty button:hover { background: var(--violet-soft); }
+        .qty input { width: 52px; text-align: center; border: 0; border-radius: 0; background: transparent; padding: 8px 0; }
+        .spec-list { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 8px; color: var(--text-2); font-size: 0.86rem; }
+        .spec-list li { display: flex; gap: 8px; align-items: center; }
+        
+        /* Carrito y checkout */
+        .cart-layout { display: grid; grid-template-columns: 1fr 360px; gap: 18px; align-items: start; }
+        .cart-line { display: grid; grid-template-columns: 64px 1fr auto auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+        .cart-line__thumb { width: 64px; height: 52px; border-radius: 10px; display: grid; place-items: center; }
+        .cart-line__thumb svg { width: 26px; color: #fff; }
+        .cart-line small { color: var(--text-2); display: block; }
+        .summary-row { display: flex; justify-content: space-between; padding: 8px 0; color: var(--text-2); font-size: 0.9rem; }
+        .summary-row--total { color: var(--text); font-size: 1.15rem; font-weight: 750; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 14px; }
+        .notice-box { padding: 12px 14px; border-radius: 12px; font-size: 0.84rem; border: 1px solid var(--line); background: rgba(59, 130, 246, 0.08); color: var(--text-2); }
+        .notice-box strong { color: var(--text); }
+        
+        /* Línea de tiempo del pedido */
+        .timeline { list-style: none; padding: 0; margin: 0; position: relative; }
+        .timeline::before { content: ""; position: absolute; left: 11px; top: 6px; bottom: 6px; width: 2px; background: var(--line-strong); }
+        .timeline li { position: relative; padding: 0 0 18px 36px; }
+        .timeline li::before {
+          content: ""; position: absolute; left: 4px; top: 4px; width: 16px; height: 16px; border-radius: 50%;
+          background: var(--bg); border: 2px solid var(--violet-2);
+        }
+        .timeline li.is-current::before { background: var(--violet); box-shadow: 0 0 0 4px var(--violet-soft); }
+        .timeline strong { display: block; font-size: 0.9rem; }
+        .timeline small { color: var(--text-2); }
+        .progress-steps { display: flex; gap: 4px; margin: 16px 0 8px; }
+        .progress-steps span { flex: 1; height: 6px; border-radius: 999px; background: rgba(148, 163, 184, 0.16); }
+        .progress-steps span.is-done { background: var(--accent-gradient); }
+        .progress-steps span.is-failed { background: var(--red); }
+        
+        /* Estado del ciclo de vida */
+        .lc { display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 750; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+        .lc::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .lc--neutral { color: var(--text-2); background: rgba(148, 163, 184, 0.12); }
+        .lc--violet { color: var(--violet-2); background: var(--violet-soft); }
+        .lc--blue { color: var(--blue-2); background: var(--blue-soft); }
+        .lc--ok { color: var(--green); background: var(--green-soft); }
+        .lc--warn { color: var(--amber); background: var(--amber-soft); }
+        .lc--error { color: #F87171; background: var(--red-soft); }
+        
+        /* Pestañas */
+        .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; scrollbar-width: thin; }
+        .tabs a, .tabs button {
+          padding: 10px 14px; color: var(--text-2); border: 0; background: transparent; font: inherit; font-size: 0.88rem;
+          border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+        }
+        .tabs a:hover, .tabs button:hover { color: var(--text); }
+        .tabs .is-active { color: var(--text); border-bottom-color: var(--violet); }
+        
+        /* KPIs y gráficos */
+        .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .kpi { padding: 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(21, 27, 35, 0.75); }
+        .kpi span { display: block; color: var(--text-2); font-size: 0.76rem; }
+        .kpi strong { display: block; font-size: 1.6rem; font-weight: 750; margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .kpi--ok strong { color: var(--green); }
+        .kpi--warn strong { color: var(--amber); }
+        .kpi--error strong { color: #F87171; }
+        .kpi--violet strong { color: var(--violet-2); }
+        .grid-2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+        .grid-2-even { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .chart { width: 100%; height: 220px; }
+        .chart text { fill: var(--text-2); font: 10px var(--font); }
+        .chart .bar { fill: url(#bar-gradient); }
+        .chart .bar:hover { fill: var(--violet-2); }
+        .chart .grid-line { stroke: rgba(148, 163, 184, 0.12); }
+        .activity { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; max-height: 360px; overflow: auto; }
+        .activity li { padding: 9px 10px; border-radius: 10px; background: rgba(11, 15, 20, 0.45); border: 1px solid var(--line); font-size: 0.82rem; }
+        .activity small { color: var(--text-2); display: block; }
+        .alerts-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+        .alerts-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; font-size: 0.84rem; border: 1px solid var(--line); }
+        .alerts-list li.is-warn { border-color: rgba(245, 158, 11, 0.4); background: var(--amber-soft); }
+        .alerts-list li.is-error { border-color: rgba(239, 68, 68, 0.4); background: var(--red-soft); }
+        .alerts-list li.is-ok { border-color: rgba(16, 185, 129, 0.35); background: var(--green-soft); }
+        
+        /* Tablas de administración */
+        .row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+        .role-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+        .role-checks label { display: inline-flex; gap: 5px; align-items: center; font-size: 0.74rem; color: var(--text-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; cursor: pointer; }
+        .role-checks input { width: auto; accent-color: var(--violet); }
+        .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem; color: var(--text-2); }
+        .switch input { width: auto; accent-color: var(--green); }
+        .swatch { display: inline-block; width: 22px; height: 22px; border-radius: 6px; vertical-align: middle; }
+        
+        /* Modal */
+        .modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(5, 8, 12, 0.72); backdrop-filter: blur(4px); }
+        .modal__dialog {
+          width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; border-radius: 18px; padding: 22px;
+          background: linear-gradient(180deg, #1C2430, #151B23); border: 1px solid var(--line-strong); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+          animation: toast-in 0.25s var(--ease);
+        }
+        .modal__dialog--wide { width: min(780px, 100%); }
+        .modal__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .modal__head h2 { font-size: 1.15rem; }
+        .modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+        .form-grid .field--full { grid-column: 1 / -1; }
+        textarea {
+          width: 100%; min-height: 84px; resize: vertical; font: inherit; color: var(--text);
+          background: rgba(11, 15, 20, 0.75); border: 1px solid var(--line-strong); border-radius: 10px; padding: 11px 13px;
+        }
+        textarea:focus { outline: none; border-color: var(--violet-2); box-shadow: 0 0 0 3px var(--violet-soft); }
+        .form-error { color: #FCA5A5; font-size: 0.84rem; margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(239, 68, 68, 0.4); background: var(--red-soft); }
+        .form-error[hidden] { display: none; }
+        
+        /* Autenticación */
+        .auth { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; max-width: 980px; margin: 0 auto; }
+        .auth__aside {
+          border-radius: 20px; padding: 32px; border: 1px solid var(--line);
+          background: radial-gradient(80% 80% at 0% 0%, rgba(139, 92, 246, 0.28), transparent 70%),
+                      radial-gradient(70% 70% at 100% 100%, rgba(59, 130, 246, 0.22), transparent 70%), rgba(21, 27, 35, 0.9);
+        }
+        .auth__aside h2 { font-size: 1.6rem; margin: 16px 0 10px; }
+        .auth__aside p { color: var(--text-2); }
+        .demo-accounts { display: grid; gap: 8px; margin-top: 22px; }
+        .demo-accounts button {
+          display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 10px;
+          border: 1px solid var(--line); background: rgba(11, 15, 20, 0.55); color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; text-align: left;
+        }
+        .demo-accounts button:hover { border-color: var(--violet-2); background: var(--violet-soft); }
+        .demo-accounts small { color: var(--text-2); }
+        
+        /* Estados vacíos */
+        .empty-state { text-align: center; padding: 48px 20px; color: var(--text-2); }
+        .empty-state svg { width: 46px; height: 46px; color: var(--violet-2); opacity: 0.8; margin: 0 auto 12px; }
+        .empty-state strong { display: block; color: var(--text); font-size: 1.05rem; margin-bottom: 6px; }
+        .skeleton { border-radius: 12px; background: linear-gradient(90deg, rgba(148,163,184,0.06), rgba(148,163,184,0.16), rgba(148,163,184,0.06)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+        .skeleton--card { height: 290px; }
+        .skeleton--row { height: 44px; margin-bottom: 8px; }
+        
+        /* Calendario logístico */
+        .cal-toolbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
+        .cal-toolbar__nav { display: flex; gap: 6px; align-items: center; }
+        .cal-toolbar h3 { font-size: 1.1rem; min-width: 220px; text-transform: capitalize; }
+        .cal-month { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+        .cal-month__dow { padding: 8px; font-size: 0.7rem; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; background: rgba(11, 15, 20, 0.5); border-bottom: 1px solid var(--line); }
+        .cal-day {
+          min-height: 108px; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+          background: rgba(21, 27, 35, 0.55); display: flex; flex-direction: column; gap: 4px; cursor: pointer; text-align: left;
+          font: inherit; color: var(--text); border-top: 0; border-left: 0;
+        }
+        .cal-day:nth-child(7n + 7) { border-right: 0; }
+        .cal-day:hover { background: rgba(139, 92, 246, 0.07); }
+        .cal-day.is-other { opacity: 0.45; }
+        .cal-day.is-today .cal-day__num { background: var(--violet); color: #fff; }
+        .cal-day__num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.78rem; font-weight: 650; }
+        .cal-event {
+          display: block; width: 100%; padding: 3px 6px; border-radius: 6px; font-size: 0.7rem; text-align: left; cursor: pointer; border: 0;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-family: inherit;
+        }
+        .cal-event:focus-visible { outline: 2px solid #fff; }
+        .cal-more { font-size: 0.68rem; color: var(--text-2); }
+        .cal-week { display: grid; grid-template-columns: 56px repeat(7, 1fr); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+        .cal-week__head { padding: 8px 6px; font-size: 0.74rem; color: var(--text-2); text-align: center; background: rgba(11, 15, 20, 0.5); border-bottom: 1px solid var(--line); text-transform: capitalize; }
+        .cal-week__head.is-today { color: var(--violet-2); font-weight: 700; }
+        .cal-week__hours { position: relative; }
+        .cal-week__hour { height: 44px; font-size: 0.66rem; color: var(--text-2); text-align: right; padding: 2px 6px 0 0; border-bottom: 1px solid rgba(148, 163, 184, 0.07); }
+        .cal-week__col { position: relative; border-left: 1px solid var(--line); background: rgba(21, 27, 35, 0.4); }
+        .cal-week__slot { height: 44px; border-bottom: 1px solid rgba(148, 163, 184, 0.07); cursor: pointer; }
+        .cal-week__slot:hover { background: rgba(139, 92, 246, 0.08); }
+        .cal-week__event { position: absolute; left: 3px; right: 3px; padding: 4px 6px; border-radius: 8px; font-size: 0.68rem; color: #fff; overflow: hidden; cursor: pointer; border: 0; text-align: left; font-family: inherit; box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
+        .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.76rem; color: var(--text-2); margin-top: 10px; }
+        .cal-legend span { display: inline-flex; gap: 6px; align-items: center; }
+        .cal-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+        .day-list { display: grid; gap: 10px; }
+        .day-list__item { display: grid; grid-template-columns: 110px 1fr auto; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(21, 27, 35, 0.6); }
+        .day-list__time { font-family: var(--mono); font-size: 0.82rem; }
+        
+        /* Responsive de la plataforma */
+        @media (max-width: 1080px) {
+          .feature-row { grid-template-columns: repeat(2, 1fr); }
+          .cart-layout, .grid-2, .product-detail { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 860px) {
+          .auth, .grid-2-even, .form-grid { grid-template-columns: 1fr; }
+          .nav__group { border-left: 0; padding-left: 0; }
+          .cal-day { min-height: 74px; }
+          .cal-event { font-size: 0.62rem; }
+          .cal-week { grid-template-columns: 40px repeat(7, minmax(80px, 1fr)); overflow-x: auto; }
+        }
+        @media (max-width: 520px) {
+          .view-root { padding: 0 16px 48px; }
+          .feature-row { grid-template-columns: 1fr; }
+          .cart-line { grid-template-columns: 52px 1fr; }
+          .cart-line > :nth-child(n + 3) { grid-column: 2; }
+          .day-list__item { grid-template-columns: 1fr; }
+          .user-chip__name { display: none; }
+        }
+        HEXFILE_108
+        COPY <<'HEXFILE_109' src/main/resources/static/img/logo.svg
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="hexaorders-logo-title">
           <title id="hexaorders-logo-title">HexaOrders</title>
           <defs>
@@ -5676,8 +5978,8 @@ services:
           </g>
           <circle cx="7.75" cy="18" r="3" fill="#10B981" stroke="#0B0F14" stroke-width="1.2"/>
         </svg>
-        HEXFILE_108
-        COPY <<'HEXFILE_109' src/main/resources/static/index.html
+        HEXFILE_109
+        COPY <<'HEXFILE_110' src/main/resources/static/index.html
         <!doctype html>
         <html lang="es">
         <head>
@@ -5690,9 +5992,10 @@ services:
           <link rel="stylesheet" href="css/base.css">
           <link rel="stylesheet" href="css/components.css">
           <link rel="stylesheet" href="css/effects.css">
+          <link rel="stylesheet" href="css/platform.css">
           <script type="module" src="js/app.js"></script>
         </head>
-        <body>
+        <body data-mode="lab">
         <canvas id="grid-canvas" class="grid-canvas" aria-hidden="true"></canvas>
         
         <!-- Bienvenida: no bloquea; el estado mostrado proviene de consultas reales. -->
@@ -5717,17 +6020,27 @@ services:
             <span class="brand__name">HEXA<span>ORDERS</span></span>
           </a>
           <nav class="nav" aria-label="Secciones">
+            <a href="#/tienda" data-route-link="/tienda">Tienda</a>
+            <a href="#inicio" data-lab-link>Laboratorio</a>
             <a href="#panel" data-nav>Panel</a>
             <a href="#pedidos" data-nav>Pedidos</a>
             <a href="#arquitectura" data-nav>Arquitectura</a>
             <a href="#observabilidad" data-nav>Observabilidad</a>
+            <span class="nav__group" id="role-nav" aria-label="Áreas de tu rol"></span>
           </nav>
-          <div id="api-status" class="status-pill" role="status" aria-live="polite">
-            <span class="dot dot--pending"></span><span class="status-pill__text">Conectando…</span>
+          <div class="topbar__actions">
+            <div id="api-status" class="status-pill" role="status" aria-live="polite">
+              <span class="dot dot--pending"></span><span class="status-pill__text">Conectando…</span>
+            </div>
+            <a class="icon-btn" href="#/carrito" id="cart-button" aria-label="Carrito">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11h11L21 7H7 M10 20h.01 M18 20h.01"/></svg>
+              <span class="icon-btn__badge" id="cart-count" hidden>0</span>
+            </a>
+            <div class="menu" id="account"></div>
           </div>
         </header>
         
-        <main id="main">
+        <main id="main" data-view="lab">
           <!-- INICIO -->
           <section id="inicio" class="hero">
             <p class="eyebrow">Order Management &amp; Risk Assessment System</p>
@@ -5736,6 +6049,7 @@ services:
             <div class="hero__actions">
               <a class="btn btn--primary" href="#pedidos">Crear un pedido</a>
               <a class="btn btn--ghost" href="#arquitectura">Explorar la arquitectura</a>
+              <a class="btn btn--ghost" href="#/tienda">Visitar la tienda</a>
             </div>
             <ul class="tech-list" aria-label="Tecnologías">
               <li>Java 21 · Spring Boot</li><li>Python · FastAPI</li><li>PostgreSQL 17</li>
@@ -5986,6 +6300,9 @@ services:
           </section>
         </main>
         
+        <!-- Vistas de la plataforma (tienda, cuenta, administración, operaciones, logística). -->
+        <div id="view-root" class="view-root" tabindex="-1" hidden></div>
+        
         <footer class="footer">
           <div class="footer__brand">
             <img src="img/logo.svg" alt="" width="28" height="28">
@@ -5997,8 +6314,8 @@ services:
         <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
         </body>
         </html>
-        HEXFILE_109
-        COPY <<'HEXFILE_110' src/main/resources/static/js/api.js
+        HEXFILE_110
+        COPY <<'HEXFILE_111' src/main/resources/static/js/api.js
         // Cliente HTTP del frontend: único módulo que habla con el backend y con Prometheus.
         // No contiene reglas de negocio: el dominio Java es la autoridad.
         
@@ -6095,8 +6412,137 @@ services:
         export function reportApiStatus(ok, detail = '') {
           window.dispatchEvent(new CustomEvent('hexa:api-status', { detail: { ok, detail, at: new Date() } }));
         }
-        HEXFILE_110
-        COPY <<'HEXFILE_111' src/main/resources/static/js/app.js
+        
+        // ---- Plataforma v3: escrituras con sesión y token CSRF ------------------------
+        // La sesión viaja en una cookie HttpOnly (el navegador la envía sola). Las escrituras añaden
+        // la cabecera X-CSRF-TOKEN, que se obtiene de GET /api/auth/csrf.
+        
+        let csrfToken = null;
+        
+        export async function refreshCsrf() {
+          const { data } = await requestJson('/api/auth/csrf');
+          csrfToken = data.token;
+          return csrfToken;
+        }
+        
+        export function forgetCsrf() { csrfToken = null; }
+        
+        /** Petición JSON de la plataforma. method distinto de GET incluye el token CSRF (un reintento si caduca). */
+        export async function send(method, url, body, { headers = {}, retry = true } = {}) {
+          if (method !== 'GET' && !csrfToken) await refreshCsrf();
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+          let response;
+          try {
+            response = await fetch(url, {
+              method,
+              cache: 'no-store',
+              credentials: 'same-origin',
+              headers: {
+                Accept: 'application/json',
+                ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+                ...(method !== 'GET' && csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                ...headers,
+              },
+              body: body === undefined ? undefined : JSON.stringify(body),
+              signal: controller.signal,
+            });
+          } catch (error) {
+            throw new ApiError(error.name === 'AbortError' ? 'Tiempo de espera agotado' : 'Sin conexión con el servidor', { status: 0 });
+          } finally {
+            clearTimeout(timer);
+          }
+          const text = await response.text();
+          let data = null;
+          if (text) { try { data = JSON.parse(text); } catch { data = null; } }
+          if (response.status === 403 && retry && data && data.title === 'Token CSRF no válido') {
+            await refreshCsrf();
+            return send(method, url, body, { headers, retry: false });
+          }
+          if (response.status === 401 && url !== '/api/auth/login') {
+            window.dispatchEvent(new CustomEvent('hexa:unauthenticated'));
+          }
+          if (!response.ok) {
+            const message = (data && (data.detail || data.title)) || `Error HTTP $${response.status}`;
+            throw new ApiError(message, { status: response.status, title: (data && data.title) || '', body: data });
+          }
+          return { data, status: response.status, headers: response.headers };
+        }
+        
+        const get = (url) => send('GET', url).then((r) => r.data);
+        const post = (url, body, options) => send('POST', url, body ?? {}, options).then((r) => r.data);
+        const put = (url, body) => send('PUT', url, body).then((r) => r.data);
+        const qs = (params) => {
+          const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '');
+          return entries.length ? `?$${new URLSearchParams(entries).toString()}` : '';
+        };
+        
+        export const authApi = {
+          me: () => get('/api/auth/me'),
+          login: (username, password) => post('/api/auth/login', { username, password }),
+          logout: () => post('/api/auth/logout'),
+          register: (payload) => post('/api/auth/register', payload),
+        };
+        
+        export const catalogApi = {
+          categories: () => get('/api/catalog/categories'),
+          products: (q, category) => get(`/api/catalog/products$${qs({ q, category })}`),
+          product: (id) => get(`/api/catalog/products/$${encodeURIComponent(id)}`),
+        };
+        
+        export const shopApi = {
+          quote: (items) => post('/api/shop/quote', { items }),
+          /** La misma Idempotency-Key en un reintento devuelve el mismo pedido (nunca se duplica). */
+          place: (items, idempotencyKey) => send('POST', '/api/shop/orders', { items }, { headers: { 'Idempotency-Key': idempotencyKey } }),
+          orders: () => get('/api/shop/orders'),
+          order: (id) => get(`/api/shop/orders/$${encodeURIComponent(id)}`),
+          cancel: (id) => post(`/api/shop/orders/$${encodeURIComponent(id)}/cancel`),
+        };
+        
+        export const accountApi = {
+          me: () => get('/api/account/me'),
+          profile: (displayName, email) => put('/api/account/profile', { displayName, email }),
+          password: (currentPassword, newPassword) => send('PUT', '/api/account/password', { currentPassword, newPassword }),
+        };
+        
+        export const adminApi = {
+          dashboard: () => get('/api/admin/dashboard'),
+          users: () => get('/api/admin/users'),
+          roles: (id, roles) => put(`/api/admin/users/$${id}/roles`, { roles }),
+          enabled: (id, enabled) => put(`/api/admin/users/$${id}/enabled`, { enabled }),
+          audit: (limit = 150) => get(`/api/admin/audit?limit=$${limit}`),
+          products: () => get('/api/admin/products'),
+          createProduct: (product) => post('/api/admin/products', product),
+          updateProduct: (id, product) => put(`/api/admin/products/$${id}`, product),
+          adjustStock: (id, delta, reason) => post(`/api/admin/products/$${id}/stock`, { delta, reason }),
+          createCategory: (slug, name) => post('/api/admin/categories', { slug, name }),
+        };
+        
+        export const operationsApi = {
+          queue: (statuses) => get(`/api/operations/orders$${qs({ status: (statuses || []).join(',') })}`),
+          order: (id) => get(`/api/operations/orders/$${encodeURIComponent(id)}`),
+          transition: (id, status, note) => post(`/api/operations/orders/$${encodeURIComponent(id)}/transitions`, { status, note }),
+        };
+        
+        export const incidentsApi = {
+          list: (status) => get(`/api/incidents$${qs({ status })}`),
+          report: (orderId, category, description) => post('/api/incidents', { orderId: orderId || null, category, description }),
+          resolve: (id, resolution) => post(`/api/incidents/$${id}/resolve`, { resolution }),
+        };
+        
+        export const logisticsApi = {
+          deliveries: (from, to, assigneeId) => get(`/api/logistics/deliveries$${qs({ from, to, assigneeId })}`),
+          assignees: () => get('/api/logistics/assignees'),
+          schedulable: () => get('/api/logistics/schedulable-orders'),
+          schedule: (payload) => post('/api/logistics/deliveries', payload),
+          reschedule: (id, payload) => put(`/api/logistics/deliveries/$${id}`, payload),
+          history: (id) => get(`/api/logistics/deliveries/$${id}/history`),
+          transition: (id, status, note) => post(`/api/logistics/orders/$${encodeURIComponent(id)}/transitions`, { status, note }),
+        };
+        
+        export const opsApi = { health: () => get('/api/ops/health') };
+        HEXFILE_111
+        COPY <<'HEXFILE_112' src/main/resources/static/js/app.js
         // Punto de entrada del frontend de HexaOrders (módulos ES nativos, sin frameworks).
         
         import { ordersApi, prometheusApi, reportApiStatus } from './api.js';
@@ -6105,7 +6551,16 @@ services:
         import { initGrid } from './grid-effect.js';
         import { initObservability, refreshObservability } from './observability.js';
         import { initOrders, renderOrders, renderOrdersError } from './orders.js';
-        import { $$, $$$$, reducedMotion } from './ui.js';
+        import { $$, $$$$, el, reducedMotion, toast } from './ui.js';
+        import { cart } from './cart.js';
+        import { navigate, startRouter } from './router.js';
+        import { ROLE_LABELS, homeFor, session } from './session.js';
+        // Vistas de la plataforma: cada módulo registra sus rutas.
+        import './views/shop.js';
+        import './views/admin.js';
+        import './views/operations.js';
+        import './views/logistics.js';
+        import './views/ops.js';
         
         const DATA_REFRESH_MS = 20000;
         const OBS_REFRESH_MS = 15000;
@@ -6206,16 +6661,80 @@ services:
           }
         }
         
+        // ---- Barra superior de la plataforma ----------------------------------------------
+        const ROLE_AREAS = [
+          ['ADMIN', '#/admin', 'Administración'],
+          ['ORDER_OPERATOR', '#/operaciones', 'Operaciones'],
+          ['LOGISTICS_OPERATOR', '#/logistica', 'Logística'],
+          ['OBSERVABILITY_VIEWER', '#/observabilidad-tecnica', 'Salud técnica'],
+        ];
+        
+        function renderAccount() {
+          const user = session.user();
+          const container = $$('#account');
+          const roleNav = $$('#role-nav');
+          roleNav.replaceChildren(...ROLE_AREAS.filter(([role]) => session.has(role) || session.has('ADMIN'))
+            .map(([, href, label]) => el('a', { href, dataset: { routeLink: href.slice(1) }, text: label })));
+          if (!user) {
+            container.replaceChildren(el('a', { class: 'btn btn--primary btn--sm', href: '#/entrar', text: 'Entrar' }));
+            return;
+          }
+          const initials = user.displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+          const panel = el('div', { class: 'menu__panel', hidden: true, role: 'menu' },
+            el('div', { class: 'menu__meta' }, el('strong', { text: user.displayName }), el('small', { text: `@$${user.username} · $${user.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}` })),
+            session.has('CUSTOMER') ? el('a', { href: '#/mis-pedidos', role: 'menuitem', text: 'Mis pedidos' }) : null,
+            ...ROLE_AREAS.filter(([role]) => session.has(role) || session.has('ADMIN')).map(([, href, label]) => el('a', { href, role: 'menuitem', text: label })),
+            el('a', { href: '#/perfil', role: 'menuitem', text: 'Perfil y seguridad' }),
+            el('button', { type: 'button', role: 'menuitem', text: 'Cerrar sesión', onclick: async () => { await session.logout(); toast('Sesión cerrada', 'ok'); navigate('#/tienda'); } }));
+          const toggle = el('button', { type: 'button', class: 'icon-btn user-chip', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
+            el('span', { class: 'avatar', text: initials }), el('span', { class: 'user-chip__name', text: user.displayName.split(' ')[0] }));
+          toggle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            panel.hidden = !panel.hidden;
+            toggle.setAttribute('aria-expanded', String(!panel.hidden));
+          });
+          document.addEventListener('click', () => { panel.hidden = true; toggle.setAttribute('aria-expanded', 'false'); });
+          panel.addEventListener('click', () => { panel.hidden = true; });
+          container.replaceChildren(toggle, panel);
+        }
+        
+        function renderCartCount() {
+          const count = cart.count();
+          const badge = $$('#cart-count');
+          badge.textContent = String(count);
+          badge.hidden = count === 0;
+          $$('#cart-button').setAttribute('aria-label', `Carrito: $${count} unidades`);
+        }
+        
+        function markActiveRoute(path) {
+          $$$$('[data-route-link]').forEach((link) => {
+            const active = path && path.startsWith(link.dataset.routeLink);
+            link.classList.toggle('is-active', Boolean(active));
+            if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+          });
+        }
+        
         // ---- Arranque ----------------------------------------------------------------
-        function start() {
+        async function start() {
           initGrid($$('#grid-canvas'));
+          window.addEventListener('hexa:session', renderAccount);
+          window.addEventListener('hexa:cart', renderCartCount);
+          window.addEventListener('hexa:route', (event) => markActiveRoute(event.detail.path));
+          window.addEventListener('hexa:unauthenticated', () => {
+            if (session.isAuthenticated()) { session.expire(); toast('Tu sesión ha caducado: vuelve a iniciar sesión', 'warn'); }
+          });
+          renderCartCount();
+          renderAccount();
+          const routedOnLoad = (window.location.hash || '').startsWith('#/');
+          await session.load();
+          await startRouter();
           initNavigation();
           initOrders({ onChanged: refreshData });
           initArchitecture();
           initObservability();
         
           const firstLoad = refreshData();
-          initSplash(firstLoad);
+          if (routedOnLoad) { $$('#splash').hidden = true; firstLoad.catch(() => {}); } else initSplash(firstLoad);
           firstLoad.finally(() => refreshObservability());
         
           $$$$('[data-refresh]').forEach((button) => button.addEventListener('click', refreshData));
@@ -6228,8 +6747,8 @@ services:
         
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
         else start();
-        HEXFILE_111
-        COPY <<'HEXFILE_112' src/main/resources/static/js/architecture.js
+        HEXFILE_112
+        COPY <<'HEXFILE_113' src/main/resources/static/js/architecture.js
         // Architecture Explorer. Cada nodo corresponde a una clase o módulo REAL del repositorio.
         // Dos vistas distintas:
         //  - "dependencies": dependencias del código fuente (las flechas apuntan hacia lo que se usa;
@@ -6675,8 +7194,304 @@ services:
           if ('ResizeObserver' in window) new ResizeObserver(redraw).observe($$('#arch-diagram'));
           select('service');
         }
-        HEXFILE_112
-        COPY <<'HEXFILE_113' src/main/resources/static/js/dashboard.js
+        HEXFILE_113
+        COPY <<'HEXFILE_114' src/main/resources/static/js/cart.js
+        // Carrito del portal: solo guarda identificadores y cantidades en el navegador. Los precios,
+        // el stock y el total los calcula siempre el backend (POST /api/shop/quote).
+        
+        const KEY = 'hexaorders.cart.v1';
+        let items = load();
+        
+        function load() {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(KEY) || '[]');
+            return Array.isArray(parsed) ? parsed.filter((i) => Number.isInteger(i.productId) && Number.isInteger(i.quantity) && i.quantity > 0) : [];
+          } catch {
+            return [];
+          }
+        }
+        
+        function save() {
+          try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { /* almacenamiento no disponible */ }
+          window.dispatchEvent(new CustomEvent('hexa:cart', { detail: cart.count() }));
+        }
+        
+        export const cart = {
+          items: () => items.map((i) => ({ ...i })),
+          count: () => items.reduce((sum, i) => sum + i.quantity, 0),
+          add(productId, quantity = 1) {
+            const line = items.find((i) => i.productId === productId);
+            if (line) line.quantity = Math.min(99, line.quantity + quantity);
+            else items.push({ productId, quantity: Math.min(99, quantity) });
+            save();
+          },
+          set(productId, quantity) {
+            if (quantity <= 0) items = items.filter((i) => i.productId !== productId);
+            else {
+              const line = items.find((i) => i.productId === productId);
+              if (line) line.quantity = Math.min(99, quantity);
+            }
+            save();
+          },
+          remove(productId) { items = items.filter((i) => i.productId !== productId); save(); },
+          clear() { items = []; save(); },
+        };
+        HEXFILE_114
+        COPY <<'HEXFILE_115' src/main/resources/static/js/components.js
+        // Componentes reutilizables de la plataforma (sin frameworks). Texto dinámico siempre con textContent.
+        
+        import { ApiError } from './api.js';
+        import { el, formatMoney, toast } from './ui.js';
+        
+        const SVG = 'http://www.w3.org/2000/svg';
+        
+        // ---- Ciclo de vida ---------------------------------------------------------
+        export const LIFECYCLE = {
+          CREATED: { label: 'Creado', tone: 'neutral' },
+          RISK_APPROVED: { label: 'Aprobado por riesgo', tone: 'ok' },
+          RISK_REVIEW: { label: 'En revisión de riesgo', tone: 'warn' },
+          CONFIRMED: { label: 'Confirmado', tone: 'violet' },
+          PREPARING: { label: 'En preparación', tone: 'violet' },
+          READY_FOR_DISPATCH: { label: 'Listo para despacho', tone: 'blue' },
+          IN_TRANSIT: { label: 'En tránsito', tone: 'blue' },
+          DELIVERED: { label: 'Entregado', tone: 'ok' },
+          REJECTED: { label: 'Rechazado', tone: 'error' },
+          CANCELLED: { label: 'Cancelado', tone: 'error' },
+        };
+        export const HAPPY_PATH = ['CREATED', 'RISK_APPROVED', 'CONFIRMED', 'PREPARING', 'READY_FOR_DISPATCH', 'IN_TRANSIT', 'DELIVERED'];
+        export const TRANSITION_VERBS = {
+          CONFIRMED: 'Confirmar', PREPARING: 'Iniciar preparación', READY_FOR_DISPATCH: 'Marcar listo para despacho',
+          IN_TRANSIT: 'Despachar', DELIVERED: 'Marcar entregado', REJECTED: 'Rechazar', CANCELLED: 'Cancelar',
+        };
+        
+        export const lifecycleBadge = (status) => {
+          const info = LIFECYCLE[status] || { label: status, tone: 'neutral' };
+          return el('span', { class: `lc lc--$${info.tone}`, text: info.label, title: status });
+        };
+        
+        export const channelBadge = (channel) => el('span', {
+          class: `badge $${channel === 'SHOP' ? 'badge--neutral' : 'badge--warn'}`,
+          text: channel === 'SHOP' ? 'Portal' : 'Laboratorio', title: channel === 'SHOP' ? 'Pedido del portal' : 'Pedido de la API original',
+        });
+        
+        /** Barra de progreso del pedido sobre el camino feliz. */
+        export function progressBar(status) {
+          const failed = status === 'REJECTED' || status === 'CANCELLED';
+          const index = status === 'RISK_REVIEW' ? 1 : HAPPY_PATH.indexOf(status);
+          return el('div', { class: 'progress-steps', role: 'img', 'aria-label': `Progreso: $${(LIFECYCLE[status] || {}).label || status}` },
+            HAPPY_PATH.slice(1).map((_, i) => el('span', { class: failed ? (i === 0 ? 'is-failed' : '') : (i < index ? 'is-done' : '') })));
+        }
+        
+        // ---- Iconos (trazos simples, diseño propio) -----------------------------------
+        const ICONS = {
+          tecnologia: 'M3 5h18v11H3z M1 19h22 M9 16v3 M15 16v3',
+          audio: 'M4 14v-2a8 8 0 0 1 16 0v2 M4 14h3v6H4z M17 14h3v6h-3z',
+          oficina: 'M3 8h18v12H3z M8 8V5h8v3 M3 13h18',
+          hogar: 'M3 11 12 4l9 7 M5 10v10h14V10 M10 20v-6h4v6',
+          accesorios: 'M6 8h12l-1 12H7z M9 8a3 3 0 0 1 6 0',
+          bienestar: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
+          cart: 'M3 4h2l2.4 11h11L21 7H7 M10 20h.01 M18 20h.01',
+          user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M4 21a8 8 0 0 1 16 0',
+          shield: 'M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z M9 12l2 2 4-4',
+          truck: 'M2 6h11v10H2z M13 10h5l3 3v3h-8 M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+          chart: 'M4 20V10 M10 20V4 M16 20v-7 M22 20H2',
+          bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
+          box: 'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',
+          empty: 'M4 7h16v13H4z M4 7l3-4h10l3 4 M9 12h6',
+          calendar: 'M4 5h16v16H4z M4 10h16 M9 3v4 M15 3v4',
+        };
+        
+        export function icon(name, extraClass = '') {
+          const svg = document.createElementNS(SVG, 'svg');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.setAttribute('fill', 'none');
+          svg.setAttribute('stroke', 'currentColor');
+          svg.setAttribute('stroke-width', '1.7');
+          svg.setAttribute('stroke-linecap', 'round');
+          svg.setAttribute('stroke-linejoin', 'round');
+          svg.setAttribute('aria-hidden', 'true');
+          if (extraClass) svg.setAttribute('class', extraClass);
+          const path = document.createElementNS(SVG, 'path');
+          path.setAttribute('d', ICONS[name] || ICONS.box);
+          svg.append(path);
+          return svg;
+        }
+        
+        const CATEGORY_ICON = { 'Tecnología': 'tecnologia', Audio: 'audio', Oficina: 'oficina', 'Hogar inteligente': 'hogar', Accesorios: 'accesorios', Bienestar: 'bienestar' };
+        
+        /** Ilustración del producto: degradado según su tono + icono de la categoría. */
+        export function productArt(product, className) {
+          const hue = Number.isFinite(product.hue) ? product.hue : 260;
+          const node = el('div', { class: className });
+          node.style.background = `radial-gradient(120% 90% at 20% 0%, hsl($${hue} 85% 62% / .55), transparent 60%),
+            linear-gradient(135deg, hsl($${hue} 70% 34%), hsl($${(hue + 40) % 360} 75% 22%))`;
+          node.append(icon(CATEGORY_ICON[product.categoryName] || 'box'));
+          return node;
+        }
+        
+        export function stockNote(stock) {
+          if (stock <= 0) return el('span', { class: 'stock-note stock-note--out', text: 'Agotado' });
+          if (stock <= 5) return el('span', { class: 'stock-note stock-note--low', text: `Últimas $${stock} unidades` });
+          return el('span', { class: 'stock-note', text: `$${stock} en stock` });
+        }
+        
+        export const money = (value) => formatMoney(value);
+        
+        // ---- Estados de carga y vacíos ------------------------------------------------
+        export function emptyState(title, text, iconName = 'empty', action = null) {
+          return el('div', { class: 'empty-state' }, icon(iconName), el('strong', { text: title }), el('p', { text }), action);
+        }
+        
+        export const skeletons = (count, className) => Array.from({ length: count }, () => el('div', { class: `skeleton $${className}` }));
+        
+        export function errorMessage(error) {
+          if (error instanceof ApiError) {
+            if (error.status === 0) return 'Sin conexión con el servidor.';
+            return `$${error.title ? `$${error.title}: ` : ''}$${error.message}`;
+          }
+          return error && error.message ? error.message : String(error);
+        }
+        
+        // ---- Modal accesible ------------------------------------------------------------
+        let openModal = null;
+        
+        export function modal(title, body, { actions = [], wide = false, onClose } = {}) {
+          closeModal();
+          const previous = document.activeElement;
+          const titleId = `modal-title-$${Math.random().toString(36).slice(2)}`;
+          const close = () => {
+            root.remove();
+            document.removeEventListener('keydown', onKey);
+            openModal = null;
+            if (previous && previous.focus) previous.focus();
+            if (onClose) onClose();
+          };
+          const onKey = (event) => {
+            if (event.key === 'Escape') close();
+            if (event.key === 'Tab') {
+              const focusables = Array.from(root.querySelectorAll('button, [href], input, select, textarea')).filter((n) => !n.disabled);
+              if (!focusables.length) return;
+              const first = focusables[0];
+              const last = focusables[focusables.length - 1];
+              if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+              else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+            }
+          };
+          const closeButton = el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Cerrar', onclick: close, text: '✕' });
+          const dialog = el('div', { class: `modal__dialog$${wide ? ' modal__dialog--wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId },
+            el('div', { class: 'modal__head' }, el('h2', { id: titleId, text: title }), closeButton),
+            body,
+            actions.length ? el('div', { class: 'modal__actions' }, actions) : null);
+          const root = el('div', { class: 'modal', onclick: (event) => { if (event.target === root) close(); } }, dialog);
+          document.body.append(root);
+          document.addEventListener('keydown', onKey);
+          openModal = close;
+          const firstInput = dialog.querySelector('input, select, textarea') || closeButton;
+          firstInput.focus();
+          return { close, root };
+        }
+        
+        export function closeModal() { if (openModal) openModal(); }
+        
+        // ---- Formularios ----------------------------------------------------------------
+        export function field(label, input, help = '') {
+          const id = input.id || `f-$${Math.random().toString(36).slice(2)}`;
+          input.id = id;
+          return el('div', { class: 'field' }, el('label', { for: id, text: label }), input, help ? el('small', { class: 'field__help', text: help }) : null);
+        }
+        
+        export const formError = () => el('div', { class: 'form-error', role: 'alert', hidden: true });
+        
+        export function showFormError(node, error) {
+          node.textContent = errorMessage(error);
+          node.hidden = false;
+        }
+        
+        /** Envía un formulario deshabilitando el botón y mostrando el error del backend. */
+        export async function submitting(button, errorNode, action, successMessage) {
+          const label = button.textContent;
+          button.disabled = true;
+          button.textContent = 'Procesando…';
+          if (errorNode) errorNode.hidden = true;
+          try {
+            const result = await action();
+            if (successMessage) toast(successMessage, 'ok');
+            return result;
+          } catch (error) {
+            if (errorNode) showFormError(errorNode, error); else toast(errorMessage(error), 'error');
+            throw error;
+          } finally {
+            button.disabled = false;
+            button.textContent = label;
+          }
+        }
+        
+        // ---- Gráfico de barras SVG (datos reales del backend) -----------------------------
+        export function barChart(series, { label = (k) => k, height = 220 } = {}) {
+          const entries = Object.entries(series);
+          const max = Math.max(1, ...entries.map(([, v]) => v));
+          const width = 640;
+          const pad = { top: 16, right: 8, bottom: 26, left: 30 };
+          const innerW = width - pad.left - pad.right;
+          const innerH = height - pad.top - pad.bottom;
+          const svg = document.createElementNS(SVG, 'svg');
+          svg.setAttribute('viewBox', `0 0 $${width} $${height}`);
+          svg.setAttribute('class', 'chart');
+          svg.setAttribute('role', 'img');
+          svg.setAttribute('aria-label', entries.map(([k, v]) => `$${label(k)}: $${v}`).join(', '));
+          const defs = document.createElementNS(SVG, 'defs');
+          defs.innerHTML = '<linearGradient id="bar-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#3B82F6"/></linearGradient>';
+          svg.append(defs);
+          for (let i = 0; i <= 4; i += 1) {
+            const y = pad.top + (innerH * i) / 4;
+            const line = document.createElementNS(SVG, 'line');
+            line.setAttribute('x1', pad.left); line.setAttribute('x2', width - pad.right);
+            line.setAttribute('y1', y); line.setAttribute('y2', y); line.setAttribute('class', 'grid-line');
+            svg.append(line);
+            const text = document.createElementNS(SVG, 'text');
+            text.setAttribute('x', pad.left - 6); text.setAttribute('y', y + 3); text.setAttribute('text-anchor', 'end');
+            text.textContent = String(Math.round(max - (max * i) / 4));
+            svg.append(text);
+          }
+          const slot = innerW / Math.max(1, entries.length);
+          entries.forEach(([key, value], index) => {
+            const h = (value / max) * innerH;
+            const rect = document.createElementNS(SVG, 'rect');
+            rect.setAttribute('x', pad.left + index * slot + slot * 0.18);
+            rect.setAttribute('y', pad.top + innerH - h);
+            rect.setAttribute('width', slot * 0.64);
+            rect.setAttribute('height', Math.max(h, value > 0 ? 2 : 0));
+            rect.setAttribute('rx', 4);
+            rect.setAttribute('class', 'bar');
+            const title = document.createElementNS(SVG, 'title');
+            title.textContent = `$${label(key)}: $${value}`;
+            rect.append(title);
+            svg.append(rect);
+            if (entries.length <= 16 || index % 2 === 0) {
+              const text = document.createElementNS(SVG, 'text');
+              text.setAttribute('x', pad.left + index * slot + slot / 2);
+              text.setAttribute('y', height - 8);
+              text.setAttribute('text-anchor', 'middle');
+              text.textContent = label(key);
+              svg.append(text);
+            }
+          });
+          return svg;
+        }
+        
+        /** Descarga un CSV generado en el navegador a partir de datos ya cargados. */
+        export function downloadCsv(filename, rows) {
+          const escape = (value) => `"$${String(value ?? '').replace(/"/g, '""')}"`;
+          const csv = rows.map((row) => row.map(escape).join(',')).join('\r\n');
+          const url = URL.createObjectURL(new Blob([`﻿$${csv}`], { type: 'text/csv;charset=utf-8' }));
+          const link = el('a', { href: url, download: filename });
+          document.body.append(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        HEXFILE_115
+        COPY <<'HEXFILE_116' src/main/resources/static/js/dashboard.js
         // Panel: estadísticas de GET /api/orders/statistics (todos los pedidos en PostgreSQL)
         // y últimos pedidos de GET /api/orders. No se calcula ni inventa ningún dato.
         
@@ -6726,8 +7541,8 @@ services:
         export function renderRecentError(message) {
           $$('#recent-orders').replaceChildren(el('li', { class: 'recent__empty', text: `No se pudieron cargar los pedidos: $${message}` }));
         }
-        HEXFILE_113
-        COPY <<'HEXFILE_114' src/main/resources/static/js/grid-effect.js
+        HEXFILE_116
+        COPY <<'HEXFILE_117' src/main/resources/static/js/grid-effect.js
         // Interactive Grid: cuadrícula de fondo que se ilumina en violeta bajo el cursor y se
         // desvanece progresivamente (~1.7 s). Un solo <canvas>, sin librerías ni miles de nodos DOM.
         //  - Las líneas estáticas se dibujan una vez en un canvas fuera de pantalla (por resize).
@@ -6851,8 +7666,8 @@ services:
           motionQuery.addEventListener?.('change', () => { active.clear(); draw(performance.now()); });
           resize();
         }
-        HEXFILE_114
-        COPY <<'HEXFILE_115' src/main/resources/static/js/observability.js
+        HEXFILE_117
+        COPY <<'HEXFILE_118' src/main/resources/static/js/observability.js
         // Observabilidad en vivo. Cada dato indica su origen; si Prometheus no responde se avisa
         // sin bloquear el resto de la aplicación. Solo se consultan métricas que el código expone:
         //  - Java (Micrometer): orders_created_total{status}, orders_risk_failures_total,
@@ -6978,8 +7793,8 @@ services:
             apiState = event.detail;
           });
         }
-        HEXFILE_115
-        COPY <<'HEXFILE_116' src/main/resources/static/js/orders.js
+        HEXFILE_118
+        COPY <<'HEXFILE_119' src/main/resources/static/js/orders.js
         // Gestión de pedidos: alta, consulta por ID y listado. Todos los datos vienen del backend.
         // La validación del formulario es solo ayuda al usuario; OrderDraft (dominio Java) es la autoridad.
         
@@ -7163,8 +7978,163 @@ services:
             renderTable();
           }));
         }
-        HEXFILE_116
-        COPY <<'HEXFILE_117' src/main/resources/static/js/ui.js
+        HEXFILE_119
+        COPY <<'HEXFILE_120' src/main/resources/static/js/router.js
+        // Enrutador por hash. Las rutas "#/..." muestran vistas de la plataforma; cualquier otro hash
+        // (vacío, #panel, #pedidos, #arquitectura, #observabilidad) muestra el laboratorio original intacto.
+        
+        import { $$ } from './ui.js';
+        import { session } from './session.js';
+        
+        const routes = [];
+        let currentCleanup = null;
+        
+        /** path con parámetros ":id"; roles = roles permitidos (vacío = público, 'auth' = cualquier sesión). */
+        export function route(path, render, { roles = [], title = 'HexaOrders' } = {}) {
+          const keys = [];
+          const pattern = new RegExp(`^$${path.replace(/:[a-zA-Z]+/g, (m) => { keys.push(m.slice(1)); return '([^/]+)'; })}$$`);
+          routes.push({ pattern, keys, render, roles, title });
+        }
+        
+        export function navigate(hash) {
+          if (window.location.hash === hash) handle(); else window.location.hash = hash;
+        }
+        
+        function forbiddenView(root) {
+          root.replaceChildren();
+          const box = document.createElement('div');
+          box.className = 'view';
+          box.innerHTML = '<div class="card empty-state"><strong>Acceso restringido</strong><p>Tu rol no tiene acceso a esta sección. El servidor también lo impide.</p><a class="btn btn--ghost" href="#/tienda">Volver a la tienda</a></div>';
+          root.append(box);
+        }
+        
+        export async function handle() {
+          const hash = window.location.hash || '';
+          const lab = $$('[data-view="lab"]');
+          const root = $$('#view-root');
+          if (!hash.startsWith('#/')) {
+            if (currentCleanup) { currentCleanup(); currentCleanup = null; }
+            root.hidden = true;
+            lab.hidden = false;
+            document.body.dataset.mode = 'lab';
+            document.title = 'HexaOrders · Order Management & Risk Assessment';
+            window.dispatchEvent(new CustomEvent('hexa:route', { detail: { path: hash } }));
+            return;
+          }
+          const [path, query = ''] = hash.slice(1).split('?');
+          const match = routes.map((r) => ({ r, m: path.match(r.pattern) })).find((x) => x.m);
+          lab.hidden = true;
+          root.hidden = false;
+          document.body.dataset.mode = 'app';
+          if (currentCleanup) { currentCleanup(); currentCleanup = null; }
+          window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+          window.dispatchEvent(new CustomEvent('hexa:route', { detail: { path } }));
+          if (!match) { navigate('#/tienda'); return; }
+          const { r, m } = match;
+          if (r.roles.length) {
+            if (!session.isAuthenticated()) { navigate(`#/entrar?next=$${encodeURIComponent(path)}`); return; }
+            if (!r.roles.includes('auth') && !session.has(...r.roles)) { forbiddenView(root); return; }
+          }
+          const params = Object.fromEntries(r.keys.map((k, i) => [k, decodeURIComponent(m[i + 1])]));
+          params.query = new URLSearchParams(query);
+          document.title = `$${r.title} · HexaOrders`;
+          root.replaceChildren();
+          try {
+            currentCleanup = (await r.render(root, params)) || null;
+          } catch (error) {
+            const box = document.createElement('div');
+            box.className = 'view';
+            const card = document.createElement('div');
+            card.className = 'card empty-state';
+            const strong = document.createElement('strong');
+            strong.textContent = 'No se pudo cargar la sección';
+            const p = document.createElement('p');
+            p.textContent = error && error.message ? error.message : String(error);
+            card.append(strong, p);
+            box.append(card);
+            root.replaceChildren(box);
+          }
+          root.focus({ preventScroll: true });
+        }
+        
+        export function startRouter() {
+          window.addEventListener('hashchange', handle);
+          return handle();
+        }
+        HEXFILE_120
+        COPY <<'HEXFILE_121' src/main/resources/static/js/session.js
+        // Estado de sesión del usuario. La autorización real ocurre en el backend: aquí solo se decide
+        // qué navegación mostrar. Un botón oculto no protege nada; el servidor responde 401/403.
+        
+        import { authApi, forgetCsrf, refreshCsrf } from './api.js';
+        
+        let current = null; // { id, username, displayName, roles: [] } | null
+        
+        export const ROLE_LABELS = {
+          CUSTOMER: 'Cliente',
+          ADMIN: 'Administración',
+          ORDER_OPERATOR: 'Operador de pedidos',
+          LOGISTICS_OPERATOR: 'Operador logístico',
+          OBSERVABILITY_VIEWER: 'Observabilidad',
+        };
+        
+        /** Página de inicio de cada rol tras iniciar sesión. */
+        export function homeFor(user) {
+          if (!user) return '#/tienda';
+          const roles = user.roles || [];
+          if (roles.includes('ADMIN')) return '#/admin';
+          if (roles.includes('ORDER_OPERATOR')) return '#/operaciones';
+          if (roles.includes('LOGISTICS_OPERATOR')) return '#/logistica';
+          if (roles.includes('OBSERVABILITY_VIEWER')) return '#/observabilidad-tecnica';
+          return '#/tienda';
+        }
+        
+        function emit() { window.dispatchEvent(new CustomEvent('hexa:session', { detail: current })); }
+        
+        export const session = {
+          user: () => current,
+          isAuthenticated: () => current !== null,
+          has: (...roles) => current !== null && roles.some((role) => current.roles.includes(role)),
+        
+          async load() {
+            try {
+              const me = await authApi.me();
+              current = me.authenticated ? me.user : null;
+            } catch {
+              current = null;
+            }
+            emit();
+            return current;
+          },
+        
+          async login(username, password) {
+            await refreshCsrf();
+            const result = await authApi.login(username, password);
+            current = result.user;
+            await refreshCsrf(); // el token puede cambiar con la nueva sesión
+            emit();
+            return current;
+          },
+        
+          async logout() {
+            try { await authApi.logout(); } finally {
+              current = null;
+              forgetCsrf();
+              emit();
+            }
+          },
+        
+          /** Llamado cuando el servidor responde 401 (sesión caducada). */
+          expire() {
+            if (current) {
+              current = null;
+              forgetCsrf();
+              emit();
+            }
+          },
+        };
+        HEXFILE_121
+        COPY <<'HEXFILE_122' src/main/resources/static/js/ui.js
         // Utilidades de presentación. Todo el texto dinámico se inserta con textContent (sin innerHTML).
         
         export const $$ = (selector, root = document) => root.querySelector(selector);
@@ -7258,8 +8228,1069 @@ services:
             toast('No se pudo copiar automáticamente', 'warn', 2500);
           }
         }
-        HEXFILE_117
-        COPY <<'HEXFILE_118' src/test/java/com/hexaorders/adapter/HttpRiskAssessmentAdapterTest.java
+        HEXFILE_122
+        COPY <<'HEXFILE_123' src/main/resources/static/js/views/admin.js
+        // Administración (ADMIN): panel, productos, inventario, pedidos, usuarios y roles, incidencias,
+        // auditoría y reportes. Todas las cifras proceden de PostgreSQL a través de la API.
+        
+        import { adminApi, catalogApi, incidentsApi, operationsApi } from '../api.js';
+        import {
+          LIFECYCLE, TRANSITION_VERBS, barChart, channelBadge, downloadCsv, emptyState, errorMessage, field, formError,
+          lifecycleBadge, modal, money, skeletons, submitting,
+        } from '../components.js';
+        import { navigate, route } from '../router.js';
+        import { ROLE_LABELS, session } from '../session.js';
+        import { el, formatDateTime, formatInt, formatRelative, toast } from '../ui.js';
+        
+        const TABS = [
+          ['panel', 'Panel'], ['productos', 'Productos e inventario'], ['pedidos', 'Pedidos'], ['usuarios', 'Usuarios y roles'],
+          ['incidencias', 'Incidencias'], ['auditoria', 'Auditoría'], ['reportes', 'Reportes'],
+        ];
+        
+        const table = (headers, rows) => el('div', { class: 'table-scroll' }, el('table', { class: 'table' },
+          el('thead', {}, el('tr', {}, headers.map((h) => el('th', { scope: 'col', text: h })))), el('tbody', {}, rows)));
+        
+        function shell(root, active, ...content) {
+          root.append(el('section', { class: 'view' },
+            el('div', { class: 'view__head' }, el('div', {}, el('p', { class: 'eyebrow', text: 'Administración' }),
+              el('h1', { class: 'view__title', text: 'Centro de control' }),
+              el('p', { class: 'section__lead', text: `Sesión: $${session.user().displayName} · datos en vivo de PostgreSQL` }))),
+            el('nav', { class: 'tabs', 'aria-label': 'Secciones de administración' },
+              TABS.map(([id, label]) => el('a', { href: `#/admin/$${id}`, class: id === active ? 'is-active' : '', 'aria-current': id === active ? 'page' : null, text: label }))),
+            ...content));
+        }
+        
+        // ---- Panel ------------------------------------------------------------------------
+        async function panel(root) {
+          const body = el('div', {}, el('div', { class: 'kpis' }, skeletons(8, 'skeleton--row')));
+          shell(root, 'panel', body);
+          const d = await adminApi.dashboard();
+          const s = d.ordersByStatus;
+          const kpi = (label, value, tone = '') => el('div', { class: `kpi$${tone ? ` kpi--$${tone}` : ''}` }, el('span', { text: label }), el('strong', { text: value }));
+          const alerts = [];
+          if (s.RISK_REVIEW > 0) alerts.push(['warn', `$${s.RISK_REVIEW} pedido(s) esperan revisión de riesgo`, '#/admin/pedidos']);
+          if (d.lowStock.length) alerts.push(['warn', `$${d.lowStock.length} producto(s) con stock ≤ 5: $${d.lowStock.slice(0, 3).map((p) => p.details.name).join(', ')}`, '#/admin/productos']);
+          if (d.openIncidents > 0) alerts.push(['error', `$${d.openIncidents} incidencia(s) abierta(s)`, '#/admin/incidencias']);
+          if (!alerts.length) alerts.push(['ok', 'Sin alertas operativas: no hay revisiones pendientes, stock bajo ni incidencias abiertas.', null]);
+          body.replaceChildren(
+            el('div', { class: 'kpis' },
+              kpi('Pedidos totales', formatInt(d.totalOrders)),
+              kpi('Ventas del portal (demo)', money(d.shopSales), 'violet'),
+              kpi('Pendientes de revisión', formatInt(s.RISK_REVIEW || 0), s.RISK_REVIEW ? 'warn' : ''),
+              kpi('Aprobados por riesgo', formatInt(s.RISK_APPROVED || 0), 'ok'),
+              kpi('En preparación', formatInt((s.CONFIRMED || 0) + (s.PREPARING || 0) + (s.READY_FOR_DISPATCH || 0))),
+              kpi('En tránsito', formatInt(s.IN_TRANSIT || 0)),
+              kpi('Entregados', formatInt(s.DELIVERED || 0), 'ok'),
+              kpi('Rechazados / cancelados', formatInt((s.REJECTED || 0) + (s.CANCELLED || 0)), (s.REJECTED || s.CANCELLED) ? 'error' : ''),
+              kpi('Productos', formatInt(d.products)),
+              kpi('Incidencias abiertas', formatInt(d.openIncidents), d.openIncidents ? 'error' : '')),
+            el('div', { class: 'grid-2' },
+              el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Pedidos por día (últimos 14 días)' }),
+                barChart(d.ordersPerDay, { label: (k) => k.slice(8, 10) + '/' + k.slice(5, 7) })),
+              el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Alertas operativas' }),
+                el('ul', { class: 'alerts-list' }, alerts.map(([tone, text, href]) => el('li', { class: `is-$${tone}` },
+                  el('span', { class: `dot dot--$${tone === 'ok' ? 'ok' : tone === 'warn' ? 'warn' : 'error'}` }),
+                  href ? el('a', { href, text }) : el('span', { text })))))),
+            el('div', { class: 'grid-2-even', style: null },
+              el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Pedidos por estado' }),
+                table(['Estado', 'Pedidos'], Object.entries(s).map(([status, count]) => el('tr', {}, el('td', {}, lifecycleBadge(status)), el('td', { class: 'mono', text: String(count) }))))),
+              el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Actividad reciente' }),
+                d.recentActivity.length ? el('ul', { class: 'activity' }, d.recentActivity.map((a) => el('li', {},
+                  el('strong', { text: a.action }), ` · $${a.actor} → $${a.target}`, el('small', { text: `$${formatRelative(a.at)}$${a.details ? ` · $${a.details}` : ''}` }))))
+                  : emptyState('Sin actividad', 'Todavía no hay eventos auditados.'))));
+          body.lastElementChild.style.marginTop = '16px';
+        }
+        
+        // ---- Productos e inventario --------------------------------------------------------
+        function productForm(categories, product = null) {
+          const v = product || { sku: '', name: '', description: '', categoryId: categories[0] && categories[0].id, price: '', active: true, hue: 260, stock: 0 };
+          const sku = el('input', { value: v.sku, maxlength: '32', placeholder: 'TEC-EJEMPLO-01' });
+          const name = el('input', { value: v.name, maxlength: '120' });
+          const description = el('textarea', { maxlength: '1000' });
+          description.value = v.description;
+          const category = el('select', {}, categories.map((c) => el('option', { value: String(c.id), text: c.name, selected: c.id === v.categoryId })));
+          const price = el('input', { value: String(v.price), inputmode: 'decimal', placeholder: '99.90' });
+          const hue = el('input', { type: 'range', min: '0', max: '359', value: String(v.hue) });
+          const swatch = el('span', { class: 'swatch' });
+          const paint = () => { swatch.style.background = `linear-gradient(135deg, hsl($${hue.value} 70% 40%), hsl($${(Number(hue.value) + 40) % 360} 75% 24%))`; };
+          hue.addEventListener('input', paint); paint();
+          const active = el('input', { type: 'checkbox', checked: v.active });
+          const stock = el('input', { type: 'number', min: '0', max: '100000', value: String(v.stock) });
+          const grid = el('div', { class: 'form-grid' },
+            field('SKU', sku), field('Nombre', name),
+            (() => { const f = field('Descripción', description); f.classList.add('field--full'); return f; })(),
+            field('Categoría', category), field('Precio (USD)', price),
+            field('Tono de la ilustración', hue), el('div', { class: 'field' }, el('span', { class: 'field__help', text: 'Vista previa' }), swatch),
+            product ? null : field('Stock inicial', stock),
+            el('label', { class: 'switch' }, active, 'Visible en el catálogo'));
+          const read = () => ({ sku: sku.value.trim(), name: name.value.trim(), description: description.value.trim(), categoryId: Number(category.value),
+            price: price.value.trim().replace(',', '.'), active: active.checked, hue: Number(hue.value), stock: Number(stock.value) });
+          return { grid, read };
+        }
+        
+        async function products(root) {
+          const body = el('div', {}, skeletons(6, 'skeleton--row'));
+          const create = el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: 'Nuevo producto' });
+          const newCategory = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Nueva categoría' });
+          shell(root, 'productos', el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Catálogo e inventario' }),
+            el('div', { class: 'row-actions' }, newCategory, create)), body));
+          const [list, categories] = await Promise.all([adminApi.products(), catalogApi.categories()]);
+          const reload = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
+          const openForm = (product) => {
+            const form = productForm(categories, product);
+            const errorNode = formError();
+            const save = el('button', { type: 'button', class: 'btn btn--primary', text: product ? 'Guardar cambios' : 'Crear producto' });
+            const dialog = modal(product ? `Editar $${product.name}` : 'Nuevo producto', el('div', {}, form.grid, errorNode),
+              { wide: true, actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+            save.addEventListener('click', async () => {
+              const value = form.read();
+              await submitting(save, errorNode, () => (product ? adminApi.updateProduct(product.id, value) : adminApi.createProduct(value)),
+                product ? 'Producto actualizado' : 'Producto creado').then(() => { dialog.close(); reload(); }).catch(() => {});
+            });
+          };
+          const openStock = (product) => {
+            const delta = el('input', { type: 'number', value: '10', step: '1' });
+            const reason = el('input', { maxlength: '200', value: 'Reposición de proveedor' });
+            const errorNode = formError();
+            const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Aplicar ajuste' });
+            const dialog = modal(`Ajustar stock · $${product.name}`, el('div', {}, el('p', { class: 'muted small', text: `Stock actual: $${product.stock}. Usa valores negativos para mermas.` }),
+              field('Cantidad (+/−)', delta), field('Motivo (queda auditado)', reason), errorNode),
+              { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+            save.addEventListener('click', async () => {
+              await submitting(save, errorNode, () => adminApi.adjustStock(product.id, Number(delta.value), reason.value), 'Stock actualizado')
+                .then(() => { dialog.close(); window.dispatchEvent(new HashChangeEvent('hashchange')); }).catch(() => {});
+            });
+          };
+          create.addEventListener('click', () => openForm(null));
+          newCategory.addEventListener('click', () => {
+            const name = el('input', { maxlength: '60' });
+            const slug = el('input', { maxlength: '48', placeholder: 'mi-categoria' });
+            name.addEventListener('input', () => { slug.value = name.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$$/g, ''); });
+            const errorNode = formError();
+            const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Crear categoría' });
+            const dialog = modal('Nueva categoría', el('div', {}, field('Nombre', name), field('Slug', slug), errorNode),
+              { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+            save.addEventListener('click', async () => {
+              await submitting(save, errorNode, () => adminApi.createCategory(slug.value, name.value), 'Categoría creada')
+                .then(() => { dialog.close(); window.dispatchEvent(new HashChangeEvent('hashchange')); }).catch(() => {});
+            });
+          });
+          body.replaceChildren(table(['Producto', 'Categoría', 'Precio', 'Stock', 'Estado', ''], list.map((p) => el('tr', {},
+            el('td', {}, el('strong', { text: p.name }), el('span', { class: 'table__id', text: p.sku })),
+            el('td', { text: p.categoryName }),
+            el('td', { class: 'mono', text: money(p.price) }),
+            el('td', {}, el('span', { class: p.stock <= 5 ? 'badge badge--warn' : 'badge badge--neutral', text: String(p.stock) })),
+            el('td', {}, el('span', { class: p.active ? 'badge badge--ok' : 'badge badge--neutral', text: p.active ? 'Activo' : 'Oculto' })),
+            el('td', {}, el('div', { class: 'row-actions' },
+              el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Stock', onclick: () => openStock(p) }),
+              el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Editar', onclick: () => openForm(p) })))))));
+        }
+        
+        // ---- Pedidos ---------------------------------------------------------------------
+        export function orderDetailModal(id, api, onChanged) {
+          const body = el('div', {}, skeletons(3, 'skeleton--row'));
+          const dialog = modal('Detalle del pedido', body, { wide: true });
+          (async () => {
+            try {
+              const { order, history, delivery, allowedTransitions } = await api.order(id);
+              const note = el('input', { maxlength: '500', placeholder: 'Nota opcional (queda en el historial)' });
+              const errorNode = formError();
+              const buttons = allowedTransitions.map((target) => {
+                const button = el('button', { type: 'button', class: target === 'REJECTED' || target === 'CANCELLED' ? 'btn btn--ghost btn--sm' : 'btn btn--primary btn--sm', text: TRANSITION_VERBS[target] || target });
+                button.addEventListener('click', async () => {
+                  await submitting(button, errorNode, () => api.transition(id, target, note.value), `Pedido: $${LIFECYCLE[target].label}`)
+                    .then(() => { dialog.close(); if (onChanged) onChanged(); }).catch(() => {});
+                });
+                return button;
+              });
+              body.replaceChildren(
+                el('div', { class: 'row-actions', style: null }, lifecycleBadge(order.status), channelBadge(order.channel),
+                  el('span', { class: 'badge badge--neutral', text: `Riesgo $${order.riskScore}/100 · $${order.riskDecision}` })),
+                el('p', { class: 'muted small', text: `$${order.id} · cliente $${order.customerId} · $${formatDateTime(order.createdAt)} · versión $${order.version}` }),
+                order.lines.length ? table(['Artículo', 'Cant.', 'Total'], order.lines.map((l) => el('tr', {}, el('td', { text: l.productName }), el('td', { text: String(l.quantity) }), el('td', { class: 'mono', text: money(l.lineTotal) }))))
+                  : el('p', { class: 'muted small', text: 'Pedido de la API original (laboratorio): sin líneas de producto.' }),
+                el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(order.amount) })),
+                delivery ? el('div', { class: 'notice-box' }, el('strong', { text: 'Entrega: ' }), `$${formatDateTime(delivery.start)} · $${delivery.assigneeName}`) : null,
+                el('h3', { class: 'card__title card__title--spaced', text: 'Historial' }),
+                el('ol', { class: 'timeline' }, history.map((h, i) => el('li', { class: i === history.length - 1 ? 'is-current' : '' },
+                  el('strong', {}, lifecycleBadge(h.to)), el('small', { text: `$${formatDateTime(h.at)} · $${h.actor}$${h.note ? ` · $${h.note}` : ''}` })))),
+                buttons.length ? el('div', {}, el('h3', { class: 'card__title card__title--spaced', text: 'Acciones permitidas para tu rol' }), note,
+                  el('div', { class: 'row-actions', style: null }, buttons), errorNode)
+                  : el('p', { class: 'muted small', text: 'No hay acciones disponibles para tu rol en este estado.' }));
+              body.querySelectorAll('.row-actions').forEach((r) => { r.style.justifyContent = 'flex-start'; r.style.marginTop = '10px'; });
+            } catch (error) {
+              body.replaceChildren(emptyState('No se pudo cargar el pedido', errorMessage(error)));
+            }
+          })();
+          return dialog;
+        }
+        
+        export function ordersTable(orders, api, onChanged) {
+          if (!orders.length) return emptyState('Sin pedidos en este filtro', 'Cambia el filtro de estado.', 'box');
+          return table(['Pedido', 'Cliente', 'Canal', 'Total', 'Riesgo', 'Estado', 'Creado', ''], orders.map((o) => el('tr', {},
+            el('td', {}, el('span', { class: 'table__id', text: o.id.slice(0, 8) })),
+            el('td', { text: o.customerId }),
+            el('td', {}, channelBadge(o.channel)),
+            el('td', { class: 'mono', text: money(o.amount) }),
+            el('td', { class: 'mono', text: `$${o.riskScore}/100` }),
+            el('td', {}, lifecycleBadge(o.status)),
+            el('td', { title: formatDateTime(o.createdAt), text: formatRelative(o.createdAt) }),
+            el('td', {}, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Gestionar', onclick: () => orderDetailModal(o.id, api, onChanged) })))));
+        }
+        
+        export function statusFilter(onChange, initial = []) {
+          const select = el('select', { 'aria-label': 'Filtrar por estado' },
+            el('option', { value: '', text: 'Todos los estados' }),
+            el('option', { value: 'RISK_REVIEW,RISK_APPROVED', text: 'Pendientes de confirmar' }),
+            el('option', { value: 'CONFIRMED,PREPARING', text: 'En preparación' }),
+            el('option', { value: 'READY_FOR_DISPATCH,IN_TRANSIT', text: 'Despacho' }),
+            ...Object.entries(LIFECYCLE).map(([k, v]) => el('option', { value: k, text: v.label })));
+          select.value = initial.join(',');
+          select.style.width = 'auto';
+          select.addEventListener('change', () => onChange(select.value ? select.value.split(',') : []));
+          return select;
+        }
+        
+        async function orders(root) {
+          const body = el('div', {}, skeletons(6, 'skeleton--row'));
+          let statuses = [];
+          const load = async () => {
+            body.replaceChildren(...skeletons(6, 'skeleton--row'));
+            try { body.replaceChildren(ordersTable(await operationsApi.queue(statuses), operationsApi, load)); }
+            catch (error) { body.replaceChildren(emptyState('No se pudieron cargar los pedidos', errorMessage(error))); }
+          };
+          shell(root, 'pedidos', el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Todos los pedidos (portal y laboratorio)' }),
+            statusFilter((value) => { statuses = value; load(); })), body));
+          await load();
+        }
+        
+        // ---- Usuarios y roles ------------------------------------------------------------
+        async function users(root) {
+          const body = el('div', {}, skeletons(6, 'skeleton--row'));
+          shell(root, 'usuarios', el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Usuarios, roles y acceso' }),
+            el('p', { class: 'muted small', text: 'Los cambios de rol se aplican en el siguiente inicio de sesión del usuario y quedan auditados.' }), body));
+          const list = await adminApi.users();
+          body.replaceChildren(table(['Usuario', 'Correo', 'Roles', 'Activo', 'Alta'], list.map((u) => {
+            const checks = el('div', { class: 'role-checks' }, Object.keys(ROLE_LABELS).map((role) => {
+              const input = el('input', { type: 'checkbox', checked: u.roles.includes(role), 'aria-label': `$${ROLE_LABELS[role]} para $${u.username}` });
+              input.addEventListener('change', async () => {
+                const roles = Array.from(checks.querySelectorAll('input')).map((i, idx) => (i.checked ? Object.keys(ROLE_LABELS)[idx] : null)).filter(Boolean);
+                try { await adminApi.roles(u.id, roles); toast(`Roles de $${u.username} actualizados`, 'ok'); }
+                catch (error) { input.checked = !input.checked; toast(errorMessage(error), 'error'); }
+              });
+              return el('label', {}, input, ROLE_LABELS[role]);
+            }));
+            const enabled = el('input', { type: 'checkbox', checked: u.enabled, 'aria-label': `Cuenta activa de $${u.username}` });
+            enabled.addEventListener('change', async () => {
+              try { await adminApi.enabled(u.id, enabled.checked); toast(`$${u.username}: $${enabled.checked ? 'activada' : 'desactivada'}`, 'ok'); }
+              catch (error) { enabled.checked = !enabled.checked; toast(errorMessage(error), 'error'); }
+            });
+            return el('tr', {},
+              el('td', {}, el('strong', { text: u.displayName }), el('span', { class: 'table__id', text: `@$${u.username}` })),
+              el('td', { text: u.email }), el('td', {}, checks),
+              el('td', {}, el('label', { class: 'switch' }, enabled, u.enabled ? 'Sí' : 'No')),
+              el('td', { text: formatRelative(u.createdAt) }));
+          })));
+        }
+        
+        // ---- Incidencias -------------------------------------------------------------------
+        export async function incidentsPanel(container, canResolve = true) {
+          const list = el('div', {}, skeletons(4, 'skeleton--row'));
+          const filter = el('select', { 'aria-label': 'Estado' }, el('option', { value: 'OPEN', text: 'Abiertas' }), el('option', { value: 'RESOLVED', text: 'Resueltas' }), el('option', { value: '', text: 'Todas' }));
+          filter.style.width = 'auto';
+          const report = el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: 'Registrar incidencia' });
+          container.append(el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Incidencias' }),
+            el('div', { class: 'row-actions' }, filter, report)), list));
+          const load = async () => {
+            try {
+              const items = await incidentsApi.list(filter.value || undefined);
+              list.replaceChildren(items.length ? table(['Categoría', 'Descripción', 'Pedido', 'Reportó', 'Estado', ''], items.map((i) => el('tr', {},
+                el('td', {}, el('span', { class: 'badge badge--warn', text: i.category })),
+                el('td', { text: i.description, style: null }),
+                el('td', {}, i.orderId ? el('span', { class: 'table__id', text: i.orderId.slice(0, 8) }) : '—'),
+                el('td', { text: `$${i.reportedBy} · $${formatRelative(i.createdAt)}` }),
+                el('td', {}, el('span', { class: i.status === 'OPEN' ? 'badge badge--error' : 'badge badge--ok', text: i.status === 'OPEN' ? 'Abierta' : 'Resuelta' })),
+                el('td', {}, i.status === 'OPEN' && canResolve ? el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Resolver', onclick: () => {
+                  const resolution = el('textarea', { maxlength: '500' });
+                  const errorNode = formError();
+                  const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Marcar resuelta' });
+                  const dialog = modal('Resolver incidencia', el('div', {}, el('p', { class: 'muted small', text: i.description }), field('Resolución', resolution), errorNode),
+                    { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+                  save.addEventListener('click', async () => { await submitting(save, errorNode, () => incidentsApi.resolve(i.id, resolution.value), 'Incidencia resuelta').then(() => { dialog.close(); load(); }).catch(() => {}); });
+                } }) : (i.resolution || '')))))
+                : emptyState('Sin incidencias', 'No hay incidencias en este filtro.', 'shield'));
+            } catch (error) {
+              list.replaceChildren(emptyState('No se pudieron cargar las incidencias', errorMessage(error)));
+            }
+          };
+          filter.addEventListener('change', load);
+          report.addEventListener('click', () => reportIncidentModal(null, load));
+          await load();
+        }
+        
+        export function reportIncidentModal(orderId, onDone) {
+          const order = el('input', { value: orderId || '', placeholder: 'UUID del pedido (opcional)', maxlength: '36' });
+          const category = el('select', {}, [['DELAY', 'Retraso'], ['DAMAGED', 'Daño'], ['ADDRESS', 'Dirección'], ['STOCK', 'Stock'], ['OTHER', 'Otra']].map(([v, t]) => el('option', { value: v, text: t })));
+          const description = el('textarea', { maxlength: '1000' });
+          const errorNode = formError();
+          const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Registrar' });
+          const dialog = modal('Registrar incidencia', el('div', {}, field('Pedido', order), field('Categoría', category), field('Descripción', description), errorNode),
+            { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+          save.addEventListener('click', async () => {
+            await submitting(save, errorNode, () => incidentsApi.report(order.value.trim() || null, category.value, description.value), 'Incidencia registrada')
+              .then(() => { dialog.close(); if (onDone) onDone(); }).catch(() => {});
+          });
+        }
+        
+        async function incidents(root) {
+          const container = el('div', {});
+          shell(root, 'incidencias', container);
+          await incidentsPanel(container);
+        }
+        
+        // ---- Auditoría y reportes ------------------------------------------------------------
+        async function audit(root) {
+          const body = el('div', {}, skeletons(8, 'skeleton--row'));
+          shell(root, 'auditoria', el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Registro de auditoría (últimos 200 eventos)' }), body));
+          const events = await adminApi.audit(200);
+          body.replaceChildren(table(['Fecha', 'Actor', 'Acción', 'Objetivo', 'Detalle'], events.map((e) => el('tr', {},
+            el('td', { text: formatDateTime(e.at) }), el('td', { text: e.actor }),
+            el('td', {}, el('span', { class: 'badge badge--neutral', text: e.action })), el('td', { class: 'mono small', text: e.target }),
+            el('td', { class: 'small', text: e.details })))));
+        }
+        
+        async function reports(root) {
+          const body = el('div', {}, skeletons(4, 'skeleton--row'));
+          const exportBtn = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Exportar CSV' });
+          shell(root, 'reportes', el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Ventas por categoría (pedidos no cancelados ni rechazados)' }), exportBtn), body));
+          const d = await adminApi.dashboard();
+          const total = d.salesByCategory.reduce((s, c) => s + Number(c.revenue), 0);
+          body.replaceChildren(d.salesByCategory.length
+            ? table(['Categoría', 'Unidades', 'Ingresos', '% del total'], d.salesByCategory.map((c) => el('tr', {},
+              el('td', { text: c.category }), el('td', { class: 'mono', text: String(c.units) }), el('td', { class: 'mono', text: money(c.revenue) }),
+              el('td', { class: 'mono', text: total ? `$${((Number(c.revenue) / total) * 100).toFixed(1)} %` : '—' }))))
+            : emptyState('Sin ventas todavía', 'Los reportes se llenan con los pedidos del portal.', 'chart'));
+          exportBtn.addEventListener('click', () => downloadCsv('hexaorders-ventas-por-categoria.csv',
+            [['categoria', 'unidades', 'ingresos_usd'], ...d.salesByCategory.map((c) => [c.category, c.units, c.revenue])]));
+        }
+        
+        const RENDER = { panel, productos: products, pedidos: orders, usuarios: users, incidencias: incidents, auditoria: audit, reportes: reports };
+        route('/admin', (root) => panel(root), { roles: ['ADMIN'], title: 'Administración' });
+        route('/admin/:tab', (root, { tab }) => (RENDER[tab] || panel)(root), { roles: ['ADMIN'], title: 'Administración' });
+        HEXFILE_123
+        COPY <<'HEXFILE_124' src/main/resources/static/js/views/logistics.js
+        // Calendario logístico (LOGISTICS_OPERATOR y ADMIN). Vistas mensual, semanal y diaria con datos de
+        // PostgreSQL. La validación de conflictos la hace el backend (409 SCHEDULE_CONFLICT) y se muestra tal cual.
+        
+        import { logisticsApi } from '../api.js';
+        import {
+          LIFECYCLE, TRANSITION_VERBS, emptyState, errorMessage, field, formError, lifecycleBadge, modal, money, submitting,
+        } from '../components.js';
+        import { route } from '../router.js';
+        import { el, formatDateTime } from '../ui.js';
+        import { reportIncidentModal } from './admin.js';
+        
+        const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 – 20:00
+        const HOUR_PX = 44;
+        const PALETTE = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#14B8A6'];
+        const monthFmt = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' });
+        const dayFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric' });
+        const longDayFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const timeFmt = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
+        
+        const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+        const startOfWeek = (d) => addDays(startOfDay(d), -((d.getDay() + 6) % 7)); // lunes
+        const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+        const pad = (n) => String(n).padStart(2, '0');
+        const toLocalInput = (d) => `$${d.getFullYear()}-$${pad(d.getMonth() + 1)}-$${pad(d.getDate())}T$${pad(d.getHours())}:$${pad(d.getMinutes())}`;
+        
+        route('/logistica', async (root) => {
+          const state = { mode: 'month', cursor: startOfDay(new Date()), assignee: '', deliveries: [], assignees: [], colors: new Map() };
+          const title = el('h3', {});
+          const modes = el('div', { class: 'segmented', role: 'group', 'aria-label': 'Vista del calendario' },
+            [['month', 'Mes'], ['week', 'Semana'], ['day', 'Día']].map(([value, label]) => el('button', {
+              type: 'button', class: `segmented__btn$${value === state.mode ? ' is-active' : ''}`, dataset: { mode: value }, 'aria-pressed': String(value === state.mode), text: label,
+            })));
+          const assigneeFilter = el('select', { 'aria-label': 'Filtrar por responsable' }, el('option', { value: '', text: 'Todos los responsables' }));
+          assigneeFilter.style.width = 'auto';
+          const scheduleButton = el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: 'Programar entrega' });
+          const calendar = el('div', { 'aria-live': 'polite' });
+          const legend = el('div', { class: 'cal-legend' });
+          const pending = el('div', {});
+          const nav = (delta) => {
+            const c = state.cursor;
+            state.cursor = state.mode === 'month' ? new Date(c.getFullYear(), c.getMonth() + delta, 1) : addDays(c, delta * (state.mode === 'week' ? 7 : 1));
+            load();
+          };
+        
+          root.append(el('section', { class: 'view' },
+            el('div', { class: 'view__head' }, el('div', {}, el('p', { class: 'eyebrow', text: 'Logística' }), el('h1', { class: 'view__title', text: 'Calendario de entregas' }),
+              el('p', { class: 'section__lead', text: 'Programa, reasigna y reprograma entregas. Cada cambio queda en el historial; el servidor impide solapamientos del mismo responsable.' })),
+              el('div', { class: 'row-actions' }, scheduleButton)),
+            el('article', { class: 'card' },
+              el('div', { class: 'cal-toolbar' },
+                el('div', { class: 'cal-toolbar__nav' },
+                  el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Anterior', text: '‹', onclick: () => nav(-1) }),
+                  el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Hoy', onclick: () => { state.cursor = startOfDay(new Date()); load(); } }),
+                  el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Siguiente', text: '›', onclick: () => nav(1) }), title),
+                el('div', { class: 'row-actions' }, assigneeFilter, modes)),
+              calendar, legend),
+            el('div', {}, pending)));
+          pending.parentElement.style.marginTop = '16px';
+        
+          modes.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-mode]');
+            if (!button) return;
+            state.mode = button.dataset.mode;
+            modes.querySelectorAll('button').forEach((b) => { b.classList.toggle('is-active', b === button); b.setAttribute('aria-pressed', String(b === button)); });
+            load();
+          });
+          assigneeFilter.addEventListener('change', () => { state.assignee = assigneeFilter.value; load(); });
+          scheduleButton.addEventListener('click', () => scheduleModal(null));
+        
+          function range() {
+            if (state.mode === 'month') {
+              const first = new Date(state.cursor.getFullYear(), state.cursor.getMonth(), 1);
+              const start = startOfWeek(first);
+              return [start, addDays(start, 42)];
+            }
+            if (state.mode === 'week') { const start = startOfWeek(state.cursor); return [start, addDays(start, 7)]; }
+            return [startOfDay(state.cursor), addDays(startOfDay(state.cursor), 1)];
+          }
+        
+          const colorOf = (assigneeId) => {
+            if (!state.colors.has(assigneeId)) state.colors.set(assigneeId, PALETTE[state.colors.size % PALETTE.length]);
+            return state.colors.get(assigneeId);
+          };
+        
+          async function load() {
+            const [from, to] = range();
+            title.textContent = state.mode === 'month' ? monthFmt.format(state.cursor)
+              : state.mode === 'week' ? `$${dayFmt.format(from)} – $${dayFmt.format(addDays(to, -1))}` : longDayFmt.format(from);
+            try {
+              state.deliveries = await logisticsApi.deliveries(from.toISOString(), to.toISOString(), state.assignee || undefined);
+              render(from);
+              renderPending();
+            } catch (error) {
+              calendar.replaceChildren(emptyState('No se pudo cargar el calendario', errorMessage(error), 'calendar'));
+            }
+          }
+        
+          function eventButton(view, className) {
+            const d = view.delivery;
+            const button = el('button', { type: 'button', class: className, title: `$${timeFmt.format(new Date(d.start))} · $${view.customerId} · $${d.assigneeName}`,
+              text: `$${timeFmt.format(new Date(d.start))} $${view.customerId}`, onclick: (event) => { event.stopPropagation(); detailModal(view); } });
+            button.style.background = colorOf(d.assigneeId);
+            if (view.orderStatus === 'DELIVERED') button.style.opacity = '0.55';
+            return button;
+          }
+        
+          function render(from) {
+            const today = new Date();
+            if (state.mode === 'month') {
+              const grid = el('div', { class: 'cal-month', role: 'grid', 'aria-label': title.textContent },
+                ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((d) => el('div', { class: 'cal-month__dow', role: 'columnheader', text: d })));
+              for (let i = 0; i < 42; i += 1) {
+                const day = addDays(from, i);
+                const events = state.deliveries.filter((v) => sameDay(new Date(v.delivery.start), day));
+                const cell = el('button', { type: 'button', class: `cal-day$${day.getMonth() !== state.cursor.getMonth() ? ' is-other' : ''}$${sameDay(day, today) ? ' is-today' : ''}`,
+                  'aria-label': `$${longDayFmt.format(day)}: $${events.length} entregas` },
+                el('span', { class: 'cal-day__num', text: String(day.getDate()) }),
+                events.slice(0, 3).map((v) => eventButton(v, 'cal-event')),
+                events.length > 3 ? el('span', { class: 'cal-more', text: `+$${events.length - 3} más` }) : null);
+                cell.addEventListener('click', () => { state.mode = 'day'; state.cursor = day; modes.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === 'day')); load(); });
+                grid.append(cell);
+              }
+              calendar.replaceChildren(grid);
+            } else if (state.mode === 'week') {
+              const grid = el('div', { class: 'cal-week' }, el('div', { class: 'cal-week__head' }));
+              for (let i = 0; i < 7; i += 1) {
+                const day = addDays(from, i);
+                grid.append(el('div', { class: `cal-week__head$${sameDay(day, today) ? ' is-today' : ''}`, text: dayFmt.format(day) }));
+              }
+              grid.append(el('div', { class: 'cal-week__hours' }, HOURS.map((h) => el('div', { class: 'cal-week__hour', text: `$${pad(h)}:00` }))));
+              for (let i = 0; i < 7; i += 1) {
+                const day = addDays(from, i);
+                const column = el('div', { class: 'cal-week__col' }, HOURS.map((h) => {
+                  const slot = el('div', { class: 'cal-week__slot', title: `Programar $${dayFmt.format(day)} $${pad(h)}:00` });
+                  slot.addEventListener('click', () => scheduleModal(null, new Date(day.getFullYear(), day.getMonth(), day.getDate(), h)));
+                  return slot;
+                }));
+                state.deliveries.filter((v) => sameDay(new Date(v.delivery.start), day)).forEach((v) => {
+                  const start = new Date(v.delivery.start);
+                  const end = new Date(v.delivery.end);
+                  const top = Math.max(0, (start.getHours() + start.getMinutes() / 60 - HOURS[0]) * HOUR_PX);
+                  const height = Math.max(22, ((end - start) / 3600000) * HOUR_PX - 2);
+                  const button = eventButton(v, 'cal-week__event');
+                  button.style.top = `$${top}px`;
+                  button.style.height = `$${height}px`;
+                  button.textContent = `$${timeFmt.format(start)}–$${timeFmt.format(end)} · $${v.customerId} · $${v.delivery.assigneeName}`;
+                  column.append(button);
+                });
+                grid.append(column);
+              }
+              calendar.replaceChildren(grid);
+            } else {
+              const events = [...state.deliveries].sort((a, b) => new Date(a.delivery.start) - new Date(b.delivery.start));
+              calendar.replaceChildren(events.length ? el('div', { class: 'day-list' }, events.map((v) => el('div', { class: 'day-list__item' },
+                el('span', { class: 'day-list__time', text: `$${timeFmt.format(new Date(v.delivery.start))}–$${timeFmt.format(new Date(v.delivery.end))}` }),
+                el('div', {}, el('strong', { text: `$${v.customerId} · $${money(v.amount)}` }), el('small', { class: 'muted', text: ` · $${v.delivery.assigneeName}$${v.delivery.notes ? ` · $${v.delivery.notes}` : ''}` })),
+                el('div', { class: 'row-actions' }, lifecycleBadge(v.orderStatus), el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Gestionar', onclick: () => detailModal(v) })))))
+                : emptyState('Sin entregas este día', 'Usa «Programar entrega» o elige otro día.', 'calendar'));
+            }
+            legend.replaceChildren(...state.assignees.map((a) => el('span', {}, (() => { const i = el('i'); i.style.background = colorOf(a.id); return i; })(), a.displayName)));
+          }
+        
+          async function renderPending() {
+            try {
+              const orders = await logisticsApi.schedulable();
+              pending.replaceChildren(el('article', { class: 'card' },
+                el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: `Pedidos pendientes de programar ($${orders.length})` })),
+                orders.length ? el('div', { class: 'day-list' }, orders.slice(0, 12).map((o) => el('div', { class: 'day-list__item' },
+                  el('span', { class: 'day-list__time', text: o.id.slice(0, 8) }),
+                  el('div', {}, el('strong', { text: `$${o.customerId} · $${money(o.amount)}` })),
+                  el('div', { class: 'row-actions' }, lifecycleBadge(o.status), el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: 'Programar', onclick: () => scheduleModal(o.id) })))))
+                  : emptyState('Nada pendiente', 'Todos los pedidos confirmados ya tienen entrega.', 'truck')));
+            } catch (error) {
+              pending.replaceChildren(el('p', { class: 'muted small', text: errorMessage(error) }));
+            }
+          }
+        
+          async function scheduleModal(orderId, startAt) {
+            const orders = await logisticsApi.schedulable().catch(() => []);
+            const order = el('select', {}, orders.map((o) => el('option', { value: o.id, text: `$${o.id.slice(0, 8)} · $${o.customerId} · $${money(o.amount)} · $${LIFECYCLE[o.status].label}`, selected: o.id === orderId })));
+            const start = startAt || (() => { const d = addDays(startOfDay(new Date()), 1); d.setHours(10); return d; })();
+            const startInput = el('input', { type: 'datetime-local', value: toLocalInput(start) });
+            const endInput = el('input', { type: 'datetime-local', value: toLocalInput(new Date(start.getTime() + 2 * 3600000)) });
+            const assignee = el('select', {}, state.assignees.map((a) => el('option', { value: String(a.id), text: a.displayName })));
+            const notes = el('input', { maxlength: '500', placeholder: 'Instrucciones de entrega (opcional)' });
+            const errorNode = formError();
+            const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Programar' });
+            const body = orders.length ? el('div', { class: 'form-grid' },
+              (() => { const f = field('Pedido', order); f.classList.add('field--full'); return f; })(),
+              field('Inicio', startInput), field('Fin (máx. 8 h)', endInput), field('Responsable', assignee), field('Notas', notes),
+              (() => { errorNode.classList.add('field--full'); return errorNode; })())
+              : emptyState('No hay pedidos para programar', 'Solo se programan pedidos CONFIRMED, PREPARING o READY_FOR_DISPATCH sin entrega.', 'truck');
+            const dialog = modal('Programar entrega', body, { wide: true, actions: orders.length ? [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] : [] });
+            save.addEventListener('click', async () => {
+              await submitting(save, errorNode, () => logisticsApi.schedule({ orderId: order.value, assigneeId: Number(assignee.value),
+                start: new Date(startInput.value).toISOString(), end: new Date(endInput.value).toISOString(), notes: notes.value }), 'Entrega programada')
+                .then(() => { dialog.close(); load(); }).catch(() => {});
+            });
+          }
+        
+          async function detailModal(view) {
+            const d = view.delivery;
+            const startInput = el('input', { type: 'datetime-local', value: toLocalInput(new Date(d.start)) });
+            const endInput = el('input', { type: 'datetime-local', value: toLocalInput(new Date(d.end)) });
+            const assignee = el('select', {}, state.assignees.map((a) => el('option', { value: String(a.id), text: a.displayName, selected: a.id === d.assigneeId })));
+            const reason = el('input', { maxlength: '500', placeholder: 'Motivo (obligatorio, queda en el historial)' });
+            const errorNode = formError();
+            const save = el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: 'Guardar reprogramación' });
+            const historyList = el('ol', { class: 'timeline' });
+            const transitions = { READY_FOR_DISPATCH: ['IN_TRANSIT'], IN_TRANSIT: ['DELIVERED'] }[view.orderStatus] || [];
+            const actionButtons = transitions.map((target) => {
+              const button = el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: TRANSITION_VERBS[target] });
+              button.addEventListener('click', async () => {
+                await submitting(button, errorNode, () => logisticsApi.transition(d.orderId, target, 'Actualización logística'), `Pedido: $${LIFECYCLE[target].label}`)
+                  .then(() => { dialog.close(); load(); }).catch(() => {});
+              });
+              return button;
+            });
+            const locked = ['IN_TRANSIT', 'DELIVERED', 'CANCELLED', 'REJECTED'].includes(view.orderStatus);
+            const dialog = modal(`Entrega · pedido $${d.orderId.slice(0, 8)}`, el('div', {},
+              el('div', { class: 'row-actions', style: null }, lifecycleBadge(view.orderStatus), el('span', { class: 'badge badge--neutral', text: `$${view.customerId} · $${money(view.amount)}` })),
+              el('p', { class: 'muted small', text: `$${formatDateTime(d.start)} – $${timeFmt.format(new Date(d.end))} · $${d.assigneeName}$${d.notes ? ` · $${d.notes}` : ''}` }),
+              actionButtons.length ? el('div', { class: 'row-actions', style: null }, actionButtons) : null,
+              locked ? el('p', { class: 'muted small', text: 'La entrega ya no se puede reprogramar en este estado.' })
+                : el('div', {}, el('h3', { class: 'card__title card__title--spaced', text: 'Reprogramar o reasignar' }),
+                  el('div', { class: 'form-grid' }, field('Inicio', startInput), field('Fin', endInput), field('Responsable', assignee), field('Motivo', reason)), save),
+              errorNode,
+              el('div', { class: 'row-actions', style: null }, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Registrar incidencia', onclick: () => { dialog.close(); reportIncidentModal(d.orderId, null); } })),
+              el('h3', { class: 'card__title card__title--spaced', text: 'Historial de cambios' }), historyList), { wide: true });
+            dialog.root.querySelectorAll('.row-actions').forEach((r) => { r.style.justifyContent = 'flex-start'; r.style.marginBottom = '10px'; });
+            save.addEventListener('click', async () => {
+              await submitting(save, errorNode, () => logisticsApi.reschedule(d.id, { assigneeId: Number(assignee.value), start: new Date(startInput.value).toISOString(),
+                end: new Date(endInput.value).toISOString(), reason: reason.value }), 'Entrega reprogramada').then(() => { dialog.close(); load(); }).catch(() => {});
+            });
+            try {
+              const history = await logisticsApi.history(d.id);
+              historyList.replaceChildren(...history.map((h, i) => el('li', { class: i === history.length - 1 ? 'is-current' : '' },
+                el('strong', { text: h.action === 'CREATED' ? 'Programada' : 'Reprogramada' }),
+                el('small', { text: `$${formatDateTime(h.at)} · $${h.actor} · $${timeFmt.format(new Date(h.newStart))}–$${timeFmt.format(new Date(h.newEnd))} · $${h.newAssignee}$${h.reason ? ` · $${h.reason}` : ''}` }))));
+            } catch (error) {
+              historyList.replaceChildren(el('li', {}, el('small', { text: errorMessage(error) })));
+            }
+          }
+        
+          try {
+            state.assignees = await logisticsApi.assignees();
+            assigneeFilter.append(...state.assignees.map((a) => el('option', { value: String(a.id), text: a.displayName })));
+          } catch (error) {
+            state.assignees = [];
+          }
+          await load();
+        }, { roles: ['LOGISTICS_OPERATOR', 'ADMIN'], title: 'Logística' });
+        HEXFILE_124
+        COPY <<'HEXFILE_125' src/main/resources/static/js/views/operations.js
+        // Operaciones (ORDER_OPERATOR y ADMIN): cola de pedidos, revisión de riesgo, preparación e incidencias.
+        
+        import { operationsApi } from '../api.js';
+        import { emptyState, errorMessage, skeletons } from '../components.js';
+        import { route } from '../router.js';
+        import { el } from '../ui.js';
+        import { incidentsPanel, ordersTable, statusFilter } from './admin.js';
+        
+        route('/operaciones', async (root) => {
+          const counters = el('div', { class: 'kpis' });
+          const body = el('div', {}, skeletons(6, 'skeleton--row'));
+          const incidents = el('div', {});
+          let statuses = ['RISK_REVIEW', 'RISK_APPROVED', 'CONFIRMED', 'PREPARING'];
+          const load = async () => {
+            body.replaceChildren(...skeletons(6, 'skeleton--row'));
+            try {
+              const [queue, all] = await Promise.all([operationsApi.queue(statuses), operationsApi.queue([])]);
+              const count = (s) => all.filter((o) => o.status === s).length;
+              counters.replaceChildren(...[
+                ['En revisión de riesgo', count('RISK_REVIEW'), count('RISK_REVIEW') ? 'warn' : ''],
+                ['Aprobados por riesgo', count('RISK_APPROVED'), 'ok'], ['Confirmados', count('CONFIRMED'), 'violet'],
+                ['En preparación', count('PREPARING'), 'violet'], ['Listos para despacho', count('READY_FOR_DISPATCH'), ''],
+              ].map(([label, value, tone]) => el('div', { class: `kpi$${tone ? ` kpi--$${tone}` : ''}` }, el('span', { text: label }), el('strong', { text: String(value) }))));
+              body.replaceChildren(ordersTable(queue, operationsApi, load));
+            } catch (error) {
+              body.replaceChildren(emptyState('No se pudo cargar la cola', errorMessage(error)));
+            }
+          };
+          root.append(el('section', { class: 'view' },
+            el('div', { class: 'view__head' }, el('div', {}, el('p', { class: 'eyebrow', text: 'Operaciones' }), el('h1', { class: 'view__title', text: 'Cola de pedidos' }),
+              el('p', { class: 'section__lead', text: 'Revisa los pedidos marcados por el motor de riesgo, confírmalos y prepáralos. Solo se muestran las transiciones que tu rol puede ejecutar; el servidor las valida igualmente.' }))),
+            counters,
+            el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Pedidos' }),
+              statusFilter((value) => { statuses = value; load(); }, statuses)), body),
+            el('div', { style: null }, incidents)));
+          incidents.parentElement.style.marginTop = '16px';
+          await Promise.all([load(), incidentsPanel(incidents, true)]);
+        }, { roles: ['ORDER_OPERATOR', 'ADMIN'], title: 'Operaciones' });
+        HEXFILE_125
+        COPY <<'HEXFILE_126' src/main/resources/static/js/views/ops.js
+        // Observabilidad técnica (OBSERVABILITY_VIEWER y ADMIN): solo lectura. Combina la comprobación
+        // del backend (/api/ops/health) con los enlaces a Prometheus y a los dashboards de Grafana.
+        
+        import { GRAFANA_URL, PROMETHEUS_URL, opsApi } from '../api.js';
+        import { LIFECYCLE, emptyState, errorMessage, icon, lifecycleBadge } from '../components.js';
+        import { route } from '../router.js';
+        import { el, formatDateTime } from '../ui.js';
+        
+        const DASHBOARDS = [
+          ['hexaorders', 'HexaOrders · Puertos, adaptadores y métricas', 'Dashboard original (conservado sin cambios).'],
+          ['hexaorders-business', 'Business Operations', 'Ciclo de vida, checkout, logística e incidencias.'],
+          ['hexaorders-risk', 'Risk Engine', 'Evaluaciones, latencias e integración Java → Python.'],
+          ['hexaorders-api', 'API Performance', 'Tráfico, percentiles y errores HTTP.'],
+          ['hexaorders-infrastructure', 'Infrastructure', 'Targets, JVM, HikariCP y scraping.'],
+          ['hexaorders-security', 'Security & Audit', 'Inicios de sesión, accesos denegados y actividad.'],
+        ];
+        
+        route('/observabilidad-tecnica', async (root) => {
+          const health = el('div', { class: 'kpis' });
+          const statuses = el('div', {});
+          root.append(el('section', { class: 'view' },
+            el('div', { class: 'view__head' }, el('div', {}, el('p', { class: 'eyebrow', text: 'Observability' }), el('h1', { class: 'view__title', text: 'Salud técnica' }),
+              el('p', { class: 'section__lead', text: 'Vista de solo lectura. Las comprobaciones de abajo las ejecuta el backend contra PostgreSQL y el motor de riesgo; no dependen de Prometheus.' })),
+              el('div', { class: 'row-actions' }, el('a', { class: 'btn btn--ghost btn--sm', href: '#observabilidad', text: 'Métricas en vivo (laboratorio)' }),
+                el('a', { class: 'btn btn--ghost btn--sm', href: `$${PROMETHEUS_URL}/alerts`, target: '_blank', rel: 'noopener', text: 'Alertas ↗' }))),
+            health,
+            el('div', { class: 'grid-2-even' },
+              el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Pedidos por estado (PostgreSQL)' }), statuses),
+              el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Dashboards de Grafana' }),
+                el('ul', { class: 'activity' }, DASHBOARDS.map(([uid, title, text]) => el('li', {},
+                  el('a', { href: `$${GRAFANA_URL}/d/$${uid}`, target: '_blank', rel: 'noopener', text: `$${title} ↗` }), el('small', { text }))))))));
+          try {
+            const h = await opsApi.health();
+            const tile = (label, ok, detail) => el('div', { class: `kpi kpi--$${ok ? 'ok' : 'error'}` }, el('span', { text: label }), el('strong', { text: ok ? 'Disponible' : 'Caído' }), el('span', { text: detail }));
+            health.replaceChildren(
+              tile('PostgreSQL', h.database, 'SELECT 1 desde order-api'),
+              tile('Motor de riesgo', h.riskEngine, 'GET /health/ready'),
+              el('div', { class: 'kpi kpi--violet' }, el('span', { text: 'Incidencias abiertas' }), el('strong', { text: String(h.openIncidents) })),
+              el('div', { class: 'kpi' }, el('span', { text: 'Comprobado' }), el('strong', { text: formatDateTime(h.checkedAt).split(',').pop().trim() })));
+            statuses.replaceChildren(el('ul', { class: 'activity' }, Object.keys(LIFECYCLE).map((status) => el('li', {},
+              lifecycleBadge(status), el('strong', { text: ` $${h.ordersByStatus[status] ?? 0}` })))));
+          } catch (error) {
+            health.replaceChildren(el('div', { class: 'card' }, emptyState('No se pudo consultar la salud', errorMessage(error), 'shield')));
+          }
+          void icon;
+        }, { roles: ['OBSERVABILITY_VIEWER', 'ADMIN'], title: 'Observabilidad técnica' });
+        HEXFILE_126
+        COPY <<'HEXFILE_127' src/main/resources/static/js/views/shop.js
+        // Portal comercial: catálogo, producto, carrito, checkout, mis pedidos, seguimiento, perfil y acceso.
+        // Precios, stock, totales, permisos y estados los decide siempre el backend.
+        
+        import { ApiError, accountApi, authApi, catalogApi, shopApi } from '../api.js';
+        import { cart } from '../cart.js';
+        import {
+          TRANSITION_VERBS, emptyState, errorMessage, field, formError, icon, lifecycleBadge, modal, money,
+          productArt, progressBar, showFormError, skeletons, stockNote, submitting,
+        } from '../components.js';
+        import { navigate, route } from '../router.js';
+        import { ROLE_LABELS, homeFor, session } from '../session.js';
+        import { $$, $$$$, el, formatDateTime, formatRelative, toast } from '../ui.js';
+        
+        const view = (...children) => el('section', { class: 'view' }, ...children);
+        const head = (eyebrow, title, lead, ...actions) => el('div', { class: 'view__head' },
+          el('div', {}, el('p', { class: 'eyebrow', text: eyebrow }), el('h1', { class: 'view__title', text: title }),
+            lead ? el('p', { class: 'section__lead', text: lead }) : null),
+          actions.length ? el('div', { class: 'row-actions' }, actions) : null);
+        
+        // ---- Catálogo ----------------------------------------------------------------
+        function productCard(product) {
+          const add = el('button', { type: 'button', class: 'btn btn--primary btn--sm', disabled: product.stock <= 0, text: product.stock <= 0 ? 'Agotado' : 'Añadir' });
+          add.addEventListener('click', () => {
+            cart.add(product.id, 1);
+            toast(`$${product.name} añadido al carrito`, 'ok', 2200);
+          });
+          return el('article', { class: 'product-card', dataset: { productId: String(product.id) } },
+            el('a', { href: `#/producto/$${product.id}`, 'aria-label': product.name, tabindex: '-1' },
+              (() => { const art = productArt(product, 'product-card__media'); art.append(el('span', { class: 'badge badge--neutral product-card__tag', text: product.categoryName })); return art; })()),
+            el('div', { class: 'product-card__body' },
+              el('h3', {}, el('a', { href: `#/producto/$${product.id}`, text: product.name })),
+              el('p', { class: 'product-card__desc', text: product.description }),
+              stockNote(product.stock),
+              el('div', { class: 'product-card__foot' }, el('span', { class: 'price', text: money(product.price) }), add)));
+        }
+        
+        route('/tienda', async (root, { query }) => {
+          let category = query.get('categoria') || '';
+          let search = query.get('q') || '';
+          let sort = 'name';
+          const grid = el('div', { class: 'products', 'aria-live': 'polite' }, skeletons(8, 'skeleton--card'));
+          const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'Categorías' });
+          const searchInput = el('input', { type: 'search', placeholder: 'Buscar productos…', value: search, 'aria-label': 'Buscar productos' });
+          const sortSelect = el('select', { 'aria-label': 'Ordenar' },
+            el('option', { value: 'name', text: 'Nombre' }), el('option', { value: 'price-asc', text: 'Precio: menor a mayor' }),
+            el('option', { value: 'price-desc', text: 'Precio: mayor a menor' }));
+          const stats = el('div', { class: 'shop-hero__stats' });
+        
+          root.append(view(
+            el('div', { class: 'shop-hero' },
+              el('p', { class: 'eyebrow', text: 'HexaOrders Store' }),
+              el('h1', {}, 'Tecnología y equipamiento con ', el('span', { class: 'gradient-text', text: 'evaluación de riesgo en tiempo real' })),
+              el('p', { text: 'Cada compra pasa por el mismo núcleo hexagonal: el backend calcula precios y stock, el motor de riesgo en Python evalúa el pedido y PostgreSQL lo guarda con su historial.' }),
+              stats),
+            el('div', { class: 'feature-row' },
+              [['shield', 'Precios del servidor', 'El total se calcula y valida en Java, nunca en el navegador.'],
+                ['bolt', 'Riesgo en milisegundos', 'Cada pedido consulta el motor FastAPI antes de guardarse.'],
+                ['truck', 'Seguimiento completo', 'Del pago de demostración a la entrega, con historial auditable.'],
+                ['box', 'Stock sin sobreventa', 'Reserva atómica en PostgreSQL y devolución al cancelar.']]
+                .map(([ic, title, text]) => el('div', { class: 'feature' }, el('div', { class: 'feature__icon' }, icon(ic)), el('strong', { text: title }), el('p', { text })))),
+            el('div', { class: 'catalog-toolbar' }, searchInput, sortSelect),
+            chips,
+            grid));
+          chips.style.marginBottom = '16px';
+        
+          let products = [];
+          const render = () => {
+            const list = [...products].sort((a, b) => (sort === 'price-asc' ? a.price - b.price : sort === 'price-desc' ? b.price - a.price : a.name.localeCompare(b.name)));
+            grid.replaceChildren(...(list.length ? list.map(productCard)
+              : [emptyState('Sin resultados', 'Prueba con otra búsqueda o categoría.', 'empty')]));
+          };
+          const load = async () => {
+            grid.replaceChildren(...skeletons(8, 'skeleton--card'));
+            try {
+              products = await catalogApi.products(search || undefined, category || undefined);
+              render();
+            } catch (error) {
+              grid.replaceChildren(emptyState('No se pudo cargar el catálogo', errorMessage(error)));
+            }
+          };
+          try {
+            const categories = await catalogApi.categories();
+            const chip = (id, name) => {
+              const button = el('button', { type: 'button', class: `chip$${String(category) === String(id) ? ' is-active' : ''}`, text: name, 'aria-pressed': String(String(category) === String(id)) });
+              button.addEventListener('click', () => {
+                category = id;
+                $$$$('.chip', chips).forEach((c) => { c.classList.toggle('is-active', c === button); c.setAttribute('aria-pressed', String(c === button)); });
+                load();
+              });
+              return button;
+            };
+            chips.replaceChildren(chip('', 'Todas'), ...categories.map((c) => chip(c.id, c.name)));
+            const all = await catalogApi.products();
+            stats.replaceChildren(
+              el('div', {}, el('strong', { text: String(all.length) }), el('span', { text: 'productos activos' })),
+              el('div', {}, el('strong', { text: String(categories.length) }), el('span', { text: 'categorías' })),
+              el('div', {}, el('strong', { text: String(all.reduce((s, p) => s + p.stock, 0)) }), el('span', { text: 'unidades en stock' })));
+          } catch (error) {
+            chips.replaceChildren(el('p', { class: 'muted small', text: errorMessage(error) }));
+          }
+          let timer = 0;
+          searchInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { search = searchInput.value.trim(); load(); }, 250); });
+          sortSelect.addEventListener('change', () => { sort = sortSelect.value; render(); });
+          await load();
+        }, { title: 'Tienda' });
+        
+        route('/producto/:id', async (root, { id }) => {
+          const product = await catalogApi.product(id);
+          let quantity = 1;
+          const qtyInput = el('input', { type: 'number', min: '1', max: String(Math.max(1, Math.min(99, product.stock))), value: '1', 'aria-label': 'Cantidad' });
+          const change = (delta) => {
+            quantity = Math.max(1, Math.min(99, Math.min(product.stock || 1, quantity + delta)));
+            qtyInput.value = String(quantity);
+          };
+          qtyInput.addEventListener('change', () => { quantity = Math.max(1, Math.min(99, Number(qtyInput.value) || 1)); qtyInput.value = String(quantity); });
+          const add = el('button', { type: 'button', class: 'btn btn--primary', disabled: product.stock <= 0, text: product.stock <= 0 ? 'Agotado' : 'Añadir al carrito' });
+          add.addEventListener('click', () => { cart.add(product.id, quantity); toast(`$${quantity} × $${product.name} en el carrito`, 'ok'); });
+          root.append(view(
+            el('nav', { class: 'breadcrumbs', 'aria-label': 'Ruta' }, el('a', { href: '#/tienda', text: 'Tienda' }), '/',
+              el('a', { href: `#/tienda?categoria=$${product.categoryId}`, text: product.categoryName }), '/', el('span', { text: product.name })),
+            el('div', { class: 'product-detail' },
+              productArt(product, 'product-detail__media'),
+              el('div', { class: 'card' },
+                el('span', { class: 'badge badge--neutral', text: product.categoryName }),
+                el('h1', { text: product.name }),
+                el('p', { class: 'muted', text: product.description }),
+                el('span', { class: 'price', text: money(product.price) }),
+                stockNote(product.stock),
+                el('div', { class: 'row-actions', style: null }, el('div', { class: 'qty' },
+                  el('button', { type: 'button', 'aria-label': 'Menos', onclick: () => change(-1), text: '−' }), qtyInput,
+                  el('button', { type: 'button', 'aria-label': 'Más', onclick: () => change(1), text: '+' })), add),
+                el('ul', { class: 'spec-list' },
+                  el('li', {}, icon('shield'), `SKU $${product.sku}`),
+                  el('li', {}, icon('bolt'), 'Evaluación de riesgo automática al confirmar el pedido'),
+                  el('li', {}, icon('truck'), 'Entrega programada por el equipo de logística'))))));
+          $$('.row-actions', root).style.justifyContent = 'flex-start';
+          $$('.row-actions', root).style.marginTop = '18px';
+        }, { title: 'Producto' });
+        
+        // ---- Carrito y checkout -----------------------------------------------------------
+        async function renderCart(root, checkout) {
+          const items = cart.items();
+          if (!items.length) {
+            root.append(view(head('Carrito', 'Tu carrito está vacío', ''), el('div', { class: 'card' },
+              emptyState('Aún no has añadido productos', 'Explora el catálogo y añade lo que necesites.', 'cart',
+                el('a', { class: 'btn btn--primary', href: '#/tienda', text: 'Ir a la tienda' })))));
+            return;
+          }
+          let quote;
+          let products;
+          try {
+            [quote, products] = await Promise.all([shopApi.quote(items), catalogApi.products()]);
+          } catch (error) {
+            root.append(view(head('Carrito', 'Revisa tu carrito', ''), el('div', { class: 'card' },
+              emptyState('Algún producto ya no está disponible', errorMessage(error), 'empty',
+                el('button', { type: 'button', class: 'btn btn--ghost', text: 'Vaciar carrito', onclick: () => { cart.clear(); navigate('#/carrito'); } })))));
+            return;
+          }
+          const byId = new Map(products.map((p) => [p.id, p]));
+          const lines = quote.lines.map((line) => {
+            const product = byId.get(line.productId) || { hue: 260, categoryName: '' };
+            const qty = el('input', { type: 'number', min: '1', max: '99', value: String(line.quantity), 'aria-label': `Cantidad de $${line.productName}`, style: null });
+            qty.style.width = '72px';
+            qty.disabled = checkout;
+            qty.addEventListener('change', () => { cart.set(line.productId, Math.max(0, Number(qty.value) || 0)); handleReload(); });
+            return el('div', { class: 'cart-line' },
+              productArt(product, 'cart-line__thumb'),
+              el('div', {}, el('strong', { text: line.productName }), el('small', { text: `$${money(line.unitPrice)} por unidad` }), product.stock !== undefined ? stockNote(product.stock) : null),
+              checkout ? el('span', { text: `× $${line.quantity}` }) : qty,
+              el('div', { class: 'row-actions' }, el('strong', { text: money(line.lineTotal) }),
+                checkout ? null : el('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Quitar $${line.productName}`, text: 'Quitar',
+                  onclick: () => { cart.remove(line.productId); handleReload(); } })));
+          });
+          const summary = el('aside', { class: 'card' },
+            el('h3', { class: 'card__title', text: 'Resumen' }),
+            el('div', { class: 'summary-row' }, el('span', { text: 'Subtotal' }), el('span', { text: money(quote.total) })),
+            el('div', { class: 'summary-row' }, el('span', { text: 'Envío' }), el('span', { text: 'Incluido' })),
+            el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(quote.total) })),
+            el('p', { class: 'muted small', text: 'Total calculado por el servidor con los precios actuales del catálogo.' }));
+          if (!checkout) {
+            summary.append(el('a', { class: 'btn btn--primary btn--block', href: '#/checkout', text: 'Continuar al checkout' }));
+          } else {
+            const errorNode = formError();
+            const confirm = el('button', { type: 'button', class: 'btn btn--primary btn--block', text: 'Confirmar pedido' });
+            // Una clave por intento de compra: si la red falla y el usuario reintenta, no se duplica el pedido.
+            const idempotencyKey = `web-$${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`.slice(0, 64);
+            confirm.addEventListener('click', async () => {
+              try {
+                const result = await submitting(confirm, errorNode, () => shopApi.place(items, idempotencyKey));
+                cart.clear();
+                const order = result.data;
+                toast(order.status === 'RISK_REVIEW' ? 'Pedido creado: queda en revisión de riesgo' : 'Pedido creado y aprobado por riesgo', order.status === 'RISK_REVIEW' ? 'warn' : 'ok');
+                navigate(`#/mis-pedidos/$${order.id}`);
+              } catch (error) {
+                if (error instanceof ApiError && error.status === 409) handleReload();
+              }
+            });
+            summary.append(el('div', { class: 'notice-box' }, el('strong', { text: 'Pago de demostración. ' }),
+              'No se solicitan ni almacenan datos bancarios: al confirmar, el pedido se evalúa y se registra.'), el('div', { style: null }), confirm, errorNode);
+            confirm.style.marginTop = '14px';
+          }
+          root.append(view(
+            head(checkout ? 'Checkout' : 'Carrito', checkout ? 'Confirmar pedido' : 'Tu carrito', checkout ? `Cliente: $${session.user().displayName}` : `$${cart.count()} unidades`),
+            el('div', { class: 'cart-layout' }, el('div', { class: 'card' }, lines), summary)));
+        }
+        
+        function handleReload() { window.dispatchEvent(new HashChangeEvent('hashchange')); }
+        
+        route('/carrito', (root) => renderCart(root, false), { title: 'Carrito' });
+        route('/checkout', (root) => renderCart(root, true), { roles: ['CUSTOMER'], title: 'Checkout' });
+        
+        // ---- Mis pedidos y seguimiento -------------------------------------------------------
+        route('/mis-pedidos', async (root) => {
+          const list = el('div', { class: 'card' }, skeletons(4, 'skeleton--row'));
+          root.append(view(head('Mi cuenta', 'Mis pedidos', 'Historial y seguimiento de tus compras.'), list));
+          try {
+            const orders = await shopApi.orders();
+            if (!orders.length) {
+              list.replaceChildren(emptyState('Todavía no tienes pedidos', 'Cuando compres algo aparecerá aquí con su seguimiento.', 'box',
+                el('a', { class: 'btn btn--primary', href: '#/tienda', text: 'Ir a la tienda' })));
+              return;
+            }
+            list.replaceChildren(el('div', { class: 'table-scroll' }, el('table', { class: 'table' },
+              el('thead', {}, el('tr', {}, ['Pedido', 'Fecha', 'Artículos', 'Total', 'Estado', ''].map((h) => el('th', { scope: 'col', text: h })))),
+              el('tbody', {}, orders.map((o) => el('tr', {},
+                el('td', {}, el('span', { class: 'table__id', text: o.id })),
+                el('td', { text: formatDateTime(o.createdAt) }),
+                el('td', { text: String(o.lines.reduce((s, l) => s + l.quantity, 0)) }),
+                el('td', { class: 'mono', text: money(o.amount) }),
+                el('td', {}, lifecycleBadge(o.status)),
+                el('td', {}, el('a', { class: 'btn btn--ghost btn--sm', href: `#/mis-pedidos/$${o.id}`, text: 'Seguimiento' }))))))));
+          } catch (error) {
+            list.replaceChildren(emptyState('No se pudieron cargar tus pedidos', errorMessage(error)));
+          }
+        }, { roles: ['CUSTOMER'], title: 'Mis pedidos' });
+        
+        route('/mis-pedidos/:id', async (root, { id }) => {
+          const details = await shopApi.order(id);
+          const { order, history, delivery, allowedTransitions } = details;
+          const cancelButton = allowedTransitions.includes('CANCELLED')
+            ? el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar pedido' }) : null;
+          if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+              const errorNode = formError();
+              const confirm = el('button', { type: 'button', class: 'btn btn--primary', text: 'Sí, cancelar' });
+              const dialog = modal('Cancelar pedido', el('div', {}, el('p', { class: 'muted', text: 'Las unidades vuelven al stock. Esta acción queda registrada en el historial.' }), errorNode),
+                { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Volver', onclick: () => dialog.close() }), confirm] });
+              confirm.addEventListener('click', async () => {
+                await submitting(confirm, errorNode, () => shopApi.cancel(id), 'Pedido cancelado');
+                dialog.close();
+                handleReload();
+              });
+            });
+          }
+          root.append(view(
+            el('nav', { class: 'breadcrumbs', 'aria-label': 'Ruta' }, el('a', { href: '#/mis-pedidos', text: 'Mis pedidos' }), '/', el('span', { text: 'Seguimiento' })),
+            head('Seguimiento', `Pedido $${order.id.slice(0, 8)}`, `Creado $${formatRelative(order.createdAt)} · riesgo $${order.riskScore}/100`, lifecycleBadge(order.status), cancelButton),
+            el('div', { class: 'grid-2' },
+              el('div', { class: 'card' },
+                el('h3', { class: 'card__title', text: 'Progreso' }), progressBar(order.status),
+                delivery ? el('div', { class: 'notice-box' }, el('strong', { text: 'Entrega programada: ' }),
+                  `$${formatDateTime(delivery.start)} – $${new Date(delivery.end).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · responsable $${delivery.assigneeName}`)
+                  : el('p', { class: 'muted small', text: 'La entrega se programará cuando el pedido esté confirmado.' }),
+                el('h3', { class: 'card__title card__title--spaced', text: 'Historial' }),
+                el('ol', { class: 'timeline' }, history.map((h, index) => el('li', { class: index === history.length - 1 ? 'is-current' : '' },
+                  el('strong', {}, lifecycleBadge(h.to)), el('small', { text: `$${formatDateTime(h.at)} · $${h.actor}$${h.note ? ` · $${h.note}` : ''}` }))))),
+              el('div', { class: 'card' },
+                el('h3', { class: 'card__title', text: 'Artículos' }),
+                order.lines.map((l) => el('div', { class: 'summary-row' }, el('span', { text: `$${l.quantity} × $${l.productName}` }), el('span', { text: money(l.lineTotal) }))),
+                el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(order.amount) })),
+                el('p', { class: 'muted small', text: `Decisión del motor de riesgo: $${order.riskDecision} ($${order.riskScore}/100).` })))));
+          void TRANSITION_VERBS;
+        }, { roles: ['CUSTOMER'], title: 'Seguimiento' });
+        
+        // ---- Perfil -------------------------------------------------------------------------
+        route('/perfil', async (root) => {
+          const me = await accountApi.me();
+          const name = el('input', { value: me.displayName, maxlength: '80', autocomplete: 'name' });
+          const email = el('input', { type: 'email', value: me.email, maxlength: '254', autocomplete: 'email' });
+          const profileError = formError();
+          const saveProfile = el('button', { type: 'submit', class: 'btn btn--primary', text: 'Guardar perfil' });
+          const current = el('input', { type: 'password', autocomplete: 'current-password' });
+          const next = el('input', { type: 'password', autocomplete: 'new-password', minlength: '8', maxlength: '72' });
+          const passError = formError();
+          const savePass = el('button', { type: 'submit', class: 'btn btn--ghost', text: 'Cambiar contraseña' });
+          const profileForm = el('form', { class: 'card form', novalidate: true }, el('h3', { class: 'card__title', text: 'Datos personales' }),
+            field('Nombre visible', name), field('Correo electrónico', email), saveProfile, profileError);
+          const passForm = el('form', { class: 'card form', novalidate: true }, el('h3', { class: 'card__title', text: 'Seguridad' }),
+            field('Contraseña actual', current), field('Nueva contraseña', next, 'Entre 8 y 72 caracteres, con letras y dígitos.'), savePass, passError);
+          profileForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await submitting(saveProfile, profileError, () => accountApi.profile(name.value, email.value), 'Perfil actualizado').catch(() => {});
+          });
+          passForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await submitting(savePass, passError, () => accountApi.password(current.value, next.value), 'Contraseña actualizada').then(() => { current.value = ''; next.value = ''; }).catch(() => {});
+          });
+          root.append(view(head('Mi cuenta', 'Perfil', `@$${me.username} · $${me.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}`),
+            el('div', { class: 'grid-2-even' }, profileForm, passForm)));
+        }, { roles: ['auth'], title: 'Perfil' });
+        
+        // ---- Acceso -------------------------------------------------------------------------
+        const DEMO = [
+          ['cliente', 'CUSTOMER'], ['admin', 'ADMIN'], ['operador', 'ORDER_OPERATOR'],
+          ['logistica', 'LOGISTICS_OPERATOR'], ['observador', 'OBSERVABILITY_VIEWER'],
+        ];
+        
+        route('/entrar', async (root, { query }) => {
+          if (session.isAuthenticated()) { navigate(homeFor(session.user())); return; }
+          const username = el('input', { autocomplete: 'username', required: true, maxlength: '32' });
+          const password = el('input', { type: 'password', autocomplete: 'current-password', required: true });
+          const errorNode = formError();
+          const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: 'Iniciar sesión' });
+          const form = el('form', { class: 'card form', novalidate: true },
+            el('h2', { class: 'card__title', text: 'Iniciar sesión' }), field('Usuario', username), field('Contraseña', password), submit, errorNode,
+            el('p', { class: 'muted small' }, '¿No tienes cuenta? ', el('a', { href: '#/registro', text: 'Regístrate como cliente' })));
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+              const user = await submitting(submit, errorNode, () => session.login(username.value.trim(), password.value));
+              toast(`Hola, $${user.displayName}`, 'ok');
+              const nextPath = query.get('next');
+              navigate(nextPath && nextPath.startsWith('/') ? `#$${nextPath}` : homeFor(user));
+            } catch { /* el error ya se muestra */ }
+          });
+          root.append(view(el('div', { class: 'auth' },
+            el('div', { class: 'auth__aside' },
+              el('img', { src: 'img/logo.svg', alt: '', width: '56', height: '56' }),
+              el('h2', { text: 'Un acceso, cinco roles' }),
+              el('p', { text: 'Cada rol ve su área y el servidor comprueba los permisos en cada petición.' }),
+              el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => { username.value = user; password.focus(); } },
+                el('span', {}, el('strong', { text: user }), el('small', { text: ` · $${ROLE_LABELS[role]}` })), el('small', { text: 'usar' })))),
+              el('p', { class: 'muted small', style: null, text: 'Cuentas de demostración: la contraseña está en secrets\\demo_password.txt (generada en tu equipo, fuera de Git).' })),
+            form)));
+          username.focus();
+        }, { title: 'Iniciar sesión' });
+        
+        route('/registro', async (root) => {
+          const username = el('input', { autocomplete: 'username', maxlength: '32' });
+          const displayName = el('input', { autocomplete: 'name', maxlength: '80' });
+          const email = el('input', { type: 'email', autocomplete: 'email', maxlength: '254' });
+          const password = el('input', { type: 'password', autocomplete: 'new-password', maxlength: '72' });
+          const errorNode = formError();
+          const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: 'Crear cuenta' });
+          const form = el('form', { class: 'card form', novalidate: true }, el('h2', { class: 'card__title', text: 'Crear cuenta de cliente' }),
+            field('Usuario', username, '3 a 32 letras, dígitos, guion o guion bajo.'), field('Nombre visible', displayName),
+            field('Correo electrónico', email), field('Contraseña', password, 'Entre 8 y 72 caracteres, con letras y dígitos.'), submit, errorNode,
+            el('p', { class: 'muted small' }, '¿Ya tienes cuenta? ', el('a', { href: '#/entrar', text: 'Inicia sesión' })));
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            try {
+              await submitting(submit, errorNode, async () => {
+                await authApi.register({ username: username.value.trim(), displayName: displayName.value.trim(), email: email.value.trim(), password: password.value });
+                return session.login(username.value.trim(), password.value);
+              }, 'Cuenta creada');
+              navigate('#/tienda');
+            } catch { /* el error ya se muestra */ }
+          });
+          root.append(view(el('div', { class: 'auth' },
+            el('div', { class: 'auth__aside' }, el('img', { src: 'img/logo.svg', alt: '', width: '56', height: '56' }),
+              el('h2', { text: 'Tu cuenta HexaOrders' }),
+              el('p', { text: 'Compra, sigue tus pedidos en tiempo real y gestiona tu perfil. La contraseña se guarda con BCrypt; nunca en texto plano.' })),
+            form)));
+          username.focus();
+        }, { title: 'Registro' });
+        
+        export function showError(node, error) { showFormError(node, error); }
+        HEXFILE_127
+        COPY <<'HEXFILE_128' src/test/java/com/hexaorders/adapter/HttpRiskAssessmentAdapterTest.java
         package com.hexaorders.adapter;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -7316,8 +9347,8 @@ services:
                 assertThatThrownBy(() -> adapter.assess(draft)).isInstanceOf(RiskUnavailableException.class);
             }
         }
-        HEXFILE_118
-        COPY <<'HEXFILE_119' src/test/java/com/hexaorders/adapter/OrderControllerTest.java
+        HEXFILE_128
+        COPY <<'HEXFILE_129' src/test/java/com/hexaorders/adapter/OrderControllerTest.java
         package com.hexaorders.adapter;
         
         import static org.mockito.ArgumentMatchers.any;
@@ -7400,8 +9431,8 @@ services:
                 http.perform(get("/api/orders/not-a-uuid")).andExpect(status().isBadRequest());
             }
         }
-        HEXFILE_119
-        COPY <<'HEXFILE_120' src/test/java/com/hexaorders/application/CommerceServiceTest.java
+        HEXFILE_129
+        COPY <<'HEXFILE_130' src/test/java/com/hexaorders/application/CommerceServiceTest.java
         package com.hexaorders.application;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -7550,8 +9581,8 @@ services:
                         .isInstanceOf(IllegalArgumentException.class);
             }
         }
-        HEXFILE_120
-        COPY <<'HEXFILE_121' src/test/java/com/hexaorders/application/OperationsAndLogisticsTest.java
+        HEXFILE_130
+        COPY <<'HEXFILE_131' src/test/java/com/hexaorders/application/OperationsAndLogisticsTest.java
         package com.hexaorders.application;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -7677,8 +9708,8 @@ services:
                 verify(deliveries, never()).overlapping(anyLong(), any(), any(), any());
             }
         }
-        HEXFILE_121
-        COPY <<'HEXFILE_122' src/test/java/com/hexaorders/application/OrderServiceTest.java
+        HEXFILE_131
+        COPY <<'HEXFILE_132' src/test/java/com/hexaorders/application/OrderServiceTest.java
         package com.hexaorders.application;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -7783,8 +9814,8 @@ services:
                 verifyNoInteractions(risk, telemetry);
             }
         }
-        HEXFILE_122
-        COPY <<'HEXFILE_123' src/test/java/com/hexaorders/architecture/HexagonalArchitectureTest.java
+        HEXFILE_132
+        COPY <<'HEXFILE_133' src/test/java/com/hexaorders/architecture/HexagonalArchitectureTest.java
         package com.hexaorders.architecture;
         
         import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -7816,8 +9847,8 @@ services:
             static final ArchRule DRIVING_ADAPTERS_USE_INPUT_PORTS_ONLY = noClasses().that().resideInAPackage("..adapter.in..")
                     .should().dependOnClassesThat().resideInAPackage("..application.port.out..");
         }
-        HEXFILE_123
-        COPY <<'HEXFILE_124' src/test/java/com/hexaorders/domain/LifecycleDomainTest.java
+        HEXFILE_133
+        COPY <<'HEXFILE_134' src/test/java/com/hexaorders/domain/LifecycleDomainTest.java
         package com.hexaorders.domain;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -7928,8 +9959,8 @@ services:
                 assertThatThrownBy(() -> UserAccount.validateEmail("sin-arroba")).isInstanceOf(IllegalArgumentException.class);
             }
         }
-        HEXFILE_124
-        COPY <<'HEXFILE_125' src/test/java/com/hexaorders/domain/OrderDomainTest.java
+        HEXFILE_134
+        COPY <<'HEXFILE_135' src/test/java/com/hexaorders/domain/OrderDomainTest.java
         package com.hexaorders.domain;
         
         import static org.assertj.core.api.Assertions.assertThat;
@@ -7996,8 +10027,8 @@ services:
                 assertThatThrownBy(() -> OrderStatistics.of(-1, 2)).isInstanceOf(IllegalArgumentException.class);
             }
         }
-        HEXFILE_125
-        COPY <<'HEXFILE_126' src/test/java/com/hexaorders/security/SecurityRulesTest.java
+        HEXFILE_135
+        COPY <<'HEXFILE_136' src/test/java/com/hexaorders/security/SecurityRulesTest.java
         package com.hexaorders.security;
         
         import static org.mockito.ArgumentMatchers.any;
@@ -8125,7 +10156,7 @@ services:
                 http.perform(get("/api/auth/me")).andExpect(status().isOk()).andExpect(jsonPath("$$.authenticated").value(false));
             }
         }
-        HEXFILE_126
+        HEXFILE_136
         RUN mvn -B -ntp verify
         
         FROM eclipse-temurin:21-jre-jammy AS runtime

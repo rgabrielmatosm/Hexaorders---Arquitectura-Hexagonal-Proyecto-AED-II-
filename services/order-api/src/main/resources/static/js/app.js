@@ -138,7 +138,7 @@ function renderAccount() {
   const panel = el('div', { class: 'menu__panel', hidden: true, role: 'menu' },
     el('div', { class: 'menu__meta' }, el('strong', { text: user.displayName }), el('small', { text: `@${user.username} · ${user.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}` })),
     session.has('CUSTOMER') ? el('a', { href: '#/mis-pedidos', role: 'menuitem', text: 'Mis pedidos' }) : null,
-    el('a', { href: homeFor(user), role: 'menuitem', text: 'Mi área' }),
+    ...ROLE_AREAS.filter(([role]) => session.has(role) || session.has('ADMIN')).map(([, href, label]) => el('a', { href, role: 'menuitem', text: label })),
     el('a', { href: '#/perfil', role: 'menuitem', text: 'Perfil y seguridad' }),
     el('button', { type: 'button', role: 'menuitem', text: 'Cerrar sesión', onclick: async () => { await session.logout(); toast('Sesión cerrada', 'ok'); navigate('#/tienda'); } }));
   const toggle = el('button', { type: 'button', class: 'icon-btn user-chip', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },

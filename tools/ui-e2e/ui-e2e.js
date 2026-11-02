@@ -28,7 +28,8 @@ async function apiJson(page, url) {
     page.on('pageerror', (error) => problems.push(`Error de JavaScript: ${error.message}`));
     page.on('console', (message) => {
       // El 400 de la prueba de validación del explorador es intencionado.
-      if (message.type() === 'error' && !/status of 400/.test(message.text())) problems.push(`console.error: ${message.text()}`);
+      if (message.type() === 'error' && !/status of 400/.test(message.text())
+        && !(process.env.SKIP_PROMETHEUS && /ERR_CONNECTION_REFUSED/.test(message.text()))) problems.push(`console.error: ${message.text()}`);
     });
 
     console.log(`Abriendo ${BASE_URL}`);
@@ -95,17 +96,77 @@ async function apiJson(page, url) {
     await page.waitForSelector('#run-steps li.is-failed', { timeout: 20000 });
     check((await page.textContent('#run-evidence')).includes('400'), 'Solicitud real inválida: el dominio responde 400 y no se guarda nada');
 
-    // Observabilidad con Prometheus y Grafana reales
-    await page.locator('#observabilidad').scrollIntoViewIfNeeded();
-    await page.waitForFunction(() => {
-      const rows = Array.from(document.querySelectorAll('#targets-body tr'));
-      return rows.length >= 3 && rows.filter((row) => row.textContent.includes('up')).length >= 3;
-    }, null, { timeout: 45000 });
-    check(true, 'Prometheus informa los 3 targets (order-api, risk-engine, prometheus) en estado up');
-    check(await page.isHidden('#obs-warning'), 'Sin avisos: Prometheus y Grafana accesibles desde el navegador');
-    await page.waitForFunction(() => !document.querySelector('#metrics-list').textContent.includes('no disponibles'), null, { timeout: 20000 });
-    check((await page.textContent('#metrics-list')).includes('Evaluaciones en Python'), 'Las métricas reales de Prometheus se muestran');
-    await page.screenshot({ path: path.join(OUT, '07-observabilidad.png') });
+    // Observabilidad con Prometheus y Grafana reales (SKIP_PROMETHEUS=1 solo para pruebas locales sin Docker).
+    if (!process.env.SKIP_PROMETHEUS) {
+      await page.locator('#observabilidad').scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => {
+        const rows = Array.from(document.querySelectorAll('#targets-body tr'));
+        return rows.length >= 3 && rows.filter((row) => row.textContent.includes('up')).length >= 3;
+      }, null, { timeout: 45000 });
+      check(true, 'Prometheus informa los 3 targets (order-api, risk-engine, prometheus) en estado up');
+      check(await page.isHidden('#obs-warning'), 'Sin avisos: Prometheus y Grafana accesibles desde el navegador');
+      await page.waitForFunction(() => !document.querySelector('#metrics-list').textContent.includes('no disponibles'), null, { timeout: 20000 });
+      check((await page.textContent('#metrics-list')).includes('Evaluaciones en Python'), 'Las métricas reales de Prometheus se muestran');
+      await page.screenshot({ path: path.join(OUT, '07-observabilidad.png') });
+    }
+
+    // Plataforma v3: flujos por rol (requiere DEMO_PASSWORD, la contraseña de las cuentas de demostración).
+    if (process.env.DEMO_PASSWORD) {
+      const rolePage = async (user) => {
+        const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const rp = await context.newPage();
+        rp.on('pageerror', (error) => problems.push(`Error de JavaScript (${user}): ${error.message}`));
+        await rp.goto(`${BASE_URL}/#/entrar`);
+        await rp.waitForSelector('#view-root form');
+        await rp.fill('#view-root input[autocomplete="username"]', user);
+        await rp.fill('#view-root input[type="password"]', process.env.DEMO_PASSWORD);
+        await rp.click('#view-root button[type="submit"]');
+        await rp.waitForFunction(() => !location.hash.startsWith('#/entrar'), null, { timeout: 15000 });
+        return rp;
+      };
+      const customerPage = await rolePage('cliente');
+      await customerPage.goto(`${BASE_URL}/#/tienda`);
+      await customerPage.waitForSelector('.product-card');
+      check((await customerPage.locator('.product-card').count()) >= 18, 'La tienda muestra el catálogo persistido');
+      await customerPage.screenshot({ path: path.join(OUT, '09-tienda.png') });
+      await customerPage.click('.product-card:has(button:not([disabled])) button.btn--primary');
+      await customerPage.goto(`${BASE_URL}/#/checkout`);
+      await customerPage.waitForSelector('.summary-row--total');
+      await customerPage.screenshot({ path: path.join(OUT, '10-checkout.png') });
+      await customerPage.click('button:has-text("Confirmar pedido")');
+      await customerPage.waitForFunction(() => /#\/mis-pedidos\//.test(location.hash), null, { timeout: 20000 });
+      await customerPage.waitForSelector('.timeline li');
+      check((await customerPage.locator('.timeline li').count()) >= 2, 'Checkout desde la interfaz: pedido creado con historial CREATED → decisión de riesgo');
+      await customerPage.screenshot({ path: path.join(OUT, '11-seguimiento.png') });
+
+      const adminPage = await rolePage('admin');
+      await adminPage.waitForSelector('.kpis .kpi');
+      check((await adminPage.textContent('.kpis')).includes('Pedidos totales'), 'El administrador ve el centro de control con KPIs reales');
+      await adminPage.screenshot({ path: path.join(OUT, '12-admin.png') });
+      await adminPage.goto(`${BASE_URL}/#/admin/usuarios`);
+      await adminPage.waitForSelector('.role-checks');
+      check((await adminPage.textContent('#view-root')).includes('@logistica'), 'Gestión de usuarios y roles');
+
+      const operatorPage = await rolePage('operador');
+      await operatorPage.waitForSelector('button:has-text("Gestionar")');
+      await operatorPage.click('button:has-text("Gestionar")');
+      await operatorPage.waitForSelector('.modal .timeline');
+      check(true, 'El operador abre el detalle de un pedido con su historial y acciones permitidas');
+      await operatorPage.screenshot({ path: path.join(OUT, '13-operaciones.png') });
+
+      const logisticsPage = await rolePage('logistica');
+      await logisticsPage.waitForSelector('.cal-month .cal-day');
+      check((await logisticsPage.locator('.cal-month .cal-day').count()) === 42, 'Calendario logístico mensual (PostgreSQL)');
+      await logisticsPage.screenshot({ path: path.join(OUT, '14-logistica.png') });
+
+      const viewerPage = await rolePage('observador');
+      await viewerPage.waitForSelector('.kpis .kpi');
+      check((await viewerPage.textContent('.kpis')).includes('Disponible'), 'El rol de observabilidad ve la salud de PostgreSQL y del motor de riesgo');
+      await viewerPage.goto(`${BASE_URL}/#/admin`);
+      await viewerPage.waitForSelector('text=Acceso restringido');
+      check(true, 'El rol de observabilidad no accede a la administración');
+      await viewerPage.screenshot({ path: path.join(OUT, '15-salud-tecnica.png') });
+    }
 
     // Móvil
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

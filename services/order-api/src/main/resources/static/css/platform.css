@@ -16,7 +16,11 @@
 .breadcrumbs a { color: var(--text-2); }
 .breadcrumbs a:hover { color: var(--text); }
 
-/* Barra superior ampliada */
+/* Barra superior ampliada: en el laboratorio se ven sus secciones; en la aplicación, las áreas del rol. */
+.view-root:focus { outline: none; }
+.nav a { white-space: nowrap; }
+body[data-mode="lab"] #role-nav, body[data-mode="lab"] [data-lab-link] { display: none; }
+body[data-mode="app"] .nav [data-nav] { display: none; }
 .topbar__actions { display: flex; align-items: center; gap: 8px; }
 .nav__group { display: flex; gap: 4px; padding-left: 8px; margin-left: 4px; border-left: 1px solid var(--line); }
 .nav__group:empty { display: none; }
