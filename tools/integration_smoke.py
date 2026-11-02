@@ -168,7 +168,9 @@ def check():
     ok(queue['consumers'] >= 1 and queue.get('message_stats', {}).get('ack', 0) >= 2,
        f'RabbitMQ: la cola hexaorders.notifications tiene consumidor y {queue["message_stats"]["ack"]} mensajes confirmados')
     dlq = get_json(f'{RABBITMQ}/api/queues/%2F/hexaorders.notifications.dlq', auth=rabbit)
-    ok(dlq['messages'] == 0 and dlq['arguments'] == {}, 'La cola de mensajes fallidos (DLQ) existe y está vacía')
+    # RabbitMQ 4 añade x-queue-type a los argumentos: solo se exige que la DLQ no reenvíe a otra DLX.
+    ok(dlq.get('messages', 0) == 0 and dlq.get('durable') and 'x-dead-letter-exchange' not in dlq.get('arguments', {}),
+       f"La cola de mensajes fallidos (DLQ) existe, es durable y está vacía (mensajes: {dlq.get('messages')}, argumentos: {dlq.get('arguments')})")
     exchange = get_json(f'{RABBITMQ}/api/exchanges/%2F/hexaorders.events', auth=rabbit)
     ok(exchange['type'] == 'topic' and exchange['durable'], 'Exchange hexaorders.events (topic, durable)')
     eventually('outbox vacío', lambda: prom('hexaorders_outbox_pending') == [0.0], timeout=60)
