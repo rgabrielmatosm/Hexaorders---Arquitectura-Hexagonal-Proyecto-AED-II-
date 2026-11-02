@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/effects.css">
+  <link rel="stylesheet" href="css/platform.css">
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
@@ -37,17 +38,26 @@
     <span class="brand__name">HEXA<span>ORDERS</span></span>
   </a>
   <nav class="nav" aria-label="Secciones">
+    <a href="#/tienda" data-route-link="/tienda">Tienda</a>
     <a href="#panel" data-nav>Panel</a>
     <a href="#pedidos" data-nav>Pedidos</a>
     <a href="#arquitectura" data-nav>Arquitectura</a>
     <a href="#observabilidad" data-nav>Observabilidad</a>
+    <span class="nav__group" id="role-nav" aria-label="Áreas de tu rol"></span>
   </nav>
-  <div id="api-status" class="status-pill" role="status" aria-live="polite">
-    <span class="dot dot--pending"></span><span class="status-pill__text">Conectando…</span>
+  <div class="topbar__actions">
+    <div id="api-status" class="status-pill" role="status" aria-live="polite">
+      <span class="dot dot--pending"></span><span class="status-pill__text">Conectando…</span>
+    </div>
+    <a class="icon-btn" href="#/carrito" id="cart-button" aria-label="Carrito">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11h11L21 7H7 M10 20h.01 M18 20h.01"/></svg>
+      <span class="icon-btn__badge" id="cart-count" hidden>0</span>
+    </a>
+    <div class="menu" id="account"></div>
   </div>
 </header>
 
-<main id="main">
+<main id="main" data-view="lab">
   <!-- INICIO -->
   <section id="inicio" class="hero">
     <p class="eyebrow">Order Management &amp; Risk Assessment System</p>
@@ -56,6 +66,7 @@
     <div class="hero__actions">
       <a class="btn btn--primary" href="#pedidos">Crear un pedido</a>
       <a class="btn btn--ghost" href="#arquitectura">Explorar la arquitectura</a>
+      <a class="btn btn--ghost" href="#/tienda">Visitar la tienda</a>
     </div>
     <ul class="tech-list" aria-label="Tecnologías">
       <li>Java 21 · Spring Boot</li><li>Python · FastAPI</li><li>PostgreSQL 17</li>
@@ -305,6 +316,9 @@
     </article>
   </section>
 </main>
+
+<!-- Vistas de la plataforma (tienda, cuenta, administración, operaciones, logística). -->
+<div id="view-root" class="view-root" tabindex="-1" hidden></div>
 
 <footer class="footer">
   <div class="footer__brand">
