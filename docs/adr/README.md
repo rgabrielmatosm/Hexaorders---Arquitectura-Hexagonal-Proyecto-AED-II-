@@ -1,6 +1,6 @@
 # Registro de decisiones de arquitectura (ADR)
 
-Formato ligero (contexto, decisión, consecuencias). Estado de todas: **aceptada** (noviembre de 2026; 0001–0008 en la versión 3, 0009–0010 en la versión 4).
+Formato ligero (contexto, decisión, consecuencias). Estado de todas: **aceptada** (noviembre de 2026; 0001–0008 en la versión 3, 0009–0010 en la versión 4; 0011–0013 en la versión 5).
 
 | ADR | Decisión |
 | --- | --- |
@@ -14,3 +14,6 @@ Formato ligero (contexto, decisión, consecuencias). Estado de todas: **aceptada
 | [0008](0008-jdbc-without-orm.md) | JDBC (`JdbcTemplate`) en lugar de JPA |
 | [0009](0009-multipage-frontend-served-by-spring.md) | Sitio multipágina servido por Spring Boot (Nginx evaluado y descartado) |
 | [0010](0010-monitoring-portal-through-a-port.md) | Portal de monitoreo a través de `MonitoringPort` |
+| [0011](0011-nginx-gateway.md) | Nginx como gateway sin sacar las páginas protegidas de Spring Security (sustituye a 0009 en lo relativo a Nginx) |
+| [0012](0012-transactional-outbox-from-history.md) | Outbox transaccional sobre las tablas de historial |
+| [0013](0013-log-collection-with-alloy.md) | Recolección de logs con Grafana Alloy |
