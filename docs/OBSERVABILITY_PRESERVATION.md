@@ -109,18 +109,26 @@ Todos los paneles nuevos usan este mismo datasource por uid; `check_observabilit
 
 Fuente: `infra/prometheus/alerts.yml`.
 
+### Versión 4: dashboard «Logistics Operations» y portal web de monitoreo
+
+- **`hexaorders-logistics`** (12 paneles): pedidos confirmados o en preparación, listos para despacho, en tránsito y entregados (`hexaorders_orders_by_status`); entregas programadas y reprogramadas, conflictos de agenda e incidencias de retraso, dirección o daño en 24 h; despachos y entregas por hora (`hexaorders_order_transitions_total{to}`); tramo logístico apilado. Usa solo métricas que ya existían: la v4 no añade ni renombra métricas.
+- **Páginas `/monitoreo/*`** para OBSERVABILITY_VIEWER y ADMIN: servicios (targets), métricas (14 indicadores con PromQL fijo) y alertas (reglas y estado). order-api las obtiene de Prometheus por la red interna `telemetry` (`PROMETHEUS_URL=http://prometheus:9090`) mediante `MonitoringPort` → `PrometheusMonitoringAdapter` ([ADR 0010](adr/0010-monitoring-portal-through-a-port.md)). **No sustituyen a Grafana**: enlazan a sus 7 dashboards. Si Prometheus no responde, lo dicen sin romper la página.
+- La única configuración tocada es la necesaria para servir el dashboard nuevo: un `COPY` en `infra/grafana/Dockerfile`, una entrada en el ConfigMap generado y un montaje `subPath` en `k8s/40-observability.yaml`, más la variable `PROMETHEUS_URL` de order-api. `prometheus.yml`, `alerts.yml`, el datasource y los 6 dashboards anteriores no cambian.
+
 ## 9. Pruebas de compatibilidad
 
 | Prueba | Dónde se ejecuta | Qué garantiza |
 | --- | --- | --- |
 | `tools/check_observability.py` | `hexaorders.cmd check` (Windows y Linux), job `windows` del CI | Dashboards, paneles, expresiones, datasource, jobs, alertas y métricas de la línea base siguen presentes e idénticos; cada dashboard JSON se copia en la imagen de Grafana; no hay uids duplicados; los paneles usan el datasource `prometheus`; existe la regla `orders_created_total`; el histograma HTTP sigue activado. |
 | `promtool check config` | `hexaorders.cmd verify` | `prometheus.yml` y `alerts.yml` (incluidas las reglas nuevas) son válidos. |
-| `tools/smoke.py` | `verify` | Targets `up`, métricas originales en Prometheus, dashboard `hexaorders` **y los 5 nuevos** aprovisionados en Grafana. |
+| `tools/smoke.py` | `verify` | Targets `up`, métricas originales en Prometheus, dashboard `hexaorders` **y los 6 nuevos** (incluido `hexaorders-logistics`) aprovisionados en Grafana. |
+| `tools/ui-e2e/pages-e2e.js` (v4) | job `compose` | El rol observador ve los 3 targets en UP y las 9 reglas de alerta leídas de Prometheus a través del backend. |
+| `PrometheusMonitoringAdapterTest` (v4) | `mvn verify` | El adaptador interpreta targets, reglas e indicadores de la API de Prometheus y convierte un fallo en «no disponible». |
 | `tools/platform_smoke.py` con `PROMETHEUS_URL` | `verify` | Las métricas nuevas y `orders_created_total` existen en Prometheus, junto con métricas de JVM y HikariCP. |
 | `tools/ui-e2e/ui-e2e.js` | job `compose` | La sección Observabilidad del laboratorio sigue mostrando los 3 targets y las métricas reales. |
 | `generate_delivery.py --check`, `validate_delivery.py` | `check` | El Compose y el ConfigMap de Kubernetes incluyen la configuración de monitoreo al día. |
 
-Resultado local de `check_observability.py`: `OK: observabilidad previa conservada (9 paneles, 2 alertas, 3 jobs) · 6 dashboards en total, 9 alertas en total`.
+Resultado local de `check_observability.py` (v4): `OK: observabilidad previa conservada (9 paneles, 2 alertas, 3 jobs) · 7 dashboards en total, 9 alertas en total`.
 
 ## 10. Defectos encontrados y corregidos
 
@@ -135,17 +143,18 @@ Durante el trabajo no se encontró ningún otro panel ni alerta roto.
 
 ## 11. Antes y después
 
-| Aspecto | Antes (v2) | Después (v3) |
-| --- | --- | --- |
-| Dashboards | 1 | 6 (el original intacto) |
-| Paneles | 9 | 70 (9 originales + 61 nuevos) |
-| Alertas | 2 | 9 (2 originales intactas + 7) |
-| Reglas de registro | 0 | 1 (compatibilidad) |
-| Jobs de Prometheus | 3 | 3 (sin cambios) |
-| Datasources | 1 | 1 (sin cambios) |
-| Métricas de negocio | pedidos y fallos de riesgo | + tienda, ciclo de vida, logística, incidencias, stock, seguridad |
-| Paneles originales con datos | 7 de 9 (2 sin datos reales por el defecto de la sección 10) | 9 de 9 |
-| Verificación automática de preservación | no | sí (`check_observability.py`) |
+| Aspecto | Antes (v2) | Después (v3) | Después (v4) |
+| --- | --- | --- | --- |
+| Dashboards | 1 | 6 (el original intacto) | 7 (+ Logistics Operations) |
+| Paneles | 9 | 70 (9 originales + 61 nuevos) | 82 (+ 12 de logística) |
+| Alertas | 2 | 9 (2 originales intactas + 7) | 9 |
+| Reglas de registro | 0 | 1 (compatibilidad) | 1 |
+| Jobs de Prometheus | 3 | 3 (sin cambios) | 3 (sin cambios) |
+| Datasources | 1 | 1 (sin cambios) | 1 (sin cambios) |
+| Métricas de negocio | pedidos y fallos de riesgo | + tienda, ciclo de vida, logística, incidencias, stock, seguridad | sin cambios |
+| Paneles originales con datos | 7 de 9 (2 sin datos reales por el defecto de la sección 10) | 9 de 9 | 9 de 9 |
+| Verificación automática de preservación | no | sí (`check_observability.py`) | sí |
+| Portal web de monitoreo | no | salud de dependencias | + targets, alertas e indicadores de Prometheus |
 
 ## 12. Cómo añadir observabilidad sin romper nada
 

@@ -276,8 +276,12 @@ export function orderDetailModal(id, api, onChanged) {
         el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(order.amount) })),
         delivery ? el('div', { class: 'notice-box' }, el('strong', { text: 'Entrega: ' }), `${formatDateTime(delivery.start)} · ${delivery.assigneeName}`) : null,
         el('h3', { class: 'card__title card__title--spaced', text: 'Historial' }),
-        el('ol', { class: 'timeline' }, history.map((h, i) => el('li', { class: i === history.length - 1 ? 'is-current' : '' },
-          el('strong', {}, lifecycleBadge(h.to)), el('small', { text: `${formatDateTime(h.at)} · ${h.actor}${h.note ? ` · ${h.note}` : ''}` })))),
+        el('ol', { class: 'timeline' }, history.length
+          ? history.map((h, i) => el('li', { class: i === history.length - 1 ? 'is-current' : '' },
+            el('strong', {}, lifecycleBadge(h.to)), el('small', { text: `${formatDateTime(h.at)} · ${h.actor}${h.note ? ` · ${h.note}` : ''}` })))
+          // Pedidos de la API original creados sin historial de transiciones: se muestra su estado actual real.
+          : [el('li', { class: 'is-current' }, el('strong', {}, lifecycleBadge(order.status)),
+            el('small', { text: `${formatDateTime(order.createdAt)} · estado actual (pedido de la API original, sin transiciones registradas todavía)` }))]),
         buttons.length ? el('div', {}, el('h3', { class: 'card__title card__title--spaced', text: 'Acciones permitidas para tu rol' }), note,
           el('div', { class: 'row-actions', style: null }, buttons), errorNode)
           : el('p', { class: 'muted small', text: 'No hay acciones disponibles para tu rol en este estado.' }));

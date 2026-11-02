@@ -2,6 +2,45 @@
 
 Este registro separa cuatro tipos de evidencia: **ejecución real**, **pruebas automáticas**, **revisión estática** y **pendiente de verificación**. Un resultado esperado nunca se presenta como observado.
 
+## Versión 4 — sitio web multipágina (2 de noviembre de 2026)
+
+Entorno local: contenedor Linux de desarrollo **sin motor Docker ni Windows** (Java 21, Maven, Python 3.13, PostgreSQL 16, Node 22, Chromium con Playwright). Sin Prometheus ni Grafana en local: su parte la ejecuta el job `compose` de GitHub Actions.
+
+### Ejecución real (Java + Python + PostgreSQL 16, sin Docker)
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Arranque sobre base vacía | Flyway aplicó `V1`–`V4`; 6 cuentas demo creadas. |
+| `tools/platform_smoke.py` | `OK plataforma: 35 comprobaciones` (sin regresiones de la v3). |
+| `tools/smoke.py` | Correcto hasta la consulta a Prometheus (no disponible en local), incluidas las páginas protegidas (302 al login), los archivos estáticos servidos idénticos, el laboratorio en `/laboratorio.html` y la página 404. |
+| `tools/ui-e2e/pages-e2e.js` (`SKIP_PROMETHEUS=1`) | `Páginas E2E correctas: 244 comprobaciones`: las 39 páginas como visitante y con los 5 roles (200 / 302 / 403 / 404), enlaces internos sin 404, recarga, filtros del catálogo en la URL, contacto persistido y visible para el admin, checkout con dirección y seguimiento, calendario, monitoreo degradado sin Prometheus, móvil de 390 px sin desbordamiento, sin errores de JavaScript ni respuestas 5xx. |
+| `tools/ui-e2e/ui-e2e.js` (`SKIP_PROMETHEUS=1`) | `UI E2E correcta: 21 comprobaciones` (laboratorio original y flujos por rol con las URLs nuevas). |
+| Revisión visual con capturas | Corregidos: breadcrumb visible en la portada (la regla CSS anulaba `hidden`), contenido centrado en los portales (`main` heredaba `margin: 0 auto`), desbordamiento horizontal en móvil por la barra lateral y nodos del diagrama de la portada solapados. |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn verify` | **81 pruebas**, cero fallos (antes 66): nuevas `WebPlatformDomainTest`, `WebPlatformServicesTest`, `PrometheusMonitoringAdapterTest` y casos de páginas en `SecurityRulesTest`. |
+| Python: `pytest` | **60 pruebas** aprobadas (sin cambios en el motor de riesgo). |
+| `check_frontend.py` | `OK: frontend multipágina coherente (39 páginas generadas + laboratorio, 32 rutas, 13 transiciones, CSP sin estilos ni scripts en línea)`. |
+| `check_observability.py` | `OK: observabilidad previa conservada (9 paneles, 2 alertas, 3 jobs) · 7 dashboards en total, 9 alertas en total`. |
+| `generate_delivery.py --check`, `validate_delivery.py` con esquemas oficiales | Correcto. |
+
+### Errores del CI encontrados y corregidos
+
+| Error | Causa | Corrección |
+| --- | --- | --- |
+| `ui-e2e.js` esperaba la línea de tiempo del modal del operador | La portada de operaciones muestra primero los pedidos más antiguos; en CI son pedidos de la API original sin historial, y la lista vacía no era visible | El modal muestra el estado actual real cuando no hay transiciones registradas |
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Instalación y arranque en un PC Windows 10/11 con Docker Desktop | No hay Windows con Docker en este entorno. Los scripts se ejecutan en el runner `windows-2022` (PowerShell 5.1) y el stack completo con el mismo `hexaorders.ps1 verify` en Ubuntu. Lista de comprobaciones manuales: [`WINDOWS_DOCKER_GUIDE.md`](WINDOWS_DOCKER_GUIDE.md#9-comprobaciones-manuales-recomendadas-en-docker-desktop). |
+| Monitoreo web contra Prometheus real y los 7 dashboards en Grafana | Lo ejecutan `smoke.py` y `pages-e2e.js` en el job `compose`; el resultado se indica en el Pull Request. |
+| Kubernetes | Solo validación de esquema. |
+
 ## Versión 3 — plataforma comercial y operaciones (2 de noviembre de 2026)
 
 Entorno: el mismo contenedor de desarrollo **sin motor Docker** (Java 21, Maven, Python 3.13, PostgreSQL 16 local, Node 22, Chromium con Playwright). Prometheus y Grafana no estaban disponibles en local; su parte la ejecuta el job `compose` de GitHub Actions.

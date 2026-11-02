@@ -8,7 +8,7 @@
 
 Gestión de pedidos con evaluación determinista de riesgo, construida con **arquitectura hexagonal** (puertos y adaptadores) en **Java 21** y **Python**, persistida en **PostgreSQL**, orquestada con **Docker Compose** y observada con **Prometheus** y **Grafana**.
 
-[Plataforma v3](#-plataforma-comercial-v3) · [Inicio rápido](#-inicio-rápido) · [Arquitectura](#-arquitectura-hexagonal) · [API](#-endpoints) · [Demostración](#-demostración) · [Guía en inglés](docs/english/presentation-guide.md)
+[Sitio web v4](#-sitio-web-multipágina-v4) · [Windows](docs/WINDOWS_DOCKER_GUIDE.md) · [Plataforma v3](#-plataforma-comercial-v3) · [Inicio rápido](#-inicio-rápido) · [Arquitectura](#-arquitectura-hexagonal) · [API](#-endpoints) · [Demostración](#-demostración) · [Guía en inglés](docs/english/presentation-guide.md)
 
 </div>
 
@@ -20,6 +20,7 @@ Gestión de pedidos con evaluación determinista de riesgo, construida con **arq
 <summary>Mostrar el índice completo</summary>
 
 1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+1. [**Sitio web multipágina v4**](#-sitio-web-multipágina-v4): [páginas](docs/FRONTEND_PAGES.md) · [arquitectura](docs/HEXAGONAL_ARCHITECTURE.md) · [Windows y Docker](docs/WINDOWS_DOCKER_GUIDE.md) · [capturas](#capturas-del-sitio-v4-datos-reales)
 1. [**Plataforma comercial v3**](#-plataforma-comercial-v3): [roles](#roles-y-permisos) · [funcionalidades](#funcionalidades) · [ciclo de vida](#ciclo-de-vida-del-pedido) · [modelo de datos](#modelo-de-datos) · [seguridad](#seguridad) · [capturas](#capturas-de-la-plataforma-datos-reales) · [ADR](docs/adr/)
 2. [Tecnologías](#-tecnologías)
 3. [Arquitectura hexagonal](#-arquitectura-hexagonal) · [Diagrama hexagonal](#diagrama-1--estructura-hexagonal-dependencias-vs-ejecución) · [Secuencia](#diagrama-2--secuencia-de-post-apiorders) · [Infraestructura](#diagrama-3--infraestructura-docker-compose)
@@ -54,6 +55,83 @@ El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma
 | Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
 | Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
 | Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## 🌐 Sitio web multipágina v4
+
+La versión 4 convierte la interfaz en un **sitio web empresarial con 39 páginas HTML reales** (más el laboratorio original), cada una con su URL, navegación, permisos por rol y datos de la API. Se conserva todo lo anterior: el laboratorio está íntegro en `/laboratorio.html`, las URLs antiguas `#/…` redirigen a su página nueva, y la API, los dashboards, las métricas y los scripts siguen funcionando.
+
+### En Windows, en tres pasos
+
+1. Instala **Docker Desktop** (motor WSL 2, contenedores Linux) y ábrelo hasta ver *Engine running*.
+2. Descarga el proyecto y abre **PowerShell** en su carpeta.
+3. Ejecuta:
+
+```powershell
+.\hexaorders.cmd start
+```
+
+Abre <http://127.0.0.1:8080>. Las cuentas `admin`, `operador`, `logistica`, `observador` y `cliente` usan la contraseña de `secrets\demo_password.txt`. No necesitas Linux, Java, Python ni PostgreSQL instalados: todo corre en Docker. Guía completa, solución de problemas y comprobaciones manuales: **[`docs/WINDOWS_DOCKER_GUIDE.md`](docs/WINDOWS_DOCKER_GUIDE.md)**.
+
+### Páginas
+
+| Área | Páginas |
+| --- | --- |
+| Público | `/` · `/catalogo.html` · `/producto.html?id=` · `/carrito.html` · `/checkout.html` · `/login.html` · `/registro.html` · `/nosotros.html` · `/contacto.html` · `/403.html` · `/404.html` |
+| Cliente | `/cliente/dashboard.html` · `pedidos.html` · `pedido-detalle.html?id=` · `seguimiento.html?id=` · `perfil.html` |
+| Administración | `/admin/dashboard.html` · `productos` · `categorias` · `inventario` · `pedidos` · `usuarios` · `incidencias` · `reportes` · `auditoria` |
+| Operaciones | `/operaciones/dashboard.html` · `pedidos` · `revisiones` · `incidencias` |
+| Logística | `/logistica/dashboard.html` · `calendario` · `entregas` · `asignaciones` |
+| Monitoreo | `/monitoreo/dashboard.html` · `servicios` · `metricas` · `alertas` |
+| Arquitectura | `/arquitectura/overview.html` · `flujo-pedidos.html` · `/laboratorio.html` |
+
+Detalle de cada página, su rol, sus APIs y la matriz de auditoría v3 → v4: **[`docs/FRONTEND_PAGES.md`](docs/FRONTEND_PAGES.md)**.
+
+### Qué se añadió
+
+- **Navegación real**: menú principal, menús por rol, barra lateral en cada portal, breadcrumbs, redirección tras el login (`?next=`), páginas 403 y 404, menú móvil y URLs limpias (`/admin`, `/catalogo`…).
+- **Seguridad en el servidor también para las páginas**: sin sesión → 302 al login; otro rol → 403. Ocultar enlaces no es la protección: Spring Security lo comprueba en cada petición.
+- **Portal público**: inicio con cifras reales, catálogo con búsqueda, categorías, precio, disponibilidad, orden y paginación (estado en la URL), relacionados en la ficha, carrito con totales del servidor y **checkout con dirección de entrega** (nuevo objeto de valor `ShippingAddress`, migración `V4`).
+- **Cliente**: resumen, historial paginado, detalle y **seguimiento** con el estado real y su historial.
+- **Administración**: categorías e inventario como páginas propias, búsqueda y paginación en productos, usuarios y auditoría, y bandeja de **mensajes de contacto**.
+- **Operaciones**: resumen, bandeja con búsqueda, **revisiones de riesgo** (confirmar/rechazar con nota) e incidencias.
+- **Logística**: resumen, calendario (mes/semana/día), **entregas** por periodo y estado, y **asignaciones** con la carga semanal por responsable.
+- **Monitoreo**: salud, **targets, alertas e indicadores leídos de Prometheus por el backend** (`MonitoringPort` → `PrometheusMonitoringAdapter`, red interna de Docker) y enlaces a los 7 dashboards de Grafana.
+- **Observabilidad**: nuevo dashboard **Logistics Operations**; los 6 anteriores, sin cambios.
+
+```mermaid
+flowchart LR
+    W[Navegador en Windows] -->|"127.0.0.1:8080 · 39 páginas + API"| OA[order-api · Spring Boot]
+    W -->|127.0.0.1:3000| G[Grafana]
+    W -->|127.0.0.1:9091| P[Prometheus]
+    OA -->|JDBC · red data| DB[(PostgreSQL)]
+    OA -->|HTTP · red compute| R[risk-engine · FastAPI]
+    OA -->|"API HTTP · red telemetry (monitoreo)"| P
+    P -->|scrape| OA
+    P -->|scrape| R
+    G --> P
+```
+
+Se evaluó un sexto contenedor Nginx para el frontend y se descartó porque rompía la protección de páginas por rol y el mismo origen de la sesión sin aportar funcionalidad ([ADR 0009](docs/adr/0009-multipage-frontend-served-by-spring.md)). Arquitectura completa con diagramas de componentes, secuencia, integración Java ↔ FastAPI, despliegue y modelo de datos: **[`docs/HEXAGONAL_ARCHITECTURE.md`](docs/HEXAGONAL_ARCHITECTURE.md)**.
+
+### Capturas del sitio v4 (datos reales)
+
+Tomadas por `tools/ui-e2e/pages-e2e.js` y Playwright contra el backend real (Java + Python + PostgreSQL 16 en local, sin Docker). Los pedidos, mensajes y entregas los crearon las propias pruebas. En local no había Prometheus, por eso no se incluye la página de monitoreo; en el CI se comprueba contra un Prometheus real.
+
+| Inicio | Catálogo |
+| --- | --- |
+| ![Portada con cifras reales](docs/assets/screenshots/v4-inicio.png) | ![Catálogo con filtros y paginación](docs/assets/screenshots/v4-catalogo.png) |
+| **Checkout con dirección** | **Seguimiento del pedido** |
+| ![Checkout con datos de entrega](docs/assets/screenshots/v4-checkout.png) | ![Seguimiento con estado e historial](docs/assets/screenshots/v4-seguimiento.png) |
+| **Resumen del cliente** | **Panel de administración** |
+| ![Resumen del cliente](docs/assets/screenshots/v4-cliente-resumen.png) | ![Panel con KPIs y mensajes de contacto](docs/assets/screenshots/v4-admin-dashboard.png) |
+| **Inventario** | **Revisiones de riesgo** |
+| ![Inventario con stock bajo](docs/assets/screenshots/v4-admin-inventario.png) | ![Revisiones de riesgo](docs/assets/screenshots/v4-revisiones.png) |
+| **Resumen logístico** | **Asignaciones** |
+| ![Resumen logístico](docs/assets/screenshots/v4-logistica-resumen.png) | ![Asignaciones semanales](docs/assets/screenshots/v4-logistica-asignaciones.png) |
+| **Flujo de pedidos** | **Contacto** |
+| ![Secuencia y ciclo de vida](docs/assets/screenshots/v4-flujo-pedidos.png) | ![Formulario de contacto](docs/assets/screenshots/v4-contacto.png) |
+
+<p align="center"><img src="docs/assets/screenshots/v4-movil-menu.png" alt="Menú móvil de 390 px" width="260"></p>
 
 ## 🏢 Plataforma comercial v3
 
@@ -444,9 +522,10 @@ El comando genera los secretos si faltan (`secrets\db_password.txt`, `secrets\gr
 
 | URL | Qué hay |
 | --- | --- |
-| <http://127.0.0.1:8080> | Laboratorio, interfaz web y API REST |
-| <http://127.0.0.1:8080/#/tienda> | Portal comercial · <http://127.0.0.1:8080/#/entrar> para entrar con una cuenta demo (contraseña en `secrets\demo_password.txt`) |
-| <http://127.0.0.1:3000/d/hexaorders> | Dashboard original de Grafana (usuario `admin`, contraseña en `secrets\grafana_password.txt`) · nuevos: `/d/hexaorders-business`, `/d/hexaorders-risk`, `/d/hexaorders-api`, `/d/hexaorders-infrastructure`, `/d/hexaorders-security` |
+| <http://127.0.0.1:8080> | Sitio web multipágina (inicio, catálogo, portales por rol, monitoreo) y API REST |
+| <http://127.0.0.1:8080/login.html> | Acceso con una cuenta demo (contraseña en `secrets\demo_password.txt`) |
+| <http://127.0.0.1:8080/laboratorio.html> | Laboratorio original: alta de pedidos, panel y explorador de arquitectura |
+| <http://127.0.0.1:3000/d/hexaorders> | Dashboard original de Grafana (usuario `admin`, contraseña en `secrets\grafana_password.txt`) · nuevos: `/d/hexaorders-business`, `/d/hexaorders-risk`, `/d/hexaorders-api`, `/d/hexaorders-infrastructure`, `/d/hexaorders-security`, `/d/hexaorders-logistics` |
 | <http://127.0.0.1:9091/targets> | Targets de Prometheus · [alertas](http://127.0.0.1:9091/alerts) |
 
 <details>
@@ -460,7 +539,7 @@ El comando genera los secretos si faltan (`secrets\db_password.txt`, `secrets\gr
 | `.\hexaorders.cmd stop` | Detiene los servicios **conservando** los datos. |
 | `.\hexaorders.cmd stop -RemoveData` | Detiene y **elimina** pedidos, métricas y datos de Grafana. |
 | `.\hexaorders.cmd verify` | La misma prueba integral que ejecuta GitHub, en un entorno aislado que se elimina al terminar. |
-| `.\hexaorders.cmd check` | Comprueba que el entregable generado está al día y es válido. |
+| `.\hexaorders.cmd check` | Entregable al día y válido, observabilidad conservada y sitio multipágina coherente (páginas, rutas, enlaces, CSP, reglas por rol). |
 | `.\hexaorders.cmd test` | Tests unitarios locales (Python + Maven). |
 | `.\hexaorders.cmd k8s-secrets` | Crea el Secret de Kubernetes desde `secrets\*.txt`. |
 | `.\hexaorders.cmd help` | Ayuda completa. |
@@ -514,13 +593,16 @@ docker compose ps
 | `/api/auth/{csrf,me,login,logout,register}` | público | Token CSRF, sesión actual, entrar, salir, registro de clientes |
 | `GET /api/catalog/{categories,products,products/{id}}` | público | Catálogo con búsqueda (`q`) y filtro por categoría (`category`) |
 | `POST /api/shop/quote` | público | Presupuesto calculado en el servidor |
-| `/api/shop/orders[/{id}[/cancel]]` | `CUSTOMER` | Checkout (`Idempotency-Key` obligatorio; `201` o `200` + `Idempotent-Replay`), mis pedidos, cancelar |
+| `/api/shop/orders[/{id}[/cancel]]` | `CUSTOMER` | Checkout (`Idempotency-Key` obligatorio; `201` o `200` + `Idempotent-Replay`; `shipping` opcional desde la v4), mis pedidos, cancelar |
 | `/api/account/{me,profile,password}` | con sesión | Perfil y contraseña |
 | `/api/operations/orders[/{id}[/transitions]]` | `ORDER_OPERATOR`, `ADMIN` | Bandeja y transiciones |
 | `/api/logistics/{deliveries,assignees,schedulable-orders}`, `/deliveries/{id}[/history]`, `/orders/{id}/transitions` | `LOGISTICS_OPERATOR`, `ADMIN` | Calendario, programación, reprogramación, historial, despacho y entrega |
 | `/api/incidents[/{id}/resolve]` | `ORDER_OPERATOR`, `LOGISTICS_OPERATOR`, `ADMIN` | Listar, reportar y resolver incidencias |
 | `/api/admin/{dashboard,users,audit,products,categories}` | `ADMIN` | Administración completa |
 | `GET /api/ops/health` | `OBSERVABILITY_VIEWER`, `ADMIN` | Salud de dependencias |
+| `GET /api/ops/monitoring` (v4) | `OBSERVABILITY_VIEWER`, `ADMIN` | Targets, reglas de alerta e indicadores leídos de Prometheus por el backend |
+| `POST /api/contact` (v4) | público (con CSRF) | Mensaje de la página de contacto (`201`, sin devolver datos personales) |
+| `GET /api/admin/contact-messages` (v4) | `ADMIN` | Mensajes de contacto recibidos |
 
 Códigos: `400` validación, `401` sin sesión, `403` sin rol o CSRF ausente, `404` inexistente o ajeno, `409` (con `code` en los conflictos de negocio: `OUT_OF_STOCK`, `CONCURRENT_UPDATE`, `SCHEDULE_CONFLICT`, `IDEMPOTENCY_KEY_REUSED`, `SELF_LOCKOUT`…), `503` motor de riesgo o PostgreSQL no disponible.
 
@@ -657,6 +739,7 @@ Dashboards añadidos en la v3 (el original se conserva sin cambios y `check_obse
 | API | `/d/hexaorders-api` | Tráfico por ruta, códigos, p50/p95/p99, errores 4xx/5xx |
 | Infraestructura | `/d/hexaorders-infrastructure` | Disponibilidad, JVM (memoria, GC, hilos), HikariCP, proceso Python, Prometheus |
 | Seguridad | `/d/hexaorders-security` | Inicios de sesión por resultado, accesos denegados, 401/403 |
+| Logística (v4) | `/d/hexaorders-logistics` | Tramo logístico: listos, en tránsito, entregados, programación, conflictos e incidencias |
 
 ## ☸️ Despliegue en Kubernetes
 
@@ -671,7 +754,7 @@ Guía paso a paso (kind, registro, port-forward): [`k8s/README.md`](k8s/README.m
 
 ## 🖥️ Interfaz web
 
-Interfaz en español, servida por Spring Boot desde `src/main/resources/static/` y organizada en `index.html`, `css/` (base, componentes, efectos) y `js/` (módulos ES nativos). No usa frameworks ni librerías.
+Interfaz en español, servida por Spring Boot desde `src/main/resources/static/`. Desde la v4 es un sitio multipágina ([`docs/FRONTEND_PAGES.md`](docs/FRONTEND_PAGES.md)); el **laboratorio original** descrito aquí está íntegro en `laboratorio.html`, con `css/` (base, componentes, efectos) y `js/` (módulos ES nativos). No usa frameworks ni librerías.
 
 | Sección | Datos |
 | --- | --- |
@@ -716,6 +799,9 @@ El fondo es una **cuadrícula interactiva** dibujada en un único `<canvas>`: se
 | Plataforma | `tools/platform_smoke.py` (dentro de `verify`) | 35 comprobaciones HTTP reales: catálogo, precios del servidor, registro, checkout idempotente, stock, aislamiento entre clientes, transiciones, 409, calendario, incidencias, auditoría, roles y métricas en Prometheus. |
 | Observabilidad | `tools/check_observability.py` (dentro de `check`) | Ningún dashboard, panel, consulta, datasource, job, alerta o métrica previa desaparece o cambia. |
 | Interfaz v3 | `tools/ui-e2e/ui-e2e.js` | Checkout de cliente, KPIs de admin, usuarios, detalle de operador, calendario logístico y restricciones del observador. |
+| Sitio v4 | `tools/ui-e2e/pages-e2e.js` | Las 39 páginas como visitante y con los 5 roles (200/302/403/404), enlaces sin 404, recarga, contacto, checkout con dirección, monitoreo con Prometheus real, móvil, sin errores de JavaScript ni 5xx. |
+| Frontend estático | `tools/check_frontend.py` (en `check`) | Páginas al día con el registro, rutas registradas, recursos y enlaces existentes, CSP sin código en línea, reglas de seguridad por página, transiciones iguales al dominio. |
+| v4 (Java) | `WebPlatformDomainTest`, `WebPlatformServicesTest`, `PrometheusMonitoringAdapterTest`, `SecurityRulesTest` | Dirección y contacto en el dominio, servicios de contacto y monitoreo, adaptador de Prometheus, redirecciones y 403 de las páginas. |
 
 ```powershell
 .\hexaorders.cmd check     # entregable + validación
@@ -758,6 +844,8 @@ Guion reproducible con resultados esperados y observados: **[`docs/demo/README.m
 - **Sin límite de intentos** de inicio de sesión (rate limiting); sí hay métrica y alerta de fallos.
 - El **checkout es de demostración**: no hay pagos, envío de correos ni facturación.
 - **Sin cAdvisor ni node-exporter**: el dashboard de infraestructura muestra métricas de JVM, HikariCP y procesos, no de contenedores.
+- **Windows**: los scripts se prueban en un runner Windows de GitHub y el stack completo con el mismo script en Ubuntu; **no se ha probado en un PC con Docker Desktop** ([comprobaciones manuales](docs/WINDOWS_DOCKER_GUIDE.md#9-comprobaciones-manuales-recomendadas-en-docker-desktop)).
+- La paginación de las tablas es en el navegador sobre listas que el servidor ya limita (200 pedidos, 200 eventos de auditoría).
 - Comunicación Java → Python **síncrona y sin reintentos** ni circuit breaker.
 - Una sola réplica de cada servicio; **sin alta disponibilidad** ni copias de seguridad automáticas.
 - Los **secretos de Compose** son archivos montados, no una bóveda cifrada.
@@ -777,4 +865,4 @@ Guion reproducible con resultados esperados y observados: **[`docs/demo/README.m
 - Spring Boot, [Actuator metrics](https://docs.spring.io/spring-boot/reference/actuator/metrics.html) · Prometheus, [Querying basics](https://prometheus.io/docs/prometheus/latest/querying/basics/) · Grafana, [Provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/).
 - [ArchUnit](https://www.archunit.org/userguide/html/000_Index.html) · [FastAPI](https://fastapi.tiangolo.com/) · [Flyway](https://documentation.red-gate.com/flyway).
 
-Alcance de cada fuente: [`docs/fuentes.md`](docs/fuentes.md). Más documentación: [arquitectura](docs/arquitectura.md) · [guía para explicar (es)](docs/guia-para-explicar.md) · [**presentation guide (en)**](docs/english/presentation-guide.md) · [**interview explanation v3 (en)**](docs/english/interview-explanation.md) · [ADR](docs/adr/) · [handoff](docs/ANTIGRAVITY_HANDOFF.md) · [observabilidad conservada](docs/OBSERVABILITY_PRESERVATION.md) · [despliegue en VM](docs/despliegue-cloud.md) · [GitHub](docs/github.md).
+Alcance de cada fuente: [`docs/fuentes.md`](docs/fuentes.md). Más documentación: [arquitectura](docs/arquitectura.md) · [guía para explicar (es)](docs/guia-para-explicar.md) · [**presentation guide (en)**](docs/english/presentation-guide.md) · [**interview explanation v3 (en)**](docs/english/interview-explanation.md) · [**arquitectura hexagonal v4**](docs/HEXAGONAL_ARCHITECTURE.md) · [**páginas**](docs/FRONTEND_PAGES.md) · [**Windows y Docker**](docs/WINDOWS_DOCKER_GUIDE.md) · [ADR](docs/adr/) · [handoff](docs/ANTIGRAVITY_HANDOFF.md) · [observabilidad conservada](docs/OBSERVABILITY_PRESERVATION.md) · [despliegue en VM](docs/despliegue-cloud.md) · [GitHub](docs/github.md).
