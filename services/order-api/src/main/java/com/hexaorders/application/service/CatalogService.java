@@ -15,23 +15,33 @@ import java.util.List;
 public final class CatalogService implements CatalogUseCases {
     private final CatalogRepository catalog;
     private final AuditLog audit;
+    private final com.hexaorders.application.port.out.CatalogCache cache;
 
     public CatalogService(CatalogRepository catalog, AuditLog audit) {
+        this(catalog, audit, com.hexaorders.application.port.out.CatalogCache.NONE);
+    }
+
+    /** v5: public catalog reads go through a read-through cache; PostgreSQL remains the source of truth. */
+    public CatalogService(CatalogRepository catalog, AuditLog audit, com.hexaorders.application.port.out.CatalogCache cache) {
         this.catalog = catalog;
         this.audit = audit;
+        this.cache = cache;
     }
 
     @Override
-    public List<Category> categories() { return catalog.categories(); }
+    public List<Category> categories() { return cache.categories(catalog::categories); }
 
     @Override
     public List<Product> products(String query, Long categoryId) {
-        return catalog.products(Guards.text(query, 80, "q"), categoryId, true);
+        String clean = Guards.text(query, 80, "q");
+        // Free-text searches are not cached (unbounded keys); category listings are.
+        if (clean != null) return catalog.products(clean, categoryId, true);
+        return cache.activeProducts(categoryId, () -> catalog.products(null, categoryId, true));
     }
 
     @Override
     public Product product(long id) {
-        return catalog.product(id).filter(product -> product.details().active())
+        return cache.product(id, () -> catalog.product(id)).filter(product -> product.details().active())
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
     }
 
@@ -49,6 +59,7 @@ public final class CatalogService implements CatalogUseCases {
             throw new BusinessConflictException("DUPLICATE_CATEGORY", "Ya existe una categoría con ese slug");
         }
         Category created = catalog.createCategory(slug, name.strip());
+        cache.invalidate();
         audit.record(admin.username(), "CATEGORY_CREATED", "category:" + created.id(), slug);
         return created;
     }
@@ -60,6 +71,7 @@ public final class CatalogService implements CatalogUseCases {
         requireCategory(details.categoryId());
         if (catalog.skuExists(details.sku(), null)) throw new BusinessConflictException("DUPLICATE_SKU", "Ya existe un producto con ese SKU");
         Product created = catalog.createProduct(details, initialStock);
+        cache.invalidate();
         audit.record(admin.username(), "PRODUCT_CREATED", "product:" + created.id(), details.sku() + " · " + details.price() + " USD");
         return created;
     }
@@ -70,6 +82,7 @@ public final class CatalogService implements CatalogUseCases {
         requireCategory(details.categoryId());
         if (catalog.skuExists(details.sku(), id)) throw new BusinessConflictException("DUPLICATE_SKU", "Ya existe un producto con ese SKU");
         Product updated = catalog.updateProduct(id, details).orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
+        cache.invalidate();
         audit.record(admin.username(), "PRODUCT_UPDATED", "product:" + id, details.sku() + " · " + details.price() + " USD · active=" + details.active());
         return updated;
     }
@@ -83,6 +96,7 @@ public final class CatalogService implements CatalogUseCases {
         catalog.product(id).orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
         Product updated = catalog.adjustStock(id, delta)
                 .orElseThrow(() -> new BusinessConflictException("NEGATIVE_STOCK", "El ajuste dejaría el stock en negativo"));
+        cache.invalidate();
         audit.record(admin.username(), "STOCK_ADJUSTED", "product:" + id, (delta > 0 ? "+" : "") + delta + " · " + cleanReason);
         return updated;
     }

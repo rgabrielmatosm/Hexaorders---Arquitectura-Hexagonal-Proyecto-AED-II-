@@ -34,13 +34,19 @@ public final class OperationsService implements OperationsUseCases {
 
     public OperationsService(CommerceOrderRepository orders, DeliveryRepository deliveries, IncidentRepository incidents,
                              BusinessTelemetry telemetry, AuditLog audit, Clock clock) {
+        this(orders, deliveries, incidents, telemetry, audit, clock, com.hexaorders.application.port.out.CatalogCache.NONE);
+    }
+
+    public OperationsService(CommerceOrderRepository orders, DeliveryRepository deliveries, IncidentRepository incidents,
+                             BusinessTelemetry telemetry, AuditLog audit, Clock clock,
+                             com.hexaorders.application.port.out.CatalogCache cache) {
         this.orders = orders;
         this.deliveries = deliveries;
         this.incidents = incidents;
         this.telemetry = telemetry;
         this.audit = audit;
         this.clock = clock;
-        this.transitions = new LifecycleTransitions(orders, deliveries, telemetry, audit, clock);
+        this.transitions = new LifecycleTransitions(orders, deliveries, telemetry, audit, clock, cache);
     }
 
     @Override

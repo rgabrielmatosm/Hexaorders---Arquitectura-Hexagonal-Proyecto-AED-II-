@@ -82,19 +82,22 @@ public class PlatformConfiguration {
         return new DependencyHealthAdapter(jdbc, builder.baseUrl(riskBaseUrl).requestFactory(requests).build());
     }
 
-    @Bean CatalogUseCases catalogUseCases(CatalogRepository catalog, AuditLog audit) { return new CatalogService(catalog, audit); }
+    @Bean CatalogUseCases catalogUseCases(CatalogRepository catalog, AuditLog audit, com.hexaorders.application.port.out.CatalogCache cache) {
+        return new CatalogService(catalog, audit, cache);
+    }
 
     @Bean
     CommerceUseCases commerceUseCases(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
                                       RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
-                                      AuditLog audit, Clock clock) {
-        return new CommerceService(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock);
+                                      AuditLog audit, Clock clock, com.hexaorders.application.port.out.CatalogCache cache) {
+        return new CommerceService(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock, cache);
     }
 
     @Bean
     OperationsUseCases operationsUseCases(CommerceOrderRepository orders, DeliveryRepository deliveries, IncidentRepository incidents,
-                                          BusinessTelemetry telemetry, AuditLog audit, Clock clock) {
-        return new OperationsService(orders, deliveries, incidents, telemetry, audit, clock);
+                                          BusinessTelemetry telemetry, AuditLog audit, Clock clock,
+                                          com.hexaorders.application.port.out.CatalogCache cache) {
+        return new OperationsService(orders, deliveries, incidents, telemetry, audit, clock, cache);
     }
 
     @Bean

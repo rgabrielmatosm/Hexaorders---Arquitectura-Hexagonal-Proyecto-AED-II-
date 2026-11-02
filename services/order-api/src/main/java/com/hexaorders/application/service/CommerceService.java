@@ -54,10 +54,18 @@ public final class CommerceService implements CommerceUseCases {
     private final AuditLog audit;
     private final Clock clock;
     private final LifecycleTransitions transitions;
+    private final com.hexaorders.application.port.out.CatalogCache cache;
 
     public CommerceService(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
                            RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
                            AuditLog audit, Clock clock) {
+        this(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock, com.hexaorders.application.port.out.CatalogCache.NONE);
+    }
+
+    public CommerceService(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
+                           RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
+                           AuditLog audit, Clock clock, com.hexaorders.application.port.out.CatalogCache cache) {
+        this.cache = cache;
         this.catalog = catalog;
         this.orders = orders;
         this.deliveries = deliveries;
@@ -66,7 +74,7 @@ public final class CommerceService implements CommerceUseCases {
         this.telemetry = telemetry;
         this.audit = audit;
         this.clock = clock;
-        this.transitions = new LifecycleTransitions(orders, deliveries, telemetry, audit, clock);
+        this.transitions = new LifecycleTransitions(orders, deliveries, telemetry, audit, clock, cache);
     }
 
     @Override
@@ -131,6 +139,7 @@ public final class CommerceService implements CommerceUseCases {
             if (again != null) return again;
             throw new BusinessConflictException("IDEMPOTENCY_KEY_REUSED", concurrent.getMessage());
         }
+        cache.invalidate(); // stock decreased in PostgreSQL: cached listings would show stale stock
         orderTelemetry.orderCreated(order.status());
         telemetry.shopOrderPlaced(order.status());
         audit.record(customer.username(), "ORDER_PLACED", order.id().toString(),
