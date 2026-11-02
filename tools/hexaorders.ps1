@@ -20,6 +20,11 @@
       logs         Últimas 100 líneas de log de cada servicio.
       stop         Detiene los servicios conservando los datos (-RemoveData los elimina).
       secrets      Solo genera secrets\db_password.txt, grafana_password.txt, demo_password.txt y rabbitmq_password.txt.
+      repair-db-password
+                   Si secrets\db_password.txt ya no coincide con la contraseña con la que se creó el
+                   volumen de PostgreSQL (order-api no arranca: "password authentication failed"),
+                   cambia la contraseña de PostgreSQL al valor del archivo. Pide confirmación y
+                   NO borra datos.
       k8s-secrets  Crea el Secret app-secrets de Kubernetes a partir de secrets\*.txt.
 
     Comandos de comprobación:
@@ -46,7 +51,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('help', 'start', 'status', 'logs', 'stop', 'secrets', 'k8s-secrets',
+    [ValidateSet('help', 'start', 'status', 'logs', 'stop', 'secrets', 'k8s-secrets', 'repair-db-password',
                  'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup')]
     [string]$Command = 'help',
 
@@ -200,6 +205,103 @@ function Show-Urls {
     }
 }
 
+# ---------------------------------------------------------------- contraseña de PostgreSQL
+
+# PostgreSQL guarda la contraseña al crear su volumen. Si después secrets\db_password.txt cambia
+# (otra carpeta, secretos regenerados), order-api muere al arrancar con "password authentication
+# failed" y Compose solo dice "dependency order-api failed to start". Estas funciones lo detectan
+# antes de arrancar y permiten repararlo sin borrar datos. La contraseña viaja por stdin, nunca en
+# la línea de comandos; tr elimina el CR que añade Windows PowerShell al canalizar texto.
+$DbCheckScript = 'tr -d \\r | { IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -X -q -t -A -o /dev/null -h 127.0.0.1 -U $POSTGRES_USER -d $POSTGRES_DB -v ON_ERROR_STOP=1; }'
+# Dentro del contenedor el socket local usa "trust" (imagen oficial), así que se puede corregir la contraseña.
+$DbRepairScript = 'tr -d \\r | { IFS= read -r p; export p; exec psql -X -q -U $POSTGRES_USER -d $POSTGRES_DB -v ON_ERROR_STOP=1; }'
+if ($IsVerifyCommand) { $DbVolume = "$($VerifyProject)_postgres_data" } else { $DbVolume = 'hexaorders_postgres_data' }
+
+function Get-DbSecretValue {
+    $path = Join-Path (Join-Path $WorkDir 'secrets') 'db_password.txt'
+    return ([System.IO.File]::ReadAllText($path)).TrimEnd([char[]]@([char]13, [char]10))
+}
+
+function Invoke-ComposeWithInput([string]$InputText, [string[]]$Arguments) {
+    # Como Invoke-Compose, pero envía $InputText por stdin y devuelve el código de salida.
+    $base = @('compose', '-f', $ComposeFile)
+    if ($IsVerifyCommand) { $base += @('-p', $VerifyProject) }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+    try { $InputText | & docker @($base + $Arguments) | Out-Host } finally { $ErrorActionPreference = $previous }
+    return $LASTEXITCODE
+}
+
+function Test-DbVolumeExists {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & docker volume inspect $DbVolume *> $null } finally { $ErrorActionPreference = $previous }
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Test-DatabasePassword {
+    Write-Step 'Comprobar que secrets\db_password.txt coincide con la contraseña guardada en el volumen de PostgreSQL'
+    [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout", 'db'))
+    $code = Invoke-ComposeWithInput ((Get-DbSecretValue) + "`nSELECT 1;`n") @('exec', '-T', 'db', 'sh', '-c', $DbCheckScript)
+    return ($code -eq 0)
+}
+
+function Set-DatabasePassword([string]$Value) {
+    # Cambia la contraseña del usuario de PostgreSQL (POSTGRES_USER) sin tocar ningún dato.
+    $sql = $Value + "`n\getenv pw p`n\getenv u POSTGRES_USER`nALTER ROLE :""u"" PASSWORD :'pw';`n"
+    $code = Invoke-ComposeWithInput $sql @('exec', '-T', 'db', 'sh', '-c', $DbRepairScript)
+    if ($code -ne 0) { throw "No se pudo cambiar la contraseña de PostgreSQL (código $code)." }
+}
+
+function Get-DbPasswordHelp {
+    $secret = Join-Path (Join-Path $WorkDir 'secrets') 'db_password.txt'
+    return ("$secret no coincide con la contraseña con la que se creó el volumen $DbVolume (de una instalación anterior). " +
+            'Por eso order-api no puede conectarse a PostgreSQL. Tus pedidos siguen intactos. Soluciones: ' +
+            '(1) copia el db_password.txt original (por ejemplo, de la carpeta secrets de la versión anterior) y vuelve a ejecutar start; ' +
+            '(2) o ejecuta .\hexaorders.cmd repair-db-password, que cambia la contraseña de PostgreSQL al valor actual del archivo sin borrar datos. ' +
+            'No uses docker compose down -v: borraría los datos.')
+}
+
+function Show-StartFailure {
+    Write-Host ''
+    Write-Host 'Algún servicio no llegó a estar sano. Estado de los contenedores:' -ForegroundColor Yellow
+    [void](Invoke-Compose @('ps', '-a') -AllowFailure)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $logs = (& docker compose -f $ComposeFile logs --no-color --tail=60 order-api 2>&1 | Out-String) } finally { $ErrorActionPreference = $previous }
+    Write-Host 'Últimas líneas de order-api:' -ForegroundColor Yellow
+    Write-Host $logs
+    if ($logs -match 'password authentication failed') {
+        Write-Host (Get-DbPasswordHelp) -ForegroundColor Yellow
+    } else {
+        Write-Host 'Para ver otro servicio: docker compose logs --no-color --tail=80 NOMBRE' -ForegroundColor Yellow
+    }
+}
+
+function Invoke-RepairDbPassword {
+    Assert-Docker
+    Initialize-WorkDir
+    if (-not (Test-DbVolumeExists)) {
+        Write-Host "No existe el volumen ${DbVolume}: PostgreSQL se creará con secrets\db_password.txt. No hay nada que reparar." -ForegroundColor Green
+        return
+    }
+    if (Test-DatabasePassword) {
+        Write-Host 'La contraseña ya coincide con la del volumen. No hay nada que reparar.' -ForegroundColor Green
+        return
+    }
+    Write-Host ''
+    Write-Host 'La contraseña de PostgreSQL no coincide con secrets\db_password.txt.' -ForegroundColor Yellow
+    Write-Host 'Si conservas el archivo original, es preferible copiarlo y no continuar.'
+    Write-Host 'Si continúas, la contraseña del usuario de PostgreSQL pasará a ser la del archivo actual.'
+    Write-Host 'Los pedidos, usuarios y demás datos NO se borran.'
+    $answer = Read-Host 'Escribe SI para continuar'
+    if ($answer -cne 'SI') { Write-Host 'Cancelado: no se cambió nada.'; return }
+    Set-DatabasePassword (Get-DbSecretValue)
+    if (-not (Test-DatabasePassword)) { throw 'La contraseña se cambió, pero la comprobación sigue fallando.' }
+    Write-Host 'Contraseña de PostgreSQL reparada sin perder datos. Ahora ejecuta: .\hexaorders.cmd start' -ForegroundColor Green
+}
+
 # ---------------------------------------------------------------- comandos
 
 function Invoke-Help { Get-Help $PSCommandPath -Detailed }
@@ -243,8 +345,10 @@ function Invoke-Start {
     [void](Invoke-Compose @('config', '--quiet'))
     Write-Step 'Construir imágenes (incluye los tests de Java y Python)'
     [void](Invoke-Compose @('build', '--pull'))
+    if ((Test-DbVolumeExists) -and -not (Test-DatabasePassword)) { throw (Get-DbPasswordHelp) }
     Write-Step "Arrancar los servicios del modo $Mode y esperar a que estén sanos"
-    [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout"))
+    try { [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout")) }
+    catch { Show-StartFailure; throw }
     [void](Invoke-Compose @('ps'))
     Show-Urls
 }
@@ -410,6 +514,17 @@ function Invoke-Verify {
         [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', '180'))
         Invoke-IntegrationSmoke @('persist-read', '--state', $state)
 
+        Write-Step '[8b/10] Contraseña de PostgreSQL distinta del secreto: se detecta y repair-db-password la corrige sin perder datos'
+        if (-not (Test-DatabasePassword)) { throw 'La contraseña de PostgreSQL debería coincidir con secrets\db_password.txt' }
+        Set-DatabasePassword ('distinta-' + [guid]::NewGuid().ToString('N'))
+        if (Test-DatabasePassword) { throw 'No se detectó una contraseña de PostgreSQL distinta del secreto' }
+        Set-DatabasePassword (Get-DbSecretValue)
+        if (-not (Test-DatabasePassword)) { throw 'La reparación no restauró el acceso a PostgreSQL' }
+        [void](Invoke-Compose @('restart', 'order-api'))
+        [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', '180'))
+        Invoke-IntegrationSmoke @('persist-read', '--state', $state)
+        Write-Host 'OK: contraseña distinta detectada y reparada; los pedidos siguen en PostgreSQL.' -ForegroundColor Green
+
         Write-Step '[9/10] Si risk-engine cae, la API responde HTTP 503 (también a través del gateway)'
         [void](Invoke-Compose @('stop', 'risk-engine'))
         $code = Get-HttpStatus 'http://127.0.0.1:8080/api/orders' '{"customerId":"demo-001","amount":125.50}'
@@ -442,6 +557,7 @@ try {
         'logs'        { Invoke-Logs }
         'stop'        { Invoke-Stop }
         'secrets'     { Invoke-Secrets }
+        'repair-db-password' { Invoke-RepairDbPassword }
         'k8s-secrets' { Invoke-K8sSecrets }
         'check'       { Invoke-Check; Write-Host 'Comprobaciones correctas.' -ForegroundColor Green }
         'test'        { Invoke-Test }
