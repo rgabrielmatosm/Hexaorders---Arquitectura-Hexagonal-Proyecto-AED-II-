@@ -20,6 +20,7 @@ Gestión de pedidos con evaluación determinista de riesgo, construida con **arq
 <summary>Mostrar el índice completo</summary>
 
 1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+1. [**Plataforma Docker v5 (13 contenedores)**](#-plataforma-docker-v5-13-contenedores): [arquitectura](docs/DOCKER_ARCHITECTURE.md) · [servicios](docs/DOCKER_SERVICES.md) · [eventos](docs/ASYNCHRONOUS_EVENTS.md) · [Redis](docs/REDIS_INTEGRATION.md) · [observabilidad](docs/OBSERVABILITY_STACK.md) · [Windows](docs/WINDOWS_DOCKER_GUIDE.md)
 1. [**Sitio web multipágina v4**](#-sitio-web-multipágina-v4): [páginas](docs/FRONTEND_PAGES.md) · [arquitectura](docs/HEXAGONAL_ARCHITECTURE.md) · [Windows y Docker](docs/WINDOWS_DOCKER_GUIDE.md) · [capturas](#capturas-del-sitio-v4-datos-reales)
 1. [**Plataforma comercial v3**](#-plataforma-comercial-v3): [roles](#roles-y-permisos) · [funcionalidades](#funcionalidades) · [ciclo de vida](#ciclo-de-vida-del-pedido) · [modelo de datos](#modelo-de-datos) · [seguridad](#seguridad) · [capturas](#capturas-de-la-plataforma-datos-reales) · [ADR](docs/adr/)
 2. [Tecnologías](#-tecnologías)
@@ -55,6 +56,66 @@ El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma
 | Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
 | Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
 | Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## 🐳 Plataforma Docker v5 (13 contenedores)
+
+La v5 convierte HexaOrders en una plataforma de **13 contenedores**, cada uno con una función real y comprobada por pruebas automáticas: 12 servicios más Alloy como agente de logs. Todo lo anterior se conserva: páginas, APIs, roles, dominio, 7 dashboards, métricas, alertas, scripts y pruebas.
+
+```mermaid
+flowchart LR
+    U((Navegador)) -->|127.0.0.1:8080| FE[frontend · Nginx]
+    FE --> OA[order-api · hexagonal]
+    OA --> DB[(PostgreSQL)]
+    OA --> RE[risk-engine · FastAPI]
+    OA -. caché .-> RD[(Redis)]
+    OA -. outbox → eventos .-> MQ[RabbitMQ]
+    MQ -. consumidor idempotente .-> OA
+    OA -. SMTP .-> MP[Mailpit]
+    OA & RE -. OTLP .-> OC[otel-collector] --> TP[(Tempo)]
+    AL[Alloy] -. logs .-> LK[(Loki)]
+    PR[Prometheus] --> GF[Grafana]
+    LK & TP --> GF
+```
+
+| Servicio | Función | Modo | Host |
+| --- | --- | --- | --- |
+| `frontend` | Gateway Nginx: estáticos y reenvío a Spring (ADR 0011) | básico | 127.0.0.1:8080 |
+| `order-api` | Núcleo hexagonal Java 21 / Spring Boot | básico | — |
+| `risk-engine` | Motor de riesgo FastAPI | básico | — |
+| `db` | PostgreSQL 17, fuente de verdad y outbox | básico | — |
+| `prometheus` | Métricas (9 jobs) y 9 alertas | básico | 127.0.0.1:9091 |
+| `grafana` | 8 dashboards; fuentes Prometheus, Loki y Tempo | básico | 127.0.0.1:3000 |
+| `redis` | Caché del catálogo (no es fuente de verdad) | full | — |
+| `rabbitmq` | Eventos de negocio versionados con DLQ | full | 127.0.0.1:15672 (consola) |
+| `mailpit` | Captura de correos de desarrollo (no envía a Internet) | full | 127.0.0.1:8025 |
+| `loki` | Logs centralizados (7 días) | full | — |
+| `tempo` | Trazas distribuidas (72 h) | full | — |
+| `otel-collector` | Recepción OTLP, filtrado, lotes y métricas de Nginx | full | — |
+| `alloy` | Recolector de logs de Docker hacia Loki | full | — |
+
+PostgreSQL, Redis y AMQP **nunca** se publican en el host. Las redes internas son `gateway`, `data`, `compute`, `cache`, `messaging` y `telemetry`.
+
+**Comandos (Windows, PowerShell):**
+
+```powershell
+.\hexaorders.cmd start               # modo completo (13 contenedores, ~4,5 GB de RAM)
+.\hexaorders.cmd start -Mode basic   # modo básico (6 contenedores, ~2,5 GB)
+.\hexaorders.cmd status
+.\hexaorders.cmd logs
+.\hexaorders.cmd smoke
+.\hexaorders.cmd check
+.\hexaorders.cmd stop                # conserva los datos
+```
+
+Documentación:
+
+- [`DOCKER_ARCHITECTURE.md`](docs/DOCKER_ARCHITECTURE.md): redes, modos y recursos;
+- [`DOCKER_SERVICES.md`](docs/DOCKER_SERVICES.md): cada servicio y su verificación;
+- [`ASYNCHRONOUS_EVENTS.md`](docs/ASYNCHRONOUS_EVENTS.md): outbox, eventos, DLQ y correos;
+- [`REDIS_INTEGRATION.md`](docs/REDIS_INTEGRATION.md);
+- [`OBSERVABILITY_STACK.md`](docs/OBSERVABILITY_STACK.md): métricas, logs y trazas;
+- [`WINDOWS_DOCKER_GUIDE.md`](docs/WINDOWS_DOCKER_GUIDE.md);
+- [`validacion.md`](docs/validacion.md): resultados reales.
 
 ## 🌐 Sitio web multipágina v4
 
@@ -550,13 +611,14 @@ En Linux o macOS, los mismos comandos con PowerShell 7: `pwsh ./tools/hexaorders
 
 ## 🐳 Ejecución con Docker Compose
 
-`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los tres secretos.
+`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los cuatro secretos (v5: se añade `rabbitmq_password.txt`).
 
 ```powershell
 New-Item -ItemType Directory secrets -Force | Out-Null
-# Crea secrets\db_password.txt, grafana_password.txt y demo_password.txt (aleatorios; no sobrescribe)
+# Crea secrets\db_password.txt, grafana_password.txt, demo_password.txt y rabbitmq_password.txt (aleatorios; no sobrescribe)
 .\tools\init-env.ps1
 docker compose config --quiet
+$env:COMPOSE_PROFILES = 'full'   # v5: omítelo para el modo básico
 docker compose build --pull
 docker compose up -d --wait --wait-timeout 240
 docker compose ps
@@ -567,7 +629,7 @@ docker compose ps
 <details>
 <summary>Qué incluye el YAML (healthchecks, límites, secretos, volúmenes)</summary>
 
-- **Healthchecks** en los cinco servicios; `order-api` espera a `db` y `risk-engine` sanos (`depends_on: condition: service_healthy`).
+- **Healthchecks** en los 13 servicios (v5; perfil `full` para los 7 opcionales); `order-api` espera a `db` y `risk-engine` sanos (`depends_on: condition: service_healthy`).
 - **Límites** de memoria y CPU (`mem_limit`, `cpus`) y rotación de logs.
 - **Secretos** de tipo archivo montados en `/run/secrets` (Compose solo admite este tipo en servicios `read_only`).
 - **Volúmenes** `postgres_data`, `prometheus_data` y `grafana_data`: `docker compose down` los conserva y `down -v` los elimina.
