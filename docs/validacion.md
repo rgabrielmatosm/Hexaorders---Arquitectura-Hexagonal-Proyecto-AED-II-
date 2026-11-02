@@ -39,7 +39,18 @@ Prometheus, Grafana y Alloy no se ejecutaron en local: los cubre el job `compose
 | --- | --- |
 | `windows` (PowerShell 5.1, cuatro secretos, `check`, `test`) | Correcto. |
 | `compose-basic` (`verify -Mode basic`: 6 contenedores) | Correcto. |
-| `compose` (`verify -Mode full`: 13 contenedores) | Ver el estado final en el Pull Request. Se corrigieron los errores de la tabla siguiente. |
+| `compose` (`verify -Mode full`: 13 contenedores, ejecución 41417234620) | **Correcto**, los 10 pasos (detalle abajo), además de `ui-e2e.js` (24 comprobaciones) y `pages-e2e.js` contra el stack completo. |
+
+Salida real del modo completo en el CI:
+
+| Paso | Resultado |
+| --- | --- |
+| `smoke.py` y `platform_smoke.py` a través del gateway | `OK: tres riesgos, persistencia…` y `OK plataforma: 36 comprobaciones`. |
+| `integration_smoke.py check` | **`OK integración (check): 45 comprobaciones`**, entre ellas: <ul><li>2 aciertos de Redis;</li><li>correos «recibido» y «aprobado» en Mailpit;</li><li>17 mensajes confirmados en RabbitMQ, la DLQ vacía y el outbox en 0;</li><li>una traza de **21 spans** de order-api y risk-engine en Tempo, con `ScoreRisk.execute`;</li><li>los 9 targets en UP, 1079 spans exportados por el collector y 166 peticiones de Nginx;</li><li>logs de order-api, risk-engine y frontend en Loki, y ninguno de los 4 secretos en los logs;</li><li>las 3 fuentes de Grafana con salud OK y los 8 dashboards.</li></ul> |
+| `degraded` (Redis y RabbitMQ detenidos) | 4 comprobaciones: el catálogo responde desde PostgreSQL en menos de 5 s, el pedido se crea y 2 eventos esperan en el outbox. |
+| `recovered` | 3 comprobaciones: el outbox se vacía, llegan los 2 correos retenidos y el catálogo vuelve a usar Redis. |
+| `persist-write` / `persist-read` | El pedido sigue en PostgreSQL tras reiniciar `db` y `order-api`. |
+| Caída del motor de riesgo | HTTP 503 a través del gateway y recuperación sana. |
 
 ### Errores del CI encontrados y corregidos
 
