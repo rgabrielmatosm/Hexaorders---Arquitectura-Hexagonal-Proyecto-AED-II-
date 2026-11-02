@@ -39,6 +39,12 @@ jobs:
           for f in services/order-api/src/main/resources/static/js/*.js services/order-api/src/main/resources/static/js/views/*.js; do
             cp "$f" "$RUNNER_TEMP/check.mjs"; node --check "$RUNNER_TEMP/check.mjs" || { echo "::error file=$f::sintaxis JavaScript no válida"; exit 1; }
           done
+      - name: Static multipage checks (pages, routes, links, CSP, role rules)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/generate_pages.py --check
+          python tools/check_frontend.py
       - name: UI end to end against the real stack (Playwright)
         shell: bash
         working-directory: tools/ui-e2e
@@ -49,6 +55,14 @@ jobs:
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
           node ui-e2e.js
+      # v4: recorre las 39 páginas HTML como visitante y con cada rol (200/302/403/404), enlaces,
+      # recargas, formularios reales, monitoreo leído de Prometheus y vista móvil.
+      - name: Multipage site end to end (every page, every role)
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: node pages-e2e.js
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -32,7 +32,7 @@ public final class ShopController {
 
     @PostMapping("/orders")
     public ResponseEntity<CommerceOrder> place(@RequestHeader("Idempotency-Key") String idempotencyKey, @RequestBody CartRequest cart) {
-        PlacementResult result = commerce.placeOrder(CurrentUser.require(), cart.toItems(), idempotencyKey);
+        PlacementResult result = commerce.placeOrder(CurrentUser.require(), cart.toItems(), idempotencyKey, cart.toShipping());
         if (!result.created()) return ResponseEntity.ok().header("Idempotent-Replay", "true").body(result.order());
         return ResponseEntity.created(URI.create("/api/shop/orders/" + result.order().id())).body(result.order());
     }
@@ -46,7 +46,13 @@ public final class ShopController {
     @PostMapping("/orders/{id}/cancel")
     public CommerceOrder cancel(@PathVariable UUID id) { return commerce.cancelMyOrder(CurrentUser.require(), id); }
 
-    public record CartRequest(List<Item> items) {
+    public record CartRequest(List<Item> items, Shipping shipping) {
+        com.hexaorders.domain.fulfillment.ShippingAddress toShipping() {
+            if (shipping == null) return null;
+            return new com.hexaorders.domain.fulfillment.ShippingAddress(shipping.recipient(), shipping.address(), shipping.city(),
+                    shipping.phone(), shipping.instructions());
+        }
+
         List<CartItem> toItems() {
             if (items == null) return List.of();
             return items.stream().map(item -> new CartItem(item.productId() == null ? 0 : item.productId(),
@@ -55,4 +61,5 @@ public final class ShopController {
     }
 
     public record Item(Long productId, Integer quantity) {}
+    public record Shipping(String recipient, String address, String city, String phone, String instructions) {}
 }

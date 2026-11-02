@@ -23,6 +23,25 @@ def fetch_raw(url):
         return response.status, response.headers.get('Content-Type', ''), response.read()
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def status_without_redirect(url):
+    """Código y Location sin seguir redirecciones (páginas protegidas → 302 al login)."""
+    try:
+        with urllib.request.build_opener(_NoRedirect).open(url, timeout=10) as response:
+            return response.status, response.headers.get('Location', '')
+    except urllib.error.HTTPError as error:
+        return error.code, error.headers.get('Location', '')
+
+
+# v4: páginas que Spring Security protege por rol (sin sesión redirigen a /login.html?next=…).
+PROTECTED_PREFIXES = ('/admin/', '/cliente/', '/operaciones/', '/logistica/', '/monitoreo/')
+PROTECTED_PAGES = {'/checkout.html'}
+
+
 api = os.environ.get('API_URL', 'http://127.0.0.1:8080')
 _, before = request(api + '/api/orders/statistics')
 prometheus = os.environ.get('PROMETHEUS_URL', 'http://127.0.0.1:9091')
@@ -47,11 +66,24 @@ for file in sorted(STATIC_DIR.rglob('*')):
     if not file.is_file():
         continue
     path = '/' + file.relative_to(STATIC_DIR).as_posix()
+    if path.startswith(PROTECTED_PREFIXES) or path in PROTECTED_PAGES:
+        code, location = status_without_redirect(api + path)
+        assert code == 302 and '/login.html?next=' in location, (path, code, location)
+        continue
     code, content_type, body = fetch_raw(api + path)
     assert code == 200 and EXPECTED_TYPES[file.suffix] in content_type, (path, code, content_type)
     assert body == file.read_bytes(), f'{path}: el contenedor sirve una versión distinta del repositorio'
 code, content_type, index = fetch_raw(api + '/')
-assert code == 200 and b'js/app.js' in index and b'css/base.css' in index, 'index.html no enlaza sus recursos'
+assert code == 200 and b'/js/page.js' in index and b'/css/base.css' in index, 'index.html no enlaza sus recursos'
+# El laboratorio original se conserva íntegro en /laboratorio.html con su app.js.
+code, content_type, lab = fetch_raw(api + '/laboratorio.html')
+assert code == 200 and b'js/app.js' in lab and b'id="arquitectura"' in lab, 'laboratorio.html no conserva el laboratorio'
+# Página 404 diseñada para navegadores.
+try:
+    urllib.request.urlopen(urllib.request.Request(api + '/no-existe.html', headers={'Accept': 'text/html'}), timeout=10)
+    raise AssertionError('Se esperaba 404')
+except urllib.error.HTTPError as error:
+    assert error.code == 404 and b'/error/404' in error.read(), 'la 404 no usa la página diseñada'
 for attempt in range(30):
     _, targets = request(prometheus + '/api/v1/targets')
     ready = {target['labels']['job']: target['health'] for target in targets['data']['activeTargets']}
@@ -67,7 +99,8 @@ if os.environ.get('GRAFANA_PASSWORD'):
     _, dashboard = request(grafana + '/api/dashboards/uid/hexaorders', headers={'Authorization': 'Basic ' + credentials})
     assert dashboard['dashboard']['uid'] == 'hexaorders'
     # v3: el dashboard original y los 5 nuevos están aprovisionados.
-    for uid in ['hexaorders-business', 'hexaorders-risk', 'hexaorders-api', 'hexaorders-infrastructure', 'hexaorders-security']:
+    for uid in ['hexaorders-business', 'hexaorders-risk', 'hexaorders-api', 'hexaorders-infrastructure', 'hexaorders-security',
+                'hexaorders-logistics']:
         _, extra = request(grafana + '/api/dashboards/uid/' + uid, headers={'Authorization': 'Basic ' + credentials})
         assert extra['dashboard']['uid'] == uid, uid
 print('OK: tres riesgos, persistencia, estadísticas, validación, recursos del frontend, targets Prometheus y Grafana')

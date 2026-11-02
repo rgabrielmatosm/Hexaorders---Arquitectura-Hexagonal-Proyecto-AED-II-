@@ -55,7 +55,7 @@ public final class OperationsService implements OperationsUseCases {
         Guards.require(operator, Role.ORDER_OPERATOR, Role.LOGISTICS_OPERATOR, Role.ADMIN);
         CommerceOrder order = orders.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Pedido no encontrado"));
         return new OrderDetails(order, orders.history(orderId), deliveries.findByOrder(orderId).orElse(null),
-                TransitionPolicy.nextFor(order.status(), operator.actors()));
+                TransitionPolicy.nextFor(order.status(), operator.actors()), orders.shippingOf(orderId).orElse(null));
     }
 
     @Override

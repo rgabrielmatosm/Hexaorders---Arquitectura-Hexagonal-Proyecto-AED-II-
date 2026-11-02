@@ -264,6 +264,9 @@ spec:
             - name: config
               mountPath: /etc/grafana/dashboards/hexaorders-security.json
               subPath: hexaorders-security.json
+            - name: config
+              mountPath: /etc/grafana/dashboards/hexaorders-logistics.json
+              subPath: hexaorders-logistics.json
               readOnly: true
       volumes:
         - name: data

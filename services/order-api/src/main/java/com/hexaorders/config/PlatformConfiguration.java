@@ -109,6 +109,29 @@ public class PlatformConfiguration {
         return new AdministrationService(orders, catalog, incidents, users, audit, health, clock);
     }
 
+    @Bean com.hexaorders.application.port.out.ContactMessageRepository contactMessageRepository(JdbcTemplate jdbc) {
+        return new com.hexaorders.adapter.out.persistence.JdbcContactMessageRepository(jdbc);
+    }
+
+    @Bean com.hexaorders.application.port.in.ContactUseCases contactUseCases(com.hexaorders.application.port.out.ContactMessageRepository messages,
+                                                                            AuditLog audit, Clock clock) {
+        return new com.hexaorders.application.service.ContactService(messages, audit, clock);
+    }
+
+    /** Prometheus is reached through the Docker network (service name), never through localhost. */
+    @Bean
+    com.hexaorders.application.port.out.MonitoringPort monitoringPort(RestClient.Builder builder,
+                                                                     @Value("${PROMETHEUS_URL:http://prometheus:9090}") String prometheusUrl) {
+        SimpleClientHttpRequestFactory requests = new SimpleClientHttpRequestFactory();
+        requests.setConnectTimeout(Duration.ofSeconds(1));
+        requests.setReadTimeout(Duration.ofSeconds(3));
+        return new com.hexaorders.adapter.out.monitoring.PrometheusMonitoringAdapter(builder.baseUrl(prometheusUrl).requestFactory(requests).build());
+    }
+
+    @Bean com.hexaorders.application.port.in.MonitoringUseCases monitoringUseCases(com.hexaorders.application.port.out.MonitoringPort monitoring, Clock clock) {
+        return new com.hexaorders.application.service.MonitoringService(monitoring, clock);
+    }
+
     @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit) { return new AccountService(users, hasher, audit); }
 
     /** Creates the demo accounts once, from the demo_password secret; never modifies existing users. */

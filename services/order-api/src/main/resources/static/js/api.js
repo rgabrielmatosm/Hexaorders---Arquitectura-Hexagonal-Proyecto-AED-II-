@@ -175,7 +175,8 @@ export const catalogApi = {
 export const shopApi = {
   quote: (items) => post('/api/shop/quote', { items }),
   /** La misma Idempotency-Key en un reintento devuelve el mismo pedido (nunca se duplica). */
-  place: (items, idempotencyKey) => send('POST', '/api/shop/orders', { items }, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  place: (items, idempotencyKey, shipping) => send('POST', '/api/shop/orders', shipping ? { items, shipping } : { items },
+    { headers: { 'Idempotency-Key': idempotencyKey } }),
   orders: () => get('/api/shop/orders'),
   order: (id) => get(`/api/shop/orders/${encodeURIComponent(id)}`),
   cancel: (id) => post(`/api/shop/orders/${encodeURIComponent(id)}/cancel`),
@@ -198,6 +199,7 @@ export const adminApi = {
   updateProduct: (id, product) => put(`/api/admin/products/${id}`, product),
   adjustStock: (id, delta, reason) => post(`/api/admin/products/${id}/stock`, { delta, reason }),
   createCategory: (slug, name) => post('/api/admin/categories', { slug, name }),
+  contactMessages: (limit = 50) => get(`/api/admin/contact-messages?limit=${limit}`),
 };
 
 export const operationsApi = {
@@ -222,4 +224,10 @@ export const logisticsApi = {
   transition: (id, status, note) => post(`/api/logistics/orders/${encodeURIComponent(id)}/transitions`, { status, note }),
 };
 
-export const opsApi = { health: () => get('/api/ops/health') };
+export const opsApi = {
+  health: () => get('/api/ops/health'),
+  /** Targets, alertas e indicadores que order-api lee de Prometheus por la red interna de Docker. */
+  monitoring: () => get('/api/ops/monitoring'),
+};
+
+export const contactApi = { send: (payload) => post('/api/contact', payload) };

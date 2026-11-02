@@ -1,0 +1,54 @@
+<section id="arquitectura" class="section" aria-labelledby="arch-title">
+  <div class="section__head">
+    <div>
+      <p class="eyebrow">Architecture Explorer</p>
+      <h2 id="arch-title">Explorador de la arquitectura hexagonal</h2>
+      <p class="section__lead">Cada bloque es una clase o módulo real del repositorio. Selecciónalo para ver su responsabilidad, capa y archivo.</p>
+    </div>
+    <div class="segmented" role="group" aria-label="Vista del diagrama">
+      <button type="button" class="segmented__btn is-active" data-arch-mode="dependencies" aria-pressed="true">Dependencias del código</button>
+      <button type="button" class="segmented__btn" data-arch-mode="execution" aria-pressed="false">Flujo de ejecución</button>
+    </div>
+  </div>
+
+  <p class="arch-legend" id="arch-mode-help"></p>
+
+  <div class="arch">
+    <div class="arch__diagram card" id="arch-diagram">
+      <svg class="arch__edges" id="arch-edges" aria-hidden="true"></svg>
+      <div class="arch__col" data-col="actors"><h4>Actor / externo</h4></div>
+      <div class="arch__col" data-col="in"><h4>Adaptadores de entrada</h4></div>
+      <div class="arch__col arch__col--core" data-col="core"><h4>Núcleo: aplicación + dominio</h4></div>
+      <div class="arch__col" data-col="out"><h4>Adaptadores de salida</h4></div>
+      <div class="arch__col" data-col="external"><h4>Servicios externos</h4></div>
+    </div>
+
+    <aside class="arch__detail card" id="arch-detail" aria-live="polite">
+      <p class="muted">Selecciona un componente del diagrama.</p>
+    </aside>
+  </div>
+
+  <div class="arch-run card">
+    <div class="arch-run__head">
+      <div>
+        <h3 class="card__title">Solicitud real a través de la arquitectura</h3>
+        <p class="muted small">Envía un pedido real. Los datos de la derecha (estado HTTP, latencia medida en el navegador, respuesta y lectura posterior desde PostgreSQL) son observaciones auténticas. Los pasos numerados son el <strong>recorrido conceptual</strong> del código para ese resultado: no es una traza instrumentada.</p>
+      </div>
+      <div class="arch-run__controls">
+        <label class="sr-only" for="run-amount">Importe</label>
+        <select id="run-amount">
+          <option value="125.50">125.50 USD → aprobado</option>
+          <option value="1500.00">1500.00 USD → revisión</option>
+          <option value="0">0 USD → validación (400)</option>
+        </select>
+        <button type="button" class="btn btn--primary" id="run-request">Ejecutar solicitud real</button>
+      </div>
+    </div>
+    <div class="arch-run__body">
+      <ol class="steps" id="run-steps"></ol>
+      <div class="evidence" id="run-evidence">
+        <p class="muted small">Aún no se ha ejecutado ninguna solicitud.</p>
+      </div>
+    </div>
+  </div>
+</section>

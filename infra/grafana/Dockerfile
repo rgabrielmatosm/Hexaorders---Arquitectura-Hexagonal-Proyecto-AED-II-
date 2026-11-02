@@ -12,3 +12,4 @@ COPY dashboards/hexaorders-risk.json /etc/grafana/dashboards/hexaorders-risk.jso
 COPY dashboards/hexaorders-api.json /etc/grafana/dashboards/hexaorders-api.json
 COPY dashboards/hexaorders-infrastructure.json /etc/grafana/dashboards/hexaorders-infrastructure.json
 COPY dashboards/hexaorders-security.json /etc/grafana/dashboards/hexaorders-security.json
+COPY dashboards/hexaorders-logistics.json /etc/grafana/dashboards/hexaorders-logistics.json

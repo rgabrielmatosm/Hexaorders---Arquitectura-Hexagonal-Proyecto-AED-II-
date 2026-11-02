@@ -22,6 +22,8 @@ public interface CommerceOrderRepository {
     Optional<CommerceOrder> findById(UUID id);
     Optional<CommerceOrder> findByIdempotencyKey(String key);
     Optional<Long> ownerOf(UUID orderId);
+    /** Shipping data of a shop order (empty for lab orders and v3 orders). */
+    Optional<com.hexaorders.domain.fulfillment.ShippingAddress> shippingOf(UUID orderId);
     List<CommerceOrder> byCustomer(long userId);
     List<CommerceOrder> byStatuses(Set<FulfillmentStatus> statuses, int limit);
     List<StatusChange> history(UUID orderId);

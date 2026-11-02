@@ -75,6 +75,11 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
                             line.unitPrice(), line.quantity(), line.lineTotal());
                 }
                 shopOrder.history().forEach(change -> insertChange(order.id(), change));
+                var shipping = shopOrder.shipping();
+                if (shipping != null) {
+                    jdbc.update("INSERT INTO order_shipping (order_id, recipient, address, city, phone, instructions) VALUES (?, ?, ?, ?, ?, ?)",
+                            order.id(), shipping.recipient(), shipping.address(), shipping.city(), shipping.phone(), shipping.instructions());
+                }
                 return findById(order.id()).orElseThrow();
             });
         } catch (OutOfStockException | IdempotencyKeyReusedException business) {
@@ -88,6 +93,13 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
         jdbc.update("INSERT INTO order_status_history (order_id, from_status, to_status, actor, note, changed_at) VALUES (?, ?, ?, ?, ?, ?)",
                 orderId, change.from() == null ? null : change.from().name(), change.to().name(), change.actor(), change.note(),
                 Jdbc.ts(change.at()));
+    }
+
+    @Override
+    public Optional<com.hexaorders.domain.fulfillment.ShippingAddress> shippingOf(UUID orderId) {
+        return Jdbc.run(() -> jdbc.query("SELECT recipient, address, city, phone, instructions FROM order_shipping WHERE order_id = ?",
+                (rs, n) -> new com.hexaorders.domain.fulfillment.ShippingAddress(rs.getString("recipient"), rs.getString("address"),
+                        rs.getString("city"), rs.getString("phone"), rs.getString("instructions")), orderId).stream().findFirst());
     }
 
     @Override

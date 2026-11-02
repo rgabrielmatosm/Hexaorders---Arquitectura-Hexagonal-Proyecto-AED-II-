@@ -59,6 +59,23 @@ const ICONS = {
   box: 'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10',
   empty: 'M4 7h16v13H4z M4 7l3-4h10l3 4 M9 12h6',
   calendar: 'M4 5h16v16H4z M4 10h16 M9 3v4 M15 3v4',
+  home: 'M3 11 12 4l9 7 M5 10v10h14V10',
+  grid: 'M4 4h7v7H4z M13 4h7v7h-7z M4 13h7v7H4z M13 13h7v7h-7z',
+  tag: 'M3 12V4h8l10 10-8 8z M7.5 8.5h.01',
+  layers: 'M12 3 2 8l10 5 10-5z M2 13l10 5 10-5 M2 17l10 5 10-5',
+  list: 'M8 6h13 M8 12h13 M8 18h13 M3 6h.01 M3 12h.01 M3 18h.01',
+  users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 21a7 7 0 0 1 14 0 M17 11a3 3 0 1 0 0-6 M22 21a6 6 0 0 0-4-5.6',
+  file: 'M6 2h9l5 5v15H6z M14 2v6h6 M9 13h8 M9 17h6',
+  alert: 'M12 3 2 21h20z M12 10v5 M12 18h.01',
+  server: 'M3 4h18v6H3z M3 14h18v6H3z M7 7h.01 M7 17h.01',
+  activity: 'M2 12h4l3-8 6 16 3-8h4',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v5l3 2',
+  map: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z M9 4v14 M15 6v14',
+  mail: 'M3 5h18v14H3z M3 6l9 7 9-7',
+  hexagon: 'M12 2 21 7v10l-9 5-9-5V7z',
+  route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M6 15V9a4 4 0 0 1 4-4h6 M18 9v6a4 4 0 0 1-4 4H8',
+  logout: 'M15 4h4v16h-4 M10 16l4-4-4-4 M14 12H3',
+  menu: 'M3 6h18 M3 12h18 M3 18h18',
 };
 
 export function icon(name, extraClass = '') {
@@ -240,6 +257,41 @@ export function barChart(series, { label = (k) => k, height = 220 } = {}) {
 }
 
 /** Descarga un CSV generado en el navegador a partir de datos ya cargados. */
+/**
+ * Paginación en el cliente para listas ya filtradas por el servidor. Devuelve un contenedor que
+ * se re-renderiza al cambiar de página; renderPage(items) devuelve el contenido de una página.
+ */
+export function paginated(items, renderPage, { pageSize = 10, label = 'elementos' } = {}) {
+  const container = el('div', { class: 'paginated' });
+  let page = 1;
+  const pages = Math.max(1, Math.ceil(items.length / pageSize));
+  const draw = () => {
+    const start = (page - 1) * pageSize;
+    const slice = items.slice(start, start + pageSize);
+    const info = el('span', { class: 'pager__info', text: items.length
+      ? `${start + 1}–${start + slice.length} de ${items.length} ${label}` : `0 ${label}` });
+    const prev = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '‹ Anterior', disabled: page <= 1, onclick: () => { page -= 1; draw(); } });
+    const next = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Siguiente ›', disabled: page >= pages, onclick: () => { page += 1; draw(); } });
+    container.replaceChildren(renderPage(slice),
+      pages > 1 || items.length ? el('nav', { class: 'pager', 'aria-label': 'Paginación' }, info,
+        pages > 1 ? el('div', { class: 'row-actions' }, prev, el('span', { class: 'pager__page', text: `Página ${page} de ${pages}` }), next) : null) : null);
+  };
+  draw();
+  return container;
+}
+
+/** Campo de búsqueda con espera breve: onSearch(texto) se llama al dejar de escribir. */
+export function searchBox(placeholder, onSearch, initial = '') {
+  const input = el('input', { type: 'search', placeholder, value: initial, 'aria-label': placeholder });
+  let timer = 0;
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => onSearch(input.value.trim().toLowerCase()), 200); });
+  return input;
+}
+
+/** Tarjeta de indicador (KPI). */
+export const kpi = (label, value, tone = '', hint = '') => el('div', { class: `kpi${tone ? ` kpi--${tone}` : ''}` },
+  el('span', { text: label }), el('strong', { text: String(value) }), hint ? el('small', { class: 'kpi__hint', text: hint }) : null);
+
 export function downloadCsv(filename, rows) {
   const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
   const csv = rows.map((row) => row.map(escape).join(',')).join('\r\n');

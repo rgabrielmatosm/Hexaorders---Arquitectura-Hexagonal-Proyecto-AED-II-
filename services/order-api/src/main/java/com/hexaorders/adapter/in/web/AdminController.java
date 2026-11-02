@@ -30,10 +30,19 @@ import org.springframework.web.bind.annotation.RestController;
 public final class AdminController {
     private final AdministrationUseCases administration;
     private final CatalogUseCases catalog;
+    private final com.hexaorders.application.port.in.ContactUseCases contact;
 
-    public AdminController(AdministrationUseCases administration, CatalogUseCases catalog) {
+    public AdminController(AdministrationUseCases administration, CatalogUseCases catalog,
+                           com.hexaorders.application.port.in.ContactUseCases contact) {
         this.administration = administration;
         this.catalog = catalog;
+        this.contact = contact;
+    }
+
+    /** Messages received from the public contact page. */
+    @GetMapping("/contact-messages")
+    public List<com.hexaorders.domain.contact.ContactMessage> contactMessages(@RequestParam(defaultValue = "50") int limit) {
+        return contact.recent(CurrentUser.require(), limit);
     }
 
     @GetMapping("/dashboard")

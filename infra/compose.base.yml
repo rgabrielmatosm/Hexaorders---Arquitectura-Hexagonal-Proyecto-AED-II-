@@ -74,6 +74,8 @@ services:
       # Contraseña común de las cuentas de demostración (se crean una sola vez al arrancar).
       DEMO_PASSWORD_FILE: /run/secrets/demo_password
       RISK_BASE_URL: http://risk-engine:8000
+      # v4: el portal de monitoreo consulta Prometheus por la red interna telemetry (nunca localhost).
+      PROMETHEUS_URL: http://prometheus:9090
       JAVA_TOOL_OPTIONS: '-XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError'
     secrets: [db_password, demo_password]
     depends_on:

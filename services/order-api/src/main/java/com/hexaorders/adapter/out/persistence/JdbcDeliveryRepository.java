@@ -50,10 +50,11 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
             args.add(assigneeId);
         }
         String sql = "SELECT d.id, d.order_id, d.assignee_id, u.display_name AS assignee_name, d.window_start, d.window_end, d.notes, "
-                + "d.version, o.fulfillment_status, o.customer_id, o.amount FROM deliveries d JOIN app_users u ON u.id = d.assignee_id "
-                + "JOIN orders o ON o.id = d.order_id WHERE d.window_start < ? AND d.window_end > ? " + filter + "ORDER BY d.window_start";
+                + "d.version, o.fulfillment_status, o.customer_id, o.amount, s.city FROM deliveries d JOIN app_users u ON u.id = d.assignee_id "
+                + "JOIN orders o ON o.id = d.order_id LEFT JOIN order_shipping s ON s.order_id = d.order_id WHERE d.window_start < ? AND d.window_end > ? " + filter + "ORDER BY d.window_start";
         return Jdbc.run(() -> jdbc.query(sql, (rs, n) -> new DeliveryView(DELIVERY.mapRow(rs, n),
-                FulfillmentStatus.valueOf(rs.getString("fulfillment_status")), rs.getString("customer_id"), rs.getBigDecimal("amount")),
+                FulfillmentStatus.valueOf(rs.getString("fulfillment_status")), rs.getString("customer_id"), rs.getBigDecimal("amount"),
+                rs.getString("city")),
                 args.toArray()));
     }
 

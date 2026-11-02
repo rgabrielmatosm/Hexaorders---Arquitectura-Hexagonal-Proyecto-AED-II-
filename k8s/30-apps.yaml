@@ -150,6 +150,8 @@ spec:
               value: /run/demo-secrets/demo_password
             - name: RISK_BASE_URL
               value: http://risk-engine:8000
+            - name: PROMETHEUS_URL
+              value: http://prometheus:9090
             - name: JAVA_TOOL_OPTIONS
               value: -XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError
           ports:

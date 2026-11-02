@@ -32,8 +32,9 @@ async function apiJson(page, url) {
         && !(process.env.SKIP_PROMETHEUS && /ERR_CONNECTION_REFUSED/.test(message.text()))) problems.push(`console.error: ${message.text()}`);
     });
 
-    console.log(`Abriendo ${BASE_URL}`);
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+    // v4: el laboratorio original vive en /laboratorio.html (la portada / es el inicio del sitio multipágina).
+    console.log(`Abriendo ${BASE_URL}/laboratorio.html`);
+    await page.goto(`${BASE_URL}/laboratorio.html`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('#splash');
     await page.waitForFunction(() => document.querySelector('#splash [data-check="api"] em').textContent !== 'comprobando…', null, { timeout: 15000 });
     check((await page.textContent('#splash [data-check="api"] em')).includes('disponible'), 'La bienvenida confirma la API con una consulta real');
@@ -120,21 +121,28 @@ async function apiJson(page, url) {
         await rp.waitForSelector('#view-root form');
         await rp.fill('#view-root input[autocomplete="username"]', user);
         await rp.fill('#view-root input[type="password"]', process.env.DEMO_PASSWORD);
-        await rp.click('#view-root button[type="submit"]');
-        await rp.waitForFunction(() => !location.hash.startsWith('#/entrar'), null, { timeout: 15000 });
+        // #/entrar redirige a /login.html; tras iniciar sesión se pasa a la página del rol.
+        await Promise.all([rp.waitForURL((url) => !url.pathname.endsWith('/login.html'), { timeout: 15000 }),
+          rp.click('#view-root button[type="submit"]')]);
         return rp;
       };
       const customerPage = await rolePage('cliente');
       await customerPage.goto(`${BASE_URL}/#/tienda`);
       await customerPage.waitForSelector('.product-card');
-      check((await customerPage.locator('.product-card').count()) >= 18, 'La tienda muestra el catálogo persistido');
+      // v4: el catálogo se pagina (8 por página); el total de 18 productos sembrados aparece en el paginador.
+      await customerPage.waitForSelector('.pager__info');
+      check((await customerPage.locator('.product-card').count()) >= 8 && /de (1[89]|[2-9]\d)/.test(await customerPage.textContent('.pager__info')),
+        'La tienda muestra el catálogo persistido (paginado)');
       await customerPage.screenshot({ path: path.join(OUT, '09-tienda.png') });
       await customerPage.click('.product-card:has(button:not([disabled])) button.btn--primary');
+      // La URL antigua #/checkout redirige a /checkout.html, que en la v4 pide los datos de entrega.
       await customerPage.goto(`${BASE_URL}/#/checkout`);
       await customerPage.waitForSelector('.summary-row--total');
+      await customerPage.fill('#view-root input[autocomplete="street-address"]', 'Av. Laboratorio 100');
+      await customerPage.fill('#view-root input[autocomplete="address-level2"]', 'Lima');
       await customerPage.screenshot({ path: path.join(OUT, '10-checkout.png') });
       await customerPage.click('button:has-text("Confirmar pedido")');
-      await customerPage.waitForFunction(() => /#\/mis-pedidos\//.test(location.hash), null, { timeout: 20000 });
+      await customerPage.waitForURL(/\/cliente\/seguimiento\.html\?id=/, { timeout: 20000 });
       await customerPage.waitForSelector('.timeline li');
       check((await customerPage.locator('.timeline li').count()) >= 2, 'Checkout desde la interfaz: pedido creado con historial CREATED → decisión de riesgo');
       await customerPage.screenshot({ path: path.join(OUT, '11-seguimiento.png') });
@@ -155,6 +163,7 @@ async function apiJson(page, url) {
       await operatorPage.screenshot({ path: path.join(OUT, '13-operaciones.png') });
 
       const logisticsPage = await rolePage('logistica');
+      await logisticsPage.goto(`${BASE_URL}/logistica/calendario.html`);
       await logisticsPage.waitForSelector('.cal-month .cal-day');
       check((await logisticsPage.locator('.cal-month .cal-day').count()) === 42, 'Calendario logístico mensual (PostgreSQL)');
       await logisticsPage.screenshot({ path: path.join(OUT, '14-logistica.png') });
@@ -171,7 +180,7 @@ async function apiJson(page, url) {
     // Móvil
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     mobile.on('pageerror', (error) => problems.push(`Error de JavaScript (móvil): ${error.message}`));
-    await mobile.goto(BASE_URL);
+    await mobile.goto(`${BASE_URL}/laboratorio.html`);
     await mobile.keyboard.press('Escape');
     await mobile.waitForTimeout(800);
     check(!(await mobile.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'Sin desplazamiento horizontal en móvil (390 px)');

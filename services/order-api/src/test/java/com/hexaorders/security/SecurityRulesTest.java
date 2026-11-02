@@ -37,6 +37,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -61,6 +63,8 @@ class SecurityRulesTest {
     @MockitoBean OperationsUseCases operations;
     @MockitoBean LogisticsUseCases logistics;
     @MockitoBean UserRepository users;
+    @MockitoBean com.hexaorders.application.port.in.ContactUseCases contact;
+    @MockitoBean com.hexaorders.application.port.in.MonitoringUseCases monitoring;
 
     private static RequestPostProcessor as(Role... roles) {
         var principal = new HexaUserPrincipal(5, "user", "Usuario", null, EnumSet.of(roles[0], roles), true);
@@ -123,5 +127,42 @@ class SecurityRulesTest {
     void csrfEndpointAndMeArePublic() throws Exception {
         http.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andExpect(jsonPath("$.headerName").value("X-CSRF-TOKEN"));
         http.perform(get("/api/auth/me")).andExpect(status().isOk()).andExpect(jsonPath("$.authenticated").value(false));
+    }
+
+    @Test
+    void protectedPagesRedirectAnonymousVisitorsToLoginAndKeepTheTarget() throws Exception {
+        http.perform(get("/admin/dashboard.html")).andExpect(status().isFound())
+                .andExpect(redirectedUrl("/login.html?next=%2Fadmin%2Fdashboard.html"));
+        http.perform(get("/cliente/pedido-detalle.html").queryParam("id", "abc")).andExpect(status().isFound())
+                .andExpect(redirectedUrl("/login.html?next=%2Fcliente%2Fpedido-detalle.html%3Fid%3Dabc"));
+        http.perform(get("/monitoreo/servicios.html")).andExpect(status().isFound());
+    }
+
+    @Test
+    void pagesOfAnotherRoleShowTheForbiddenPage() throws Exception {
+        http.perform(get("/admin/usuarios.html").with(as(Role.CUSTOMER))).andExpect(status().isForbidden())
+                .andExpect(forwardedUrl("/403.html"));
+        http.perform(get("/logistica/calendario.html").with(as(Role.ORDER_OPERATOR))).andExpect(status().isForbidden());
+        http.perform(get("/cliente/pedidos.html").with(as(Role.ADMIN))).andExpect(status().isForbidden());
+        http.perform(get("/admin/usuarios.html").with(as(Role.ADMIN))).andExpect(status().isOk());
+        http.perform(get("/cliente/perfil.html").with(as(Role.LOGISTICS_OPERATOR))).andExpect(status().isOk());
+    }
+
+    @Test
+    void publicPagesAndTheContactFormNeedNoLogin() throws Exception {
+        for (String page : new String[] {"/", "/index.html", "/catalogo.html", "/producto.html", "/carrito.html", "/login.html",
+                "/registro.html", "/nosotros.html", "/contacto.html", "/laboratorio.html", "/arquitectura/overview.html", "/404.html", "/403.html"}) {
+            http.perform(get(page)).andExpect(status().isOk());
+        }
+        when(contact.send(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(new com.hexaorders.domain.contact.ContactMessage(9, "Ana", "ana@example.com",
+                "DEMO", "Hola, quiero una demo.", java.time.Instant.parse("2026-11-02T10:00:00Z")));
+        http.perform(post("/api/contact").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Ana\",\"email\":\"ana@example.com\",\"topic\":\"DEMO\",\"message\":\"Hola, quiero una demo.\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(9))
+                .andExpect(jsonPath("$.email").doesNotExist());
+        http.perform(post("/api/contact").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
+        http.perform(get("/api/ops/monitoring").with(as(Role.CUSTOMER))).andExpect(status().isForbidden());
+        http.perform(get("/api/admin/contact-messages").with(as(Role.OBSERVABILITY_VIEWER))).andExpect(status().isForbidden());
     }
 }

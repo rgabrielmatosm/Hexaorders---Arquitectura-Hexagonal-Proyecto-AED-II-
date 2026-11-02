@@ -3,28 +3,35 @@
 
 import { adminApi, catalogApi, incidentsApi, operationsApi } from '../api.js';
 import {
-  LIFECYCLE, TRANSITION_VERBS, barChart, channelBadge, downloadCsv, emptyState, errorMessage, field, formError,
-  lifecycleBadge, modal, money, skeletons, submitting,
+  LIFECYCLE, TRANSITION_VERBS, barChart, channelBadge, downloadCsv, emptyState, errorMessage, field, formError, kpi as kpiTile,
+  lifecycleBadge, modal, money, paginated, searchBox, skeletons, submitting,
 } from '../components.js';
-import { navigate, route } from '../router.js';
+import { link, rerender, route } from '../router.js';
 import { ROLE_LABELS, session } from '../session.js';
 import { el, formatDateTime, formatInt, formatRelative, toast } from '../ui.js';
 
-const TABS = [
-  ['panel', 'Panel'], ['productos', 'Productos e inventario'], ['pedidos', 'Pedidos'], ['usuarios', 'Usuarios y roles'],
-  ['incidencias', 'Incidencias'], ['auditoria', 'Auditoría'], ['reportes', 'Reportes'],
-];
+const TITLES = {
+  panel: ['Centro de control', 'Indicadores reales de PostgreSQL: pedidos, ventas, stock e incidencias.'],
+  productos: ['Productos', 'Alta y edición del catálogo. El precio y la visibilidad se validan en el dominio.'],
+  categorias: ['Categorías', 'Organización del catálogo público.'],
+  inventario: ['Inventario', 'Stock por producto, alertas de stock bajo y ajustes auditados.'],
+  pedidos: ['Pedidos', 'Todos los pedidos del portal y del laboratorio, con su ciclo de vida.'],
+  usuarios: ['Usuarios y roles', 'Roles, activación de cuentas y protección contra el autobloqueo.'],
+  incidencias: ['Incidencias', 'Registro y resolución de incidencias operativas.'],
+  reportes: ['Reportes', 'Ventas por categoría exportables a CSV.'],
+  auditoria: ['Auditoría', 'Quién hizo qué y cuándo: eventos registrados por los casos de uso.'],
+};
 
 const table = (headers, rows) => el('div', { class: 'table-scroll' }, el('table', { class: 'table' },
   el('thead', {}, el('tr', {}, headers.map((h) => el('th', { scope: 'col', text: h })))), el('tbody', {}, rows)));
 
+// En el sitio multipágina la navegación entre secciones la da la barra lateral (layout.js).
 function shell(root, active, ...content) {
+  const [title, lead] = TITLES[active] || TITLES.panel;
   root.append(el('section', { class: 'view' },
     el('div', { class: 'view__head' }, el('div', {}, el('p', { class: 'eyebrow', text: 'Administración' }),
-      el('h1', { class: 'view__title', text: 'Centro de control' }),
-      el('p', { class: 'section__lead', text: `Sesión: ${session.user().displayName} · datos en vivo de PostgreSQL` }))),
-    el('nav', { class: 'tabs', 'aria-label': 'Secciones de administración' },
-      TABS.map(([id, label]) => el('a', { href: `#/admin/${id}`, class: id === active ? 'is-active' : '', 'aria-current': id === active ? 'page' : null, text: label }))),
+      el('h1', { class: 'view__title', text: title }),
+      el('p', { class: 'section__lead', text: `${lead} Sesión: ${session.user().displayName}.` }))),
     ...content));
 }
 
@@ -36,9 +43,9 @@ async function panel(root) {
   const s = d.ordersByStatus;
   const kpi = (label, value, tone = '') => el('div', { class: `kpi${tone ? ` kpi--${tone}` : ''}` }, el('span', { text: label }), el('strong', { text: value }));
   const alerts = [];
-  if (s.RISK_REVIEW > 0) alerts.push(['warn', `${s.RISK_REVIEW} pedido(s) esperan revisión de riesgo`, '#/admin/pedidos']);
-  if (d.lowStock.length) alerts.push(['warn', `${d.lowStock.length} producto(s) con stock ≤ 5: ${d.lowStock.slice(0, 3).map((p) => p.details.name).join(', ')}`, '#/admin/productos']);
-  if (d.openIncidents > 0) alerts.push(['error', `${d.openIncidents} incidencia(s) abierta(s)`, '#/admin/incidencias']);
+  if (s.RISK_REVIEW > 0) alerts.push(['warn', `${s.RISK_REVIEW} pedido(s) esperan revisión de riesgo`, '/admin/pedidos.html']);
+  if (d.lowStock.length) alerts.push(['warn', `${d.lowStock.length} producto(s) con stock ≤ 5: ${d.lowStock.slice(0, 3).map((p) => p.details.name).join(', ')}`, '/admin/inventario.html']);
+  if (d.openIncidents > 0) alerts.push(['error', `${d.openIncidents} incidencia(s) abierta(s)`, '/admin/incidencias.html']);
   if (!alerts.length) alerts.push(['ok', 'Sin alertas operativas: no hay revisiones pendientes, stock bajo ni incidencias abiertas.', null]);
   body.replaceChildren(
     el('div', { class: 'kpis' },
@@ -67,6 +74,19 @@ async function panel(root) {
           el('strong', { text: a.action }), ` · ${a.actor} → ${a.target}`, el('small', { text: `${formatRelative(a.at)}${a.details ? ` · ${a.details}` : ''}` }))))
           : emptyState('Sin actividad', 'Todavía no hay eventos auditados.'))));
   body.lastElementChild.style.marginTop = '16px';
+  const messages = el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: 'Mensajes de la página de contacto' }),
+    el('div', {}, skeletons(2, 'skeleton--row')));
+  body.append(messages);
+  try {
+    const list = await adminApi.contactMessages(20);
+    messages.lastElementChild.replaceChildren(list.length ? paginated(list, (page) => table(['Fecha', 'Nombre', 'Correo', 'Tema', 'Mensaje'],
+      page.map((m) => el('tr', {}, el('td', { text: formatRelative(m.createdAt) }), el('td', { text: m.name }),
+        el('td', {}, el('a', { href: `mailto:${m.email}`, text: m.email })), el('td', {}, el('span', { class: 'badge badge--neutral', text: m.topic })),
+        el('td', { class: 'small', text: m.message })))), { pageSize: 5, label: 'mensajes' })
+      : emptyState('Sin mensajes', 'Los mensajes enviados desde /contacto.html aparecerán aquí.', 'mail'));
+  } catch (error) {
+    messages.lastElementChild.replaceChildren(emptyState('No se pudieron cargar los mensajes', errorMessage(error)));
+  }
 }
 
 // ---- Productos e inventario --------------------------------------------------------
@@ -103,7 +123,7 @@ async function products(root) {
   shell(root, 'productos', el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Catálogo e inventario' }),
     el('div', { class: 'row-actions' }, newCategory, create)), body));
   const [list, categories] = await Promise.all([adminApi.products(), catalogApi.categories()]);
-  const reload = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
+  const reload = () => rerender();
   const openForm = (product) => {
     const form = productForm(categories, product);
     const errorNode = formError();
@@ -126,7 +146,7 @@ async function products(root) {
       { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
     save.addEventListener('click', async () => {
       await submitting(save, errorNode, () => adminApi.adjustStock(product.id, Number(delta.value), reason.value), 'Stock actualizado')
-        .then(() => { dialog.close(); window.dispatchEvent(new HashChangeEvent('hashchange')); }).catch(() => {});
+        .then(() => { dialog.close(); rerender(); }).catch(() => {});
     });
   };
   create.addEventListener('click', () => openForm(null));
@@ -140,10 +160,11 @@ async function products(root) {
       { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
     save.addEventListener('click', async () => {
       await submitting(save, errorNode, () => adminApi.createCategory(slug.value, name.value), 'Categoría creada')
-        .then(() => { dialog.close(); window.dispatchEvent(new HashChangeEvent('hashchange')); }).catch(() => {});
+        .then(() => { dialog.close(); rerender(); }).catch(() => {});
     });
   });
-  body.replaceChildren(table(['Producto', 'Categoría', 'Precio', 'Stock', 'Estado', ''], list.map((p) => el('tr', {},
+  const draw = (filter) => body.replaceChildren(paginated(list.filter((p) => !filter || `${p.name} ${p.sku} ${p.categoryName}`.toLowerCase().includes(filter)),
+    (page) => table(['Producto', 'Categoría', 'Precio', 'Stock', 'Estado', ''], page.map((p) => el('tr', {},
     el('td', {}, el('strong', { text: p.name }), el('span', { class: 'table__id', text: p.sku })),
     el('td', { text: p.categoryName }),
     el('td', { class: 'mono', text: money(p.price) }),
@@ -151,7 +172,82 @@ async function products(root) {
     el('td', {}, el('span', { class: p.active ? 'badge badge--ok' : 'badge badge--neutral', text: p.active ? 'Activo' : 'Oculto' })),
     el('td', {}, el('div', { class: 'row-actions' },
       el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Stock', onclick: () => openStock(p) }),
-      el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Editar', onclick: () => openForm(p) })))))));
+      el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Editar', onclick: () => openForm(p) })))))), { pageSize: 10, label: 'productos' }));
+  body.before(el('div', { class: 'catalog-toolbar' }, searchBox('Buscar por nombre, SKU o categoría', draw)));
+  draw('');
+}
+
+// ---- Categorías -------------------------------------------------------------------------
+async function categoriesPage(root) {
+  const body = el('div', {}, skeletons(4, 'skeleton--row'));
+  const create = el('button', { type: 'button', class: 'btn btn--primary btn--sm', text: 'Nueva categoría' });
+  shell(root, 'categorias', el('article', { class: 'card' }, el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Categorías del catálogo' }), create), body));
+  const [categories, list] = await Promise.all([catalogApi.categories(), adminApi.products()]);
+  create.addEventListener('click', () => {
+    const name = el('input', { maxlength: '60' });
+    const slug = el('input', { maxlength: '48', placeholder: 'mi-categoria' });
+    name.addEventListener('input', () => { slug.value = name.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); });
+    const errorNode = formError();
+    const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Crear categoría' });
+    const dialog = modal('Nueva categoría', el('div', {}, field('Nombre', name), field('Slug (URL)', slug), errorNode),
+      { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+    save.addEventListener('click', async () => {
+      await submitting(save, errorNode, () => adminApi.createCategory(slug.value, name.value), 'Categoría creada')
+        .then(() => { dialog.close(); rerender(); }).catch(() => {});
+    });
+  });
+  body.replaceChildren(table(['Categoría', 'Slug', 'Productos', 'Activos', 'Unidades en stock', ''], categories.map((c) => {
+    const items = list.filter((p) => p.categoryId === c.id);
+    return el('tr', {},
+      el('td', {}, el('strong', { text: c.name })), el('td', { class: 'mono small', text: c.slug }),
+      el('td', { class: 'mono', text: String(items.length) }), el('td', { class: 'mono', text: String(items.filter((p) => p.active).length) }),
+      el('td', { class: 'mono', text: String(items.reduce((s, p) => s + p.stock, 0)) }),
+      el('td', {}, el('a', { class: 'btn btn--ghost btn--sm', href: `/catalogo.html?categoria=${c.id}`, text: 'Ver en el catálogo' })));
+  })));
+}
+
+// ---- Inventario -------------------------------------------------------------------------
+async function inventoryPage(root) {
+  const summary = el('div', { class: 'kpis' }, skeletons(4, 'skeleton--row'));
+  const body = el('div', {}, skeletons(6, 'skeleton--row'));
+  const filter = el('select', { 'aria-label': 'Filtrar inventario' }, el('option', { value: 'all', text: 'Todos los productos' }),
+    el('option', { value: 'low', text: 'Stock bajo (≤ 5)' }), el('option', { value: 'out', text: 'Agotados' }));
+  filter.style.width = 'auto';
+  shell(root, 'inventario', summary, el('article', { class: 'card card--spaced' },
+    el('div', { class: 'card__head' }, el('h3', { class: 'card__title', text: 'Existencias' }), filter), body));
+  const list = await adminApi.products();
+  summary.replaceChildren(
+    kpiTile('Productos', list.length), kpiTile('Unidades en stock', list.reduce((s, p) => s + p.stock, 0), 'violet'),
+    kpiTile('Stock bajo (≤ 5)', list.filter((p) => p.stock > 0 && p.stock <= 5).length, 'warn'),
+    kpiTile('Agotados', list.filter((p) => p.stock === 0).length, list.some((p) => p.stock === 0) ? 'error' : ''),
+    kpiTile('Valor del inventario', money(list.reduce((s, p) => s + Number(p.price) * p.stock, 0)), 'ok'));
+  const adjust = (product) => {
+    const delta = el('input', { type: 'number', value: '10', step: '1' });
+    const reason = el('input', { maxlength: '200', value: 'Reposición de proveedor' });
+    const errorNode = formError();
+    const save = el('button', { type: 'button', class: 'btn btn--primary', text: 'Aplicar ajuste' });
+    const dialog = modal(`Ajustar stock · ${product.name}`, el('div', {}, el('p', { class: 'muted small', text: `Stock actual: ${product.stock}. Usa valores negativos para mermas; el stock nunca queda negativo.` }),
+      field('Cantidad (+/−)', delta), field('Motivo (queda auditado)', reason), errorNode),
+      { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
+    save.addEventListener('click', async () => {
+      await submitting(save, errorNode, () => adminApi.adjustStock(product.id, Number(delta.value), reason.value), 'Stock actualizado')
+        .then(() => { dialog.close(); rerender(); }).catch(() => {});
+    });
+  };
+  const draw = () => {
+    const rows = list.filter((p) => filter.value === 'all' || (filter.value === 'low' ? p.stock <= 5 : p.stock === 0))
+      .sort((a, b) => a.stock - b.stock);
+    body.replaceChildren(rows.length ? paginated(rows, (page) => table(['Producto', 'SKU', 'Stock', 'Nivel', ''], page.map((p) => el('tr', {},
+      el('td', {}, el('strong', { text: p.name }), el('span', { class: 'table__id', text: p.categoryName })),
+      el('td', { class: 'mono small', text: p.sku }),
+      el('td', { class: 'mono', text: String(p.stock) }),
+      el('td', {}, el('div', { class: 'meter', role: 'img', 'aria-label': `${p.stock} unidades` },
+        (() => { const bar = el('span', { class: p.stock === 0 ? 'is-error' : p.stock <= 5 ? 'is-warn' : '' }); bar.style.width = `${Math.min(100, p.stock * 2)}%`; return bar; })())),
+      el('td', {}, el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Ajustar', onclick: () => adjust(p) }))))), { pageSize: 12, label: 'productos' })
+      : emptyState('Nada que mostrar', 'No hay productos en este filtro.', 'box'));
+  };
+  filter.addEventListener('change', draw);
+  draw();
 }
 
 // ---- Pedidos ---------------------------------------------------------------------
@@ -238,7 +334,19 @@ async function users(root) {
   shell(root, 'usuarios', el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Usuarios, roles y acceso' }),
     el('p', { class: 'muted small', text: 'Los cambios de rol se aplican en el siguiente inicio de sesión del usuario y quedan auditados.' }), body));
   const list = await adminApi.users();
-  body.replaceChildren(table(['Usuario', 'Correo', 'Roles', 'Activo', 'Alta'], list.map((u) => {
+  const roleFilter = el('select', { 'aria-label': 'Filtrar por rol' }, el('option', { value: '', text: 'Todos los roles' }),
+    ...Object.entries(ROLE_LABELS).map(([value, label]) => el('option', { value, text: label })));
+  roleFilter.style.width = 'auto';
+  let text = '';
+  const draw = () => body.replaceChildren(paginated(list.filter((u) => (!roleFilter.value || u.roles.includes(roleFilter.value))
+    && (!text || `${u.username} ${u.displayName} ${u.email}`.toLowerCase().includes(text))), (page) => usersTable(page), { pageSize: 10, label: 'usuarios' }));
+  body.before(el('div', { class: 'catalog-toolbar' }, searchBox('Buscar usuario, nombre o correo', (value) => { text = value; draw(); }), roleFilter));
+  roleFilter.addEventListener('change', draw);
+  draw();
+}
+
+function usersTable(list) {
+  return table(['Usuario', 'Correo', 'Roles', 'Activo', 'Alta'], list.map((u) => {
     const checks = el('div', { class: 'role-checks' }, Object.keys(ROLE_LABELS).map((role) => {
       const input = el('input', { type: 'checkbox', checked: u.roles.includes(role), 'aria-label': `${ROLE_LABELS[role]} para ${u.username}` });
       input.addEventListener('change', async () => {
@@ -258,7 +366,7 @@ async function users(root) {
       el('td', { text: u.email }), el('td', {}, checks),
       el('td', {}, el('label', { class: 'switch' }, enabled, u.enabled ? 'Sí' : 'No')),
       el('td', { text: formatRelative(u.createdAt) }));
-  })));
+  }));
 }
 
 // ---- Incidencias -------------------------------------------------------------------
@@ -321,10 +429,20 @@ async function audit(root) {
   const body = el('div', {}, skeletons(8, 'skeleton--row'));
   shell(root, 'auditoria', el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Registro de auditoría (últimos 200 eventos)' }), body));
   const events = await adminApi.audit(200);
-  body.replaceChildren(table(['Fecha', 'Actor', 'Acción', 'Objetivo', 'Detalle'], events.map((e) => el('tr', {},
+  const actions = [...new Set(events.map((e) => e.action))].sort();
+  const actionFilter = el('select', { 'aria-label': 'Filtrar por acción' }, el('option', { value: '', text: 'Todas las acciones' }),
+    ...actions.map((a) => el('option', { value: a, text: a })));
+  actionFilter.style.width = 'auto';
+  let text = '';
+  const draw = () => body.replaceChildren(paginated(events.filter((e) => (!actionFilter.value || e.action === actionFilter.value)
+    && (!text || `${e.actor} ${e.target} ${e.details}`.toLowerCase().includes(text))),
+  (page) => table(['Fecha', 'Actor', 'Acción', 'Objetivo', 'Detalle'], page.map((e) => el('tr', {},
     el('td', { text: formatDateTime(e.at) }), el('td', { text: e.actor }),
     el('td', {}, el('span', { class: 'badge badge--neutral', text: e.action })), el('td', { class: 'mono small', text: e.target }),
-    el('td', { class: 'small', text: e.details })))));
+    el('td', { class: 'small', text: e.details })))), { pageSize: 15, label: 'eventos' }));
+  body.before(el('div', { class: 'catalog-toolbar' }, searchBox('Buscar actor, objetivo o detalle', (value) => { text = value; draw(); }), actionFilter));
+  actionFilter.addEventListener('change', draw);
+  draw();
 }
 
 async function reports(root) {
@@ -342,6 +460,10 @@ async function reports(root) {
     [['categoria', 'unidades', 'ingresos_usd'], ...d.salesByCategory.map((c) => [c.category, c.units, c.revenue])]));
 }
 
-const RENDER = { panel, productos: products, pedidos: orders, usuarios: users, incidencias: incidents, auditoria: audit, reportes: reports };
+const RENDER = {
+  panel, productos: products, categorias: categoriesPage, inventario: inventoryPage, pedidos: orders, usuarios: users,
+  incidencias: incidents, auditoria: audit, reportes: reports,
+};
+void link;
 route('/admin', (root) => panel(root), { roles: ['ADMIN'], title: 'Administración' });
 route('/admin/:tab', (root, { tab }) => (RENDER[tab] || panel)(root), { roles: ['ADMIN'], title: 'Administración' });

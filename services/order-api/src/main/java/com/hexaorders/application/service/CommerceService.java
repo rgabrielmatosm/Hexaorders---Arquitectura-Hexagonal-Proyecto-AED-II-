@@ -77,7 +77,8 @@ public final class CommerceService implements CommerceUseCases {
     }
 
     @Override
-    public PlacementResult placeOrder(AuthenticatedUser customer, List<CartItem> items, String idempotencyKey) {
+    public PlacementResult placeOrder(AuthenticatedUser customer, List<CartItem> items, String idempotencyKey,
+                                      com.hexaorders.domain.fulfillment.ShippingAddress shipping) {
         Guards.require(customer, Role.CUSTOMER);
         if (idempotencyKey == null || !IDEMPOTENCY_KEY.matcher(idempotencyKey).matches()) {
             throw new IllegalArgumentException("Idempotency-Key: obligatoria, 8 a 64 caracteres [A-Za-z0-9_-]");
@@ -121,7 +122,7 @@ public final class CommerceService implements CommerceUseCases {
         // 2) One transaction: order + lines + history + conditional stock decrement.
         CommerceOrder placed;
         try {
-            placed = orders.placeOrder(new NewShopOrder(order, customer.userId(), status, quote.lines(), history, idempotencyKey));
+            placed = orders.placeOrder(new NewShopOrder(order, customer.userId(), status, quote.lines(), history, idempotencyKey, shipping));
         } catch (OutOfStockException outOfStock) {
             telemetry.checkoutFailed("out_of_stock");
             throw outOfStock;
@@ -159,7 +160,7 @@ public final class CommerceService implements CommerceUseCases {
         ensureOwner(customer, orderId);
         CommerceOrder order = orders.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Pedido no encontrado"));
         return new OrderDetails(order, orders.history(orderId), deliveries.findByOrder(orderId).orElse(null),
-                TransitionPolicy.nextFor(order.status(), EnumSet.of(Actor.CUSTOMER)));
+                TransitionPolicy.nextFor(order.status(), EnumSet.of(Actor.CUSTOMER)), orders.shippingOf(orderId).orElse(null));
     }
 
     @Override

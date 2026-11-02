@@ -10,14 +10,16 @@
 
     Comandos de uso diario (proyecto Compose "hexaorders", carpeta del repositorio):
       start        Genera secretos si faltan, valida, construye y arranca los 5 servicios.
+                   Se detiene sin tocar nada si hay datos de PostgreSQL pero falta su secreto.
       status       Estado de los contenedores.
       logs         Últimas 100 líneas de log de cada servicio.
       stop         Detiene los servicios conservando los datos (-RemoveData los elimina).
-      secrets      Solo genera secrets\db_password.txt y secrets\grafana_password.txt.
+      secrets      Solo genera secrets\db_password.txt, grafana_password.txt y demo_password.txt.
       k8s-secrets  Crea el Secret app-secrets de Kubernetes a partir de secrets\*.txt.
 
     Comandos de comprobación:
-      check        Entregable generado al día + validación Compose/Kubernetes (Python).
+      check        Entregable generado al día + validación Compose/Kubernetes, observabilidad
+                   conservada y sitio multipágina coherente (Python, sin Docker).
       test         Tests unitarios locales: pytest (risk-engine) y Maven (order-api).
       verify       Prueba integral aislada, igual que GitHub: build con tests, promtool,
                    5 servicios sanos, smoke HTTP y HTTP 503 cuando cae risk-engine.
@@ -163,7 +165,9 @@ function Show-Urls {
     $grafanaSecret = Join-Path (Join-Path $WorkDir 'secrets') 'grafana_password.txt'
     Write-Host ''
     Write-Host 'HexaOrders está en marcha:' -ForegroundColor Green
-    Write-Host '  Aplicación y API : http://127.0.0.1:8080'
+    Write-Host '  Sitio web        : http://127.0.0.1:8080  (catálogo, portales por rol, monitoreo)'
+    Write-Host '  Laboratorio      : http://127.0.0.1:8080/laboratorio.html'
+    Write-Host "  Cuentas demo     : admin, operador, logistica, observador, cliente · contraseña en $(Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt')"
     Write-Host '  Grafana          : http://127.0.0.1:3000/d/hexaorders  (usuario admin)'
     Write-Host "  Contraseña       : $grafanaSecret"
     Write-Host '  Prometheus       : http://127.0.0.1:9091/targets'
@@ -173,9 +177,27 @@ function Show-Urls {
 
 function Invoke-Help { Get-Help $PSCommandPath -Detailed }
 
+function Assert-DatabaseSecretMatchesVolume {
+    # Si PostgreSQL ya se inicializó (volumen hexaorders_postgres_data) con una contraseña y el
+    # archivo secrets\db_password.txt falta, generar uno nuevo dejaría la API sin acceso a sus datos.
+    # En ese caso se detiene con instrucciones: nunca se borran volúmenes ni se regeneran secretos.
+    if ($IsVerifyCommand) { return }
+    $secret = Join-Path (Join-Path $WorkDir 'secrets') 'db_password.txt'
+    if (Test-Path -LiteralPath $secret -PathType Leaf) { return }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & docker volume inspect hexaorders_postgres_data *> $null } finally { $ErrorActionPreference = $previous }
+    if ($LASTEXITCODE -eq 0) {
+        throw ("Existe el volumen de datos hexaorders_postgres_data pero falta $secret. " +
+               'Restaura ese archivo con la contraseña original (copia de seguridad o variable DB_PASSWORD) para conservar los pedidos. ' +
+               'Solo si quieres empezar de cero y PERDER los datos: .\hexaorders.cmd stop -RemoveData')
+    }
+}
+
 function Invoke-Start {
     Assert-Docker
     Write-Step 'Secretos'
+    Assert-DatabaseSecretMatchesVolume
     Initialize-WorkDir
     Write-Step 'Validar docker-compose.yml'
     [void](Invoke-Compose @('config', '--quiet'))
@@ -235,6 +257,9 @@ function Invoke-Check {
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'validate_delivery.py'))
     Write-Step 'Preservación de la observabilidad (dashboards, paneles, alertas, jobs y métricas previas)'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_observability.py'))
+    Write-Step 'Sitio multipágina: páginas HTML al día, rutas, enlaces, CSP y reglas de seguridad por rol'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_pages.py'), '--check')
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_frontend.py'))
 }
 
 function Invoke-Test {

@@ -116,6 +116,7 @@ def monitoring_configmap() -> str:
         'hexaorders-api.json': 'infra/grafana/dashboards/hexaorders-api.json',
         'hexaorders-infrastructure.json': 'infra/grafana/dashboards/hexaorders-infrastructure.json',
         'hexaorders-security.json': 'infra/grafana/dashboards/hexaorders-security.json',
+        'hexaorders-logistics.json': 'infra/grafana/dashboards/hexaorders-logistics.json',
     }
     doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'hexaorders'},
            'data': {key: read_text(ROOT / value) for key, value in paths.items()}}

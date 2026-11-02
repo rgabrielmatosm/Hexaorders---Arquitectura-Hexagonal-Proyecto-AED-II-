@@ -8,14 +8,9 @@ import { initObservability, refreshObservability } from './observability.js';
 import { initOrders, renderOrders, renderOrdersError } from './orders.js';
 import { $, $$, el, reducedMotion, toast } from './ui.js';
 import { cart } from './cart.js';
-import { navigate, startRouter } from './router.js';
+import { startRouter } from './router.js';
 import { ROLE_LABELS, homeFor, session } from './session.js';
-// Vistas de la plataforma: cada módulo registra sus rutas.
-import './views/shop.js';
-import './views/admin.js';
-import './views/operations.js';
-import './views/logistics.js';
-import './views/ops.js';
+// v4: las vistas de la plataforma se cargan en sus páginas HTML (js/page.js); aquí solo queda el laboratorio.
 
 const DATA_REFRESH_MS = 20000;
 const OBS_REFRESH_MS = 15000;
@@ -117,11 +112,12 @@ function initNavigation() {
 }
 
 // ---- Barra superior de la plataforma ----------------------------------------------
+// v4: cada área es una página HTML real del sitio multipágina.
 const ROLE_AREAS = [
-  ['ADMIN', '#/admin', 'Administración'],
-  ['ORDER_OPERATOR', '#/operaciones', 'Operaciones'],
-  ['LOGISTICS_OPERATOR', '#/logistica', 'Logística'],
-  ['OBSERVABILITY_VIEWER', '#/observabilidad-tecnica', 'Salud técnica'],
+  ['ADMIN', '/admin/dashboard.html', 'Administración'],
+  ['ORDER_OPERATOR', '/operaciones/dashboard.html', 'Operaciones'],
+  ['LOGISTICS_OPERATOR', '/logistica/dashboard.html', 'Logística'],
+  ['OBSERVABILITY_VIEWER', '/monitoreo/dashboard.html', 'Monitoreo'],
 ];
 
 function renderAccount() {
@@ -129,18 +125,18 @@ function renderAccount() {
   const container = $('#account');
   const roleNav = $('#role-nav');
   roleNav.replaceChildren(...ROLE_AREAS.filter(([role]) => session.has(role) || session.has('ADMIN'))
-    .map(([, href, label]) => el('a', { href, dataset: { routeLink: href.slice(1) }, text: label })));
+    .map(([, href, label]) => el('a', { href, text: label })));
   if (!user) {
-    container.replaceChildren(el('a', { class: 'btn btn--primary btn--sm', href: '#/entrar', text: 'Entrar' }));
+    container.replaceChildren(el('a', { class: 'btn btn--primary btn--sm', href: '/login.html?next=%2Flaboratorio.html', text: 'Entrar' }));
     return;
   }
   const initials = user.displayName.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const panel = el('div', { class: 'menu__panel', hidden: true, role: 'menu' },
     el('div', { class: 'menu__meta' }, el('strong', { text: user.displayName }), el('small', { text: `@${user.username} · ${user.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}` })),
-    session.has('CUSTOMER') ? el('a', { href: '#/mis-pedidos', role: 'menuitem', text: 'Mis pedidos' }) : null,
+    session.has('CUSTOMER') ? el('a', { href: '/cliente/pedidos.html', role: 'menuitem', text: 'Mis pedidos' }) : null,
     ...ROLE_AREAS.filter(([role]) => session.has(role) || session.has('ADMIN')).map(([, href, label]) => el('a', { href, role: 'menuitem', text: label })),
-    el('a', { href: '#/perfil', role: 'menuitem', text: 'Perfil y seguridad' }),
-    el('button', { type: 'button', role: 'menuitem', text: 'Cerrar sesión', onclick: async () => { await session.logout(); toast('Sesión cerrada', 'ok'); navigate('#/tienda'); } }));
+    el('a', { href: '/cliente/perfil.html', role: 'menuitem', text: 'Perfil y seguridad' }),
+    el('button', { type: 'button', role: 'menuitem', text: 'Cerrar sesión', onclick: async () => { await session.logout(); toast('Sesión cerrada', 'ok'); window.location.assign('/'); } }));
   const toggle = el('button', { type: 'button', class: 'icon-btn user-chip', 'aria-haspopup': 'menu', 'aria-expanded': 'false' },
     el('span', { class: 'avatar', text: initials }), el('span', { class: 'user-chip__name', text: user.displayName.split(' ')[0] }));
   toggle.addEventListener('click', (event) => {

@@ -4,7 +4,9 @@ import com.hexaorders.adapter.in.web.security.HexaUserPrincipal;
 import com.hexaorders.adapter.in.web.security.SecurityTelemetry;
 import com.hexaorders.application.port.out.UserRepository;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.net.URLEncoder;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.springframework.context.annotation.Bean;
@@ -77,6 +79,7 @@ public class SecurityConfiguration {
                     .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/shop/quote").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()
                     .requestMatchers("/api/shop/**").hasRole("CUSTOMER")
                     .requestMatchers("/api/account/**").authenticated()
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -87,14 +90,32 @@ public class SecurityConfiguration {
                     // Actuator lives on the management port 9090, reachable only from internal Docker networks.
                     .requestMatchers("/actuator/**").permitAll()
                     .requestMatchers("/api/**").denyAll()
+                    // v4 multipage site: protected HTML pages are checked on the server too, not only hidden in menus.
+                    .requestMatchers("/checkout.html").hasRole("CUSTOMER")
+                    .requestMatchers("/cliente/perfil.html").authenticated()
+                    .requestMatchers("/cliente", "/cliente/**").hasRole("CUSTOMER")
+                    .requestMatchers("/admin", "/admin/**").hasRole("ADMIN")
+                    .requestMatchers("/operaciones", "/operaciones/**").hasAnyRole("ORDER_OPERATOR", "ADMIN")
+                    .requestMatchers("/logistica", "/logistica/**").hasAnyRole("LOGISTICS_OPERATOR", "ADMIN")
+                    .requestMatchers("/monitoreo", "/monitoreo/**").hasAnyRole("OBSERVABILITY_VIEWER", "ADMIN")
                     .anyRequest().permitAll())
             .exceptionHandling(errors -> errors
                     .authenticationEntryPoint((request, response, failure) -> {
                         telemetry.unauthenticated();
+                        if (isPage(request)) {
+                            // Pages: back to the login page, which returns here after signing in.
+                            response.sendRedirect("/login.html?next=" + URLEncoder.encode(pathWithQuery(request), StandardCharsets.UTF_8));
+                            return;
+                        }
                         problem(response, HttpServletResponse.SC_UNAUTHORIZED, "Autenticación requerida", "Inicia sesión para continuar");
                     })
                     .accessDeniedHandler((request, response, denied) -> {
                         telemetry.forbidden();
+                        if (isPage(request) && !(denied instanceof CsrfException)) {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            request.getRequestDispatcher("/403.html").forward(request, response);
+                            return;
+                        }
                         if (denied instanceof CsrfException) {
                             problem(response, HttpServletResponse.SC_FORBIDDEN, "Token CSRF no válido", "Recarga la página e inténtalo de nuevo");
                         } else {
@@ -109,6 +130,16 @@ public class SecurityConfiguration {
                     .contentSecurityPolicy(csp -> csp.policyDirectives(CSP))
                     .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN)));
         return http.build();
+    }
+
+    private static boolean isPage(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return !path.startsWith("/api/") && !path.startsWith("/actuator/");
+    }
+
+    private static String pathWithQuery(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return request.getQueryString() == null ? path : path + "?" + request.getQueryString();
     }
 
     private static void problem(HttpServletResponse response, int status, String title, String detail) throws IOException {

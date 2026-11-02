@@ -13,15 +13,16 @@ export const ROLE_LABELS = {
   OBSERVABILITY_VIEWER: 'Observabilidad',
 };
 
-/** Página de inicio de cada rol tras iniciar sesión. */
+/** Página de inicio de cada rol tras iniciar sesión (páginas HTML reales del sitio multipágina). */
 export function homeFor(user) {
-  if (!user) return '#/tienda';
+  if (!user) return '/catalogo.html';
   const roles = user.roles || [];
-  if (roles.includes('ADMIN')) return '#/admin';
-  if (roles.includes('ORDER_OPERATOR')) return '#/operaciones';
-  if (roles.includes('LOGISTICS_OPERATOR')) return '#/logistica';
-  if (roles.includes('OBSERVABILITY_VIEWER')) return '#/observabilidad-tecnica';
-  return '#/tienda';
+  if (roles.includes('ADMIN')) return '/admin/dashboard.html';
+  if (roles.includes('ORDER_OPERATOR')) return '/operaciones/dashboard.html';
+  if (roles.includes('LOGISTICS_OPERATOR')) return '/logistica/dashboard.html';
+  if (roles.includes('OBSERVABILITY_VIEWER')) return '/monitoreo/dashboard.html';
+  if (roles.includes('CUSTOMER')) return '/cliente/dashboard.html';
+  return '/catalogo.html';
 }
 
 function emit() { window.dispatchEvent(new CustomEvent('hexa:session', { detail: current })); }
