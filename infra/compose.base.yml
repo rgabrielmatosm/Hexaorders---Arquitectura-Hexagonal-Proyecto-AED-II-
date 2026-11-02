@@ -396,7 +396,7 @@ services:
       loki:
         condition: service_healthy
     volumes:
-      - alloy_data:/var/lib/alloy
+      - alloy_data:/var/lib/hexaorders-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [telemetry]
     read_only: true

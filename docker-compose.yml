@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo b7076eaa21d58c2f08a374e1278175313705eab5070710e9a99adfb449f2ff71
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo f2ef3666dea57de8b2b9490b08d37aed7f7b56e4dcfad0a80c9099d53b470e45
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -26469,7 +26469,7 @@ services:
         RUN mkdir -p /data-dir
         FROM grafana/alloy:v1.21.3
         COPY --from=tools /bin/busybox /usr/local/bin/busybox
-        COPY --from=tools --chown=0:0 /data-dir /var/lib/alloy
+        COPY --from=tools --chown=0:0 /data-dir /var/lib/hexaorders-alloy
         COPY <<'HEXFILE_0' /etc/alloy/config.alloy
         // Solo contenedores con la etiqueta com.hexaorders.logs=true (los de este proyecto): nunca se
         // recogen logs de otros contenedores de tu Docker Desktop.
@@ -26531,14 +26531,14 @@ services:
           }
         }
         HEXFILE_0
-        CMD ["run", "--server.http.listen-addr=0.0.0.0:12345", "--storage.path=/var/lib/alloy/data", "--disable-reporting", "/etc/alloy/config.alloy"]
+        CMD ["run", "--server.http.listen-addr=0.0.0.0:12345", "--storage.path=/var/lib/hexaorders-alloy/data", "--disable-reporting", "/etc/alloy/config.alloy"]
         HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=10 CMD ["/usr/local/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:12345/-/ready"]
     user: '0:0'  # leer /var/run/docker.sock (sin capacidades: cap_drop ALL)
     depends_on:
       loki:
         condition: service_healthy
     volumes:
-      - alloy_data:/var/lib/alloy
+      - alloy_data:/var/lib/hexaorders-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [telemetry]
     read_only: true

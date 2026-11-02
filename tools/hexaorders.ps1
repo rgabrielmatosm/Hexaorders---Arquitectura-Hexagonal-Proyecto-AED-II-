@@ -10,8 +10,8 @@
 
     Modos (v5, perfiles de Docker Compose; parámetro -Mode):
       full   (por defecto) 13 contenedores: los 5 originales, el gateway Nginx (frontend) y
-             redis, rabbitmq, mailpit, loki, tempo, otel-collector y alloy. ~4 GB de RAM.
-      basic  6 contenedores: db, risk-engine, order-api, prometheus, grafana y frontend. ~2 GB.
+             redis, rabbitmq, mailpit, loki, tempo, otel-collector y alloy. Límites: ~4,5 GB.
+      basic  6 contenedores: db, risk-engine, order-api, prometheus, grafana y frontend. Límites: ~2,5 GB.
 
     Comandos de uso diario (proyecto Compose "hexaorders", carpeta del repositorio):
       start        Genera secretos si faltan, valida, construye y arranca los servicios del modo.
