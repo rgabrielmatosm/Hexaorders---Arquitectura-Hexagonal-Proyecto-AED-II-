@@ -29,12 +29,25 @@ BUILD_CONTEXTS = {
     'risk-engine': 'services/risk-engine',
     'prometheus': 'infra/prometheus',
     'grafana': 'infra/grafana',
+    # v5
+    'frontend': 'infra/frontend',
+    'rabbitmq': 'infra/rabbitmq',
+    'loki': 'infra/loki',
+    'tempo': 'infra/tempo',
+    'otel-collector': 'infra/otel-collector',
+    'alloy': 'infra/alloy',
 }
 INLINE_MARKERS = {
     '__INLINE_JAVA__': 'order-api',
     '__INLINE_RISK__': 'risk-engine',
     '__INLINE_PROMETHEUS__': 'prometheus',
     '__INLINE_GRAFANA__': 'grafana',
+    '__INLINE_FRONTEND__': 'frontend',
+    '__INLINE_RABBITMQ__': 'rabbitmq',
+    '__INLINE_LOKI__': 'loki',
+    '__INLINE_TEMPO__': 'tempo',
+    '__INLINE_OTEL_COLLECTOR__': 'otel-collector',
+    '__INLINE_ALLOY__': 'alloy',
 }
 
 
@@ -50,7 +63,8 @@ def inline_dockerfile(service: str) -> str:
         if len(parts) != 3 or parts[1].startswith('--'):
             raise ValueError(f'COPY no soportado: {line}')
         source, destination = parts[1:]
-        origin = context / source
+        # '@repo/…' = ruta desde la raíz del repositorio (p. ej. el gateway reutiliza los estáticos de order-api).
+        origin = ROOT / source[len('@repo/'):] if source.startswith('@repo/') else context / source
         files = sorted_files(origin) if origin.is_dir() else [origin]
         files = [file for file in files if file.is_file()
                  and not any(part in {'__pycache__', '.pytest_cache', '.venv'} for part in file.parts)]
@@ -117,6 +131,7 @@ def monitoring_configmap() -> str:
         'hexaorders-infrastructure.json': 'infra/grafana/dashboards/hexaorders-infrastructure.json',
         'hexaorders-security.json': 'infra/grafana/dashboards/hexaorders-security.json',
         'hexaorders-logistics.json': 'infra/grafana/dashboards/hexaorders-logistics.json',
+        'hexaorders-integrations.json': 'infra/grafana/dashboards/hexaorders-integrations.json',
     }
     doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'hexaorders'},
            'data': {key: read_text(ROOT / value) for key, value in paths.items()}}

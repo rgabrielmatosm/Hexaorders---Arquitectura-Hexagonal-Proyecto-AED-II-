@@ -100,7 +100,7 @@ if os.environ.get('GRAFANA_PASSWORD'):
     assert dashboard['dashboard']['uid'] == 'hexaorders'
     # v3: el dashboard original y los 5 nuevos están aprovisionados.
     for uid in ['hexaorders-business', 'hexaorders-risk', 'hexaorders-api', 'hexaorders-infrastructure', 'hexaorders-security',
-                'hexaorders-logistics']:
+                'hexaorders-logistics', 'hexaorders-integrations']:
         _, extra = request(grafana + '/api/dashboards/uid/' + uid, headers={'Authorization': 'Basic ' + credentials})
         assert extra['dashboard']['uid'] == uid, uid
 print('OK: tres riesgos, persistencia, estadísticas, validación, recursos del frontend, targets Prometheus y Grafana')

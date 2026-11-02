@@ -8,8 +8,13 @@
     política de ejecución bloquee los scripts .ps1. El workflow de GitHub ejecuta este mismo
     script, así que lo que pasa en GitHub es lo que se ejecuta en tu equipo.
 
+    Modos (v5, perfiles de Docker Compose; parámetro -Mode):
+      full   (por defecto) 13 contenedores: los 5 originales, el gateway Nginx (frontend) y
+             redis, rabbitmq, mailpit, loki, tempo, otel-collector y alloy. ~4 GB de RAM.
+      basic  6 contenedores: db, risk-engine, order-api, prometheus, grafana y frontend. ~2 GB.
+
     Comandos de uso diario (proyecto Compose "hexaorders", carpeta del repositorio):
-      start        Genera secretos si faltan, valida, construye y arranca los 5 servicios.
+      start        Genera secretos si faltan, valida, construye y arranca los servicios del modo.
                    Se detiene sin tocar nada si hay datos de PostgreSQL pero falta su secreto.
       status       Estado de los contenedores.
       logs         Últimas 100 líneas de log de cada servicio.
@@ -21,13 +26,18 @@
       check        Entregable generado al día + validación Compose/Kubernetes, observabilidad
                    conservada y sitio multipágina coherente (Python, sin Docker).
       test         Tests unitarios locales: pytest (risk-engine) y Maven (order-api).
-      verify       Prueba integral aislada, igual que GitHub: build con tests, promtool,
-                   5 servicios sanos, smoke HTTP y HTTP 503 cuando cae risk-engine.
+      smoke        Pruebas HTTP contra TU entorno en marcha: smoke, plataforma y (modo full)
+                   integraciones Redis, RabbitMQ, Mailpit, Loki, Tempo y OpenTelemetry.
+      verify       Prueba integral aislada, igual que GitHub: build con tests, validación de
+                   configuración, servicios sanos, smoke, plataforma, integraciones, degradación
+                   sin Redis/RabbitMQ, persistencia tras reiniciar y HTTP 503 sin risk-engine.
       diagnose     Estado y logs del entorno de verify (nunca falla).
       cleanup      Elimina contenedores y volúmenes del entorno de verify (nunca falla).
 
 .EXAMPLE
     .\hexaorders.cmd start
+.EXAMPLE
+    .\hexaorders.cmd start -Mode basic
 .EXAMPLE
     .\hexaorders.cmd stop -RemoveData
 .EXAMPLE
@@ -37,8 +47,12 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet('help', 'start', 'status', 'logs', 'stop', 'secrets', 'k8s-secrets',
-                 'check', 'test', 'verify', 'diagnose', 'cleanup')]
+                 'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup')]
     [string]$Command = 'help',
+
+    # v5: full = 13 contenedores (perfil "full" de Compose); basic = 6 contenedores esenciales.
+    [ValidateSet('full', 'basic')]
+    [string]$Mode = 'full',
 
     # Carpeta con docker-compose.yml y secrets\. Por defecto: la raíz del repositorio para los
     # comandos diarios, y una carpeta temporal aislada para verify/diagnose/cleanup.
@@ -69,6 +83,11 @@ if (-not $WorkDir) {
 if (-not [System.IO.Path]::IsPathRooted($WorkDir)) { $WorkDir = Join-Path (Get-Location).Path $WorkDir }
 $WorkDir = [System.IO.Path]::GetFullPath($WorkDir)
 $ComposeFile = Join-Path $WorkDir 'docker-compose.yml'
+# Perfiles de Compose: start/verify usan el modo pedido; status, logs, stop, diagnose y cleanup
+# incluyen siempre el perfil "full" para ver o detener TODOS los contenedores del proyecto.
+$UsesMode = @('start', 'verify') -contains $Command
+if ($UsesMode -and $Mode -eq 'basic') { $env:COMPOSE_PROFILES = '' } else { $env:COMPOSE_PROFILES = 'full' }
+$FullMode = $env:COMPOSE_PROFILES -eq 'full'
 
 # ---------------------------------------------------------------- utilidades
 
@@ -171,6 +190,14 @@ function Show-Urls {
     Write-Host '  Grafana          : http://127.0.0.1:3000/d/hexaorders  (usuario admin)'
     Write-Host "  Contraseña       : $grafanaSecret"
     Write-Host '  Prometheus       : http://127.0.0.1:9091/targets'
+    if ($FullMode) {
+        $rabbitSecret = Join-Path (Join-Path $WorkDir 'secrets') 'rabbitmq_password.txt'
+        Write-Host '  Mailpit (correos): http://127.0.0.1:8025'
+        Write-Host "  RabbitMQ         : http://127.0.0.1:15672  (usuario hexaorders, contraseña en $rabbitSecret)"
+        Write-Host '  Logs y trazas    : Grafana -> Explore -> Loki / Tempo · dashboard /d/hexaorders-integrations'
+    } else {
+        Write-Host '  Modo básico: Redis, RabbitMQ, Mailpit, Loki, Tempo y OpenTelemetry no están en marcha.'
+    }
 }
 
 # ---------------------------------------------------------------- comandos
@@ -178,20 +205,33 @@ function Show-Urls {
 function Invoke-Help { Get-Help $PSCommandPath -Detailed }
 
 function Assert-DatabaseSecretMatchesVolume {
-    # Si PostgreSQL ya se inicializó (volumen hexaorders_postgres_data) con una contraseña y el
-    # archivo secrets\db_password.txt falta, generar uno nuevo dejaría la API sin acceso a sus datos.
-    # En ese caso se detiene con instrucciones: nunca se borran volúmenes ni se regeneran secretos.
+    # PostgreSQL, Grafana y RabbitMQ guardan su contraseña al inicializar su volumen. Si el volumen
+    # existe y falta el archivo de secreto, generar uno nuevo dejaría el servicio sin acceso a sus
+    # datos. En ese caso se detiene con instrucciones: nunca se borran volúmenes ni se regeneran secretos.
     if ($IsVerifyCommand) { return }
-    $secret = Join-Path (Join-Path $WorkDir 'secrets') 'db_password.txt'
-    if (Test-Path -LiteralPath $secret -PathType Leaf) { return }
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try { & docker volume inspect hexaorders_postgres_data *> $null } finally { $ErrorActionPreference = $previous }
-    if ($LASTEXITCODE -eq 0) {
-        throw ("Existe el volumen de datos hexaorders_postgres_data pero falta $secret. " +
-               'Restaura ese archivo con la contraseña original (copia de seguridad o variable DB_PASSWORD) para conservar los pedidos. ' +
-               'Solo si quieres empezar de cero y PERDER los datos: .\hexaorders.cmd stop -RemoveData')
+    $pairs = @(
+        @{ Secret = 'db_password.txt'; Volume = 'hexaorders_postgres_data'; Variable = 'DB_PASSWORD'; Data = 'los pedidos' },
+        @{ Secret = 'grafana_password.txt'; Volume = 'hexaorders_grafana_data'; Variable = 'GRAFANA_PASSWORD'; Data = 'el usuario admin de Grafana' },
+        @{ Secret = 'rabbitmq_password.txt'; Volume = 'hexaorders_rabbitmq_data'; Variable = 'RABBITMQ_PASSWORD'; Data = 'los mensajes de RabbitMQ' }
+    )
+    foreach ($pair in $pairs) {
+        $secret = Join-Path (Join-Path $WorkDir 'secrets') $pair.Secret
+        if (Test-Path -LiteralPath $secret -PathType Leaf) { continue }
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { & docker volume inspect $pair.Volume *> $null } finally { $ErrorActionPreference = $previous }
+        if ($LASTEXITCODE -eq 0) {
+            throw ("Existe el volumen $($pair.Volume) pero falta $secret. " +
+                   "Restaura ese archivo con la contraseña original (copia de seguridad o variable $($pair.Variable)) para conservar $($pair.Data). " +
+                   'Solo si quieres empezar de cero y PERDER los datos: .\hexaorders.cmd stop -RemoveData')
+        }
     }
+}
+
+function Invoke-IntegrationSmoke([string[]]$Arguments) {
+    $env:SECRETS_DIR = Join-Path $WorkDir 'secrets'
+    $env:PROMETHEUS_URL = 'http://127.0.0.1:9091'
+    Invoke-Python (@((Join-Path (Join-Path $RepoRoot 'tools') 'integration_smoke.py')) + $Arguments)
 }
 
 function Invoke-Start {
@@ -203,10 +243,29 @@ function Invoke-Start {
     [void](Invoke-Compose @('config', '--quiet'))
     Write-Step 'Construir imágenes (incluye los tests de Java y Python)'
     [void](Invoke-Compose @('build', '--pull'))
-    Write-Step 'Arrancar los cinco servicios y esperar a que estén sanos'
+    Write-Step "Arrancar los servicios del modo $Mode y esperar a que estén sanos"
     [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout"))
     [void](Invoke-Compose @('ps'))
     Show-Urls
+}
+
+function Invoke-Smoke {
+    Assert-Docker
+    $env:GRAFANA_PASSWORD = Get-GrafanaPassword
+    $env:PROMETHEUS_URL = 'http://127.0.0.1:9091'
+    Write-Step 'Smoke HTTP (pedidos, persistencia, métricas y dashboards)'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'smoke.py'))
+    Write-Step 'Plataforma (portal, roles, ciclo de vida, logística)'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'platform_smoke.py'),
+                    '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
+    $running = & docker ps -q --filter 'label=com.docker.compose.project=hexaorders' --filter 'label=com.docker.compose.service=rabbitmq'
+    if ($running) {
+        Write-Step 'Integraciones del modo full (Redis, RabbitMQ, Mailpit, Loki, Tempo, OpenTelemetry)'
+        Invoke-IntegrationSmoke @('check')
+    } else {
+        Write-Host 'Modo básico: se omiten las pruebas de integración del perfil full.'
+    }
+    Write-Host 'Pruebas HTTP correctas.' -ForegroundColor Green
 }
 
 function Invoke-Status { Assert-Docker; [void](Invoke-Compose @('ps', '-a')) }
@@ -293,7 +352,7 @@ function Invoke-Cleanup {
 }
 
 function Invoke-Verify {
-    Write-Step '[1/8] Entregable generado al día'
+    Write-Step '[1/10] Entregable generado al día'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_delivery.py'), '--check')
 
     Assert-Docker
@@ -303,37 +362,61 @@ function Invoke-Verify {
         if ($running) { throw 'El entorno "hexaorders" está en marcha y usa los mismos puertos. Detenlo con: .\hexaorders.cmd stop' }
     }
 
-    Write-Step "[2/8] Copiar el YAML entregable a una carpeta aislada ($WorkDir) y generar secretos"
+    Write-Step "[2/10] Copiar el YAML entregable a una carpeta aislada ($WorkDir) y generar secretos"
     Initialize-WorkDir -CopyFromRepo
 
     $succeeded = $false
+    $state = Join-Path $WorkDir 'integration-state.json'
     try {
-        Write-Step '[3/8] Validar y construir (los builds ejecutan los tests de Java y Python)'
+        Write-Step "[3/10] Validar y construir en modo $Mode (los builds ejecutan los tests de Java y Python)"
         [void](Invoke-Compose @('config', '--quiet'))
         [void](Invoke-Compose @('build', '--pull'))
 
-        Write-Step '[4/8] Validar configuración y reglas de Prometheus con promtool'
+        Write-Step '[4/10] Validar configuraciones: Prometheus (promtool) y OpenTelemetry Collector'
         [void](Invoke-Compose @('run', '--rm', '--no-deps', '--entrypoint', '/bin/promtool', 'prometheus',
                                 'check', 'config', '/etc/prometheus/prometheus.yml'))
+        if ($FullMode) {
+            [void](Invoke-Compose @('run', '--rm', '--no-deps', '--entrypoint', '/otelcol-contrib', 'otel-collector',
+                                    'validate', '--config=/etc/otelcol-contrib/config.yaml'))
+        }
 
-        Write-Step '[5/8] Arrancar los cinco servicios y esperar a que estén sanos'
+        Write-Step "[5/10] Arrancar los servicios del modo $Mode y esperar a que estén sanos"
         [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout"))
 
-        Write-Step '[6/8] Smoke HTTP: pedidos, persistencia, validación, métricas y dashboard'
+        Write-Step '[6/10] Smoke HTTP a través del gateway: pedidos, persistencia, validación, métricas y dashboards'
         $env:GRAFANA_PASSWORD = Get-GrafanaPassword
         Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'smoke.py'))
-        Write-Step '[6b/8] Plataforma: portal, roles, ciclo de vida, logística, auditoría y métricas nuevas'
+        Write-Step '[6b/10] Plataforma: portal, roles, ciclo de vida, logística, auditoría y métricas nuevas'
         $env:PROMETHEUS_URL = 'http://127.0.0.1:9091'
         Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'platform_smoke.py'),
                         '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
 
-        Write-Step '[7/8] Si risk-engine cae, la API responde HTTP 503'
+        if ($FullMode) {
+            Write-Step '[7/10] Integraciones reales: Redis, RabbitMQ, Mailpit, Tempo, OpenTelemetry, Loki y Grafana'
+            Invoke-IntegrationSmoke @('check')
+            Write-Step '[7b/10] Degradación: sin Redis ni RabbitMQ el catálogo y los pedidos siguen funcionando'
+            [void](Invoke-Compose @('stop', 'redis', 'rabbitmq'))
+            Invoke-IntegrationSmoke @('degraded', '--state', $state)
+            [void](Invoke-Compose @('start', 'redis', 'rabbitmq'))
+            [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', '180'))
+            Invoke-IntegrationSmoke @('recovered', '--state', $state)
+        } else {
+            Write-Step '[7/10] Modo básico: se omiten las integraciones del perfil full'
+        }
+
+        Write-Step '[8/10] Persistencia: reiniciar PostgreSQL y order-api conserva los pedidos'
+        Invoke-IntegrationSmoke @('persist-write', '--state', $state)
+        [void](Invoke-Compose @('restart', 'db', 'order-api'))
+        [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', '180'))
+        Invoke-IntegrationSmoke @('persist-read', '--state', $state)
+
+        Write-Step '[9/10] Si risk-engine cae, la API responde HTTP 503 (también a través del gateway)'
         [void](Invoke-Compose @('stop', 'risk-engine'))
         $code = Get-HttpStatus 'http://127.0.0.1:8080/api/orders' '{"customerId":"demo-001","amount":125.50}'
         if ($code -ne 503) { throw "Se esperaba HTTP 503 con risk-engine detenido y se obtuvo $code" }
         Write-Host 'HTTP 503 recibido correctamente.'
 
-        Write-Step '[8/8] Recuperación: risk-engine vuelve y todo queda sano'
+        Write-Step '[10/10] Recuperación: risk-engine vuelve y todo queda sano'
         [void](Invoke-Compose @('start', 'risk-engine'))
         [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', '120'))
         $succeeded = $true
@@ -346,7 +429,7 @@ function Invoke-Verify {
     }
     if ($InGitHub) { Write-Host '::endgroup::' }
     Write-Host ''
-    Write-Host 'VERIFICACIÓN COMPLETA: los cinco servicios funcionan de extremo a extremo.' -ForegroundColor Green
+    Write-Host "VERIFICACIÓN COMPLETA (modo $Mode): todos los servicios funcionan de extremo a extremo." -ForegroundColor Green
 }
 
 # ---------------------------------------------------------------- main
@@ -362,6 +445,7 @@ try {
         'k8s-secrets' { Invoke-K8sSecrets }
         'check'       { Invoke-Check; Write-Host 'Comprobaciones correctas.' -ForegroundColor Green }
         'test'        { Invoke-Test }
+        'smoke'       { Invoke-Smoke }
         'verify'      { Invoke-Verify }
         'diagnose'    { Invoke-Diagnose }
         'cleanup'     { Invoke-Cleanup }
