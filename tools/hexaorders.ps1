@@ -19,7 +19,7 @@
       status       Estado de los contenedores.
       logs         Últimas 100 líneas de log de cada servicio.
       stop         Detiene los servicios conservando los datos (-RemoveData los elimina).
-      secrets      Solo genera secrets\db_password.txt, grafana_password.txt y demo_password.txt.
+      secrets      Solo genera secrets\db_password.txt, grafana_password.txt, demo_password.txt y rabbitmq_password.txt.
       k8s-secrets  Crea el Secret app-secrets de Kubernetes a partir de secrets\*.txt.
 
     Comandos de comprobación:
