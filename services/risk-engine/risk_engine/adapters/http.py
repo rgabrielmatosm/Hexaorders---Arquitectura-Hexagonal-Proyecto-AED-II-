@@ -6,6 +6,7 @@ from time import perf_counter
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from opentelemetry import trace
 from prometheus_client import CollectorRegistry, Counter, Histogram, CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -81,7 +82,11 @@ def create_app(score_risk: ScoreRiskPort) -> FastAPI:
             detail = exc.errors(include_input=False, include_context=False) if isinstance(exc, ValidationError) else "Invalid JSON body"
             raise HTTPException(status_code=422, detail=detail) from exc
         started = perf_counter()
-        result = score_risk.execute(evaluation)
+        # Span of the use case (no-op unless tracing is configured). No customer data in attributes.
+        with trace.get_tracer("risk_engine.adapters.http").start_as_current_span("ScoreRisk.execute") as span:
+            result = score_risk.execute(evaluation)
+            span.set_attribute("risk.decision", result.decision.value)
+            span.set_attribute("risk.score", result.score)
         duration.observe(perf_counter() - started)
         evaluations.labels(decision=result.decision.value).inc()
         return ScoreResponse(score=result.score, decision=result.decision.value)
