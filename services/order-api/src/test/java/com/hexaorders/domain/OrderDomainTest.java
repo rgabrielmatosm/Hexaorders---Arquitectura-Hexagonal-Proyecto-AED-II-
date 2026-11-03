@@ -49,7 +49,8 @@ class OrderDomainTest {
 
     @Test
     void rejectsUnsupportedCurrencyAndContradictoryStatus() {
-        assertThatThrownBy(() -> new OrderDraft("demo", BigDecimal.ONE, "PEN"))
+        // v6: PEN is the store currency (the original API keeps requiring USD, see OrderServiceTest).
+        assertThatThrownBy(() -> new OrderDraft("demo", BigDecimal.ONE, "EUR"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Order(UUID.randomUUID(), "demo", BigDecimal.ONE, "USD", 80,
                 OrderStatus.APPROVED, Instant.now())).isInstanceOf(IllegalArgumentException.class);

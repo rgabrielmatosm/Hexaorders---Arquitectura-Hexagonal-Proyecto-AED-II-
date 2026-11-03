@@ -87,7 +87,7 @@ public final class RedisCatalogCache implements CatalogCache {
             try {
                 if (invalidationPending) { redis.opsForValue().increment(VERSION_KEY); invalidationPending = false; }
                 String version = Optional.ofNullable(redis.opsForValue().get(VERSION_KEY)).orElse("0");
-                key = "hexaorders:catalog:v" + version + ":" + name;
+                key = "hexaorders:catalog6:v" + version + ":" + name;
                 String raw = redis.opsForValue().get(key);
                 if (raw != null) {
                     counter("hit").increment();

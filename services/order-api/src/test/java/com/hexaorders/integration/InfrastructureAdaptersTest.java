@@ -84,7 +84,7 @@ class InfrastructureAdaptersTest {
         ValueOperations<String, String> values = mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(values);
         when(values.get(RedisCatalogCache_VERSION())).thenReturn("3");
-        when(values.get("hexaorders:catalog:v3:categories")).thenReturn(null, "[{\"id\":1,\"slug\":\"tecnologia\",\"name\":\"Tecnología\"}]");
+        when(values.get("hexaorders:catalog6:v3:categories")).thenReturn(null, "[{\"id\":1,\"slug\":\"tecnologia\",\"name\":\"Tecnología\"}]");
         var registry = new SimpleMeterRegistry();
         var cache = new RedisCatalogCache(redis, Duration.ofSeconds(60), Duration.ofSeconds(30), registry);
         AtomicInteger loads = new AtomicInteger();
@@ -92,7 +92,7 @@ class InfrastructureAdaptersTest {
         List<Category> second = cache.categories(() -> { loads.incrementAndGet(); return List.of(); });
         assertThat(first).isEqualTo(second);
         assertThat(loads).hasValue(1);
-        verify(values).set(eq("hexaorders:catalog:v3:categories"), anyString(), eq(Duration.ofSeconds(60)));
+        verify(values).set(eq("hexaorders:catalog6:v3:categories"), anyString(), eq(Duration.ofSeconds(60)));
         cache.invalidate();
         verify(values).increment(RedisCatalogCache_VERSION());
         assertThat(registry.counter("hexaorders_cache_requests", "cache", "catalog", "result", "hit").count()).isEqualTo(1);

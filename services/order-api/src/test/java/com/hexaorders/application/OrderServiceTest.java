@@ -39,6 +39,13 @@ class OrderServiceTest {
     private final OrderDraft draft = new OrderDraft("cliente_1", new BigDecimal("125.50"), "USD");
 
     @Test
+    void theOriginalApiStillOnlyAcceptsUsdAlthoughTheStoreSellsInPen() {
+        OrderDraft soles = new OrderDraft("cliente_1", new BigDecimal("125.50"), "PEN");
+        assertThatThrownBy(() -> service.create(soles)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("USD");
+        verifyNoInteractions(risk, repository, telemetry);
+    }
+
+    @Test
     void assessesRiskBeforePersistenceAndCountsOnlyPersistedOrders() {
         when(risk.assess(draft)).thenReturn(70);
         Order order = service.create(draft);

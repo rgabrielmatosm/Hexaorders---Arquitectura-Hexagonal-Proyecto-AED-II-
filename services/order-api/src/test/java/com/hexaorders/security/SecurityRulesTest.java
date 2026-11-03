@@ -58,6 +58,8 @@ class SecurityRulesTest {
     @MockitoBean OrderUseCases orderUseCases;
     @MockitoBean CatalogUseCases catalog;
     @MockitoBean CommerceUseCases commerce;
+    @MockitoBean com.hexaorders.application.port.in.PromotionUseCases promotions;
+    @MockitoBean com.hexaorders.application.port.in.CartUseCases carts;
     @MockitoBean AccountUseCases accounts;
     @MockitoBean AdministrationUseCases administration;
     @MockitoBean OperationsUseCases operations;
