@@ -27,11 +27,18 @@ Entorno local: contenedor Linux **sin Docker ni Windows**, con Java 21, PostgreS
 | `generate_catalog.py --check`, `generate_pages.py --check`, `generate_delivery.py --check`, `validate_delivery.py`, `check_observability.py` | Correctos; la observabilidad previa se conserva (8 dashboards, 9 alertas) |
 | Revisión visual con capturas | Corregidos: filtro de categorías vacío por un error de anidación, precio tachado pegado al precio en la ficha, desbordamiento de 144 px de la ficha en móvil, panel del megamenú demasiado transparente y franja superior demasiado alta en móvil |
 
+### CI con Docker real (GitHub Actions, ejecución 41595395620)
+
+| Job | Resultado |
+| --- | --- |
+| `compose` (`verify -Mode full`: 13 contenedores) | **Correcto**: los 10 pasos con `store_smoke.py` (paso 6c), la persistencia de la tienda tras reiniciar `db` y `order-api` (`store_smoke.py --quick`), las integraciones y la degradación; después `ui-e2e.js` y `pages-e2e.js` contra el stack completo |
+| `compose-basic` (`verify -Mode basic`: 6 contenedores) | **Correcto** |
+| `windows` (PowerShell 5.1: `check` con `generate_catalog.py --check`, pruebas unitarias) | **Correcto** |
+
 ### Pendiente de verificación
 
 | Comprobación | Motivo |
 | --- | --- |
-| Stack Docker completo con la v6 (13 contenedores) | Lo ejecuta el job `compose` del CI; el resultado se indica en el Pull Request |
 | Docker Desktop en Windows 10/11 | No hay Windows con Docker en este entorno |
 | Kubernetes | Solo validación de esquema |
 
