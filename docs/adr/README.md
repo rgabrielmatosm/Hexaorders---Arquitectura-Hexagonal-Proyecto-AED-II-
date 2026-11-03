@@ -17,3 +17,5 @@ Formato ligero (contexto, decisión, consecuencias). Estado de todas: **aceptada
 | [0011](0011-nginx-gateway.md) | Nginx como gateway sin sacar las páginas protegidas de Spring Security (sustituye a 0009 en lo relativo a Nginx) |
 | [0012](0012-transactional-outbox-from-history.md) | Outbox transaccional sobre las tablas de historial |
 | [0013](0013-log-collection-with-alloy.md) | Recolección de logs con Grafana Alloy |
+| [0014](0014-commercial-store-and-internal-technical-docs.md) | Tienda comercial y documentación técnica interna (v6) |
+| [0015](0015-pricing-promotions-and-currency-in-the-domain.md) | Precios, promociones y moneda (PEN) en el dominio (v6) |

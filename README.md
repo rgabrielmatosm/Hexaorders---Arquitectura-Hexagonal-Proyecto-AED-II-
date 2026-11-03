@@ -20,6 +20,7 @@ Gestión de pedidos con evaluación determinista de riesgo, construida con **arq
 <summary>Mostrar el índice completo</summary>
 
 1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+1. [**Tienda tecnológica v6**](#-tienda-tecnológica-v6): [documentación técnica](docs/TECH_STORE.md) · [ADR 0014](docs/adr/0014-commercial-store-and-internal-technical-docs.md) · [ADR 0015](docs/adr/0015-pricing-promotions-and-currency-in-the-domain.md) · [actualizar desde la v5](docs/WINDOWS_DOCKER_GUIDE.md#10-actualizar-desde-la-v5-a-la-v6-tienda-tecnológica)
 1. [**Plataforma Docker v5 (13 contenedores)**](#-plataforma-docker-v5-13-contenedores): [arquitectura](docs/DOCKER_ARCHITECTURE.md) · [servicios](docs/DOCKER_SERVICES.md) · [eventos](docs/ASYNCHRONOUS_EVENTS.md) · [Redis](docs/REDIS_INTEGRATION.md) · [observabilidad](docs/OBSERVABILITY_STACK.md) · [Windows](docs/WINDOWS_DOCKER_GUIDE.md)
 1. [**Sitio web multipágina v4**](#-sitio-web-multipágina-v4): [páginas](docs/FRONTEND_PAGES.md) · [arquitectura](docs/HEXAGONAL_ARCHITECTURE.md) · [Windows y Docker](docs/WINDOWS_DOCKER_GUIDE.md) · [capturas](#capturas-del-sitio-v4-datos-reales)
 1. [**Plataforma comercial v3**](#-plataforma-comercial-v3): [roles](#roles-y-permisos) · [funcionalidades](#funcionalidades) · [ciclo de vida](#ciclo-de-vida-del-pedido) · [modelo de datos](#modelo-de-datos) · [seguridad](#seguridad) · [capturas](#capturas-de-la-plataforma-datos-reales) · [ADR](docs/adr/)
@@ -56,6 +57,26 @@ El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma
 | Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
 | Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
 | Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## 🛒 Tienda tecnológica v6
+
+La v6 convierte http://localhost:8080 en una **tienda virtual de tecnología** sobre la misma arquitectura hexagonal y los mismos 13 contenedores:
+
+- **Catálogo:** **556 productos activos** en **20 categorías y 170 subcategorías**: computadoras, componentes, monitores, smartphones, gaming, periféricos, audio, redes, almacenamiento, smart home, seguridad, televisores, fotografía, empresarial, robótica, impresión 3D, wearables, realidad virtual, energía y productividad.
+- **Búsqueda y filtros:** por nombre, marca, modelo y SKU; filtros por categoría, marca, precio, disponibilidad, ofertas y **atributos técnicos reales** (RAM, almacenamiento, procesador, GPU, resolución, frecuencia, conectividad, batería…); orden y paginación del servidor.
+- **Ficha de producto:** especificaciones técnicas, precio en **soles**, precio anterior y descuento calculado, disponibilidad y productos relacionados.
+- **Promociones:** campañas con vigencia que gestiona el administrador.
+- **Compra:** **carrito guardado** en PostgreSQL y **checkout** con método de entrega y de pago (sin pagos en línea) y número de pedido `HX-…`.
+- **Portales por rol:** adaptados para cliente, administración, operaciones, logística y monitoreo.
+
+La tienda no muestra contenido técnico. La documentación técnica está en [`docs/TECH_STORE.md`](docs/TECH_STORE.md) y, para el personal autorizado, en **Monitoreo → Documentación técnica** (ADR 0014).
+
+```powershell
+.\hexaorders.cmd start          # modo completo (13 contenedores)
+.\hexaorders.cmd start -Mode basic
+```
+
+Las migraciones V6 y V7 se aplican solas y **no borran datos**: los pedidos y usuarios de la v5 se conservan.
 
 ## 🐳 Plataforma Docker v5 (13 contenedores)
 

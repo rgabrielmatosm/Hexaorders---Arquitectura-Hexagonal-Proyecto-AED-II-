@@ -2,6 +2,39 @@
 
 Este registro separa cuatro tipos de evidencia: **ejecución real**, **pruebas automáticas**, **revisión estática** y **pendiente de verificación**. Un resultado esperado nunca se presenta como observado.
 
+## Versión 6 — tienda tecnológica (3 de noviembre de 2026)
+
+Entorno local: contenedor Linux **sin Docker ni Windows**, con Java 21, PostgreSQL 16, Python 3.13 (motor de riesgo), Node 22 y Chromium con Playwright. Integraciones desactivadas (`HEXAORDERS_INTEGRATIONS=off`) y sin Prometheus. El stack Docker completo lo ejecuta el CI (tabla final).
+
+### Actualización real de una base v5 con datos
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Base v5 con pedidos (`platform_smoke.py`: 35 OK sobre la v5) | Flyway en la versión 5, 18 productos y 3 pedidos en USD |
+| Arranque de la v6 sobre esa base | `Successfully applied 2 migrations … now at version v7 (00:00.475s)`; la aplicación arrancó en 6,5 s |
+| Estado tras migrar | 20 categorías principales visibles, 170 subcategorías y 6 categorías anteriores ocultas; 557 productos, de los cuales 556 activos (la botella térmica deja de venderse, sin borrarse); `TEC-LAPTOP-14` pasó a S/ 4806,90; los 3 pedidos conservan su moneda USD y recibieron los números HX-100001 a HX-100003 |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn verify` | **110 pruebas**, cero fallos (antes 97). Nuevas: `TechStoreDomainTest` (7), `TechStoreServicesTest` (5) y la prueba de que `/api/orders` sigue exigiendo USD. Se actualizaron, por cambios de requisito, `OrderDomainTest` (PEN ya es válida), `SecurityRulesTest` (laboratorio y arquitectura internos) e `IntegrationServicesTest` (texto del correo) |
+| `tools/store_smoke.py` contra PostgreSQL real | `OK tienda: 38 comprobaciones`: catálogo, búsqueda por marca, modelo y SKU, filtros técnicos con conteos exactos, ofertas, paginación, promociones aplicadas en el servidor, carrito persistente entre sesiones con validación de stock (409), checkout express con transferencia (pedido HX en PEN), idempotencia, inventario, cancelación, promociones del administrador y reportes |
+| `tools/platform_smoke.py` sobre la v6 | `OK plataforma: 35 comprobaciones` (sin regresiones) |
+| `tools/ui-e2e/ui-e2e.js` (`SKIP_PROMETHEUS=1`) | `UI E2E correcta: 25 comprobaciones`: laboratorio interno como observador, compra con envío express y número de pedido |
+| `tools/ui-e2e/pages-e2e.js` (`SKIP_PROMETHEUS=1`) | `Páginas E2E correctas: 266 comprobaciones`: todas las páginas con visitante y los 5 roles, filtros persistentes en la URL, filtro de marca, «Comprar ahora» y checkout, **ningún texto técnico visible** para visitante y cliente, y móvil de 390 px en seis páginas sin desbordamiento |
+| `check_frontend.py` | `OK … 18 páginas de la tienda sin contenido técnico` (también comprobé que falla si se añade un texto técnico) |
+| `generate_catalog.py --check`, `generate_pages.py --check`, `generate_delivery.py --check`, `validate_delivery.py`, `check_observability.py` | Correctos; la observabilidad previa se conserva (8 dashboards, 9 alertas) |
+| Revisión visual con capturas | Corregidos: filtro de categorías vacío por un error de anidación, precio tachado pegado al precio en la ficha, desbordamiento de 144 px de la ficha en móvil, panel del megamenú demasiado transparente y franja superior demasiado alta en móvil |
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Stack Docker completo con la v6 (13 contenedores) | Lo ejecuta el job `compose` del CI; el resultado se indica en el Pull Request |
+| Docker Desktop en Windows 10/11 | No hay Windows con Docker en este entorno |
+| Kubernetes | Solo validación de esquema |
+
 ## Versión 5 — plataforma de 13 contenedores (2 de noviembre de 2026)
 
 Entorno local: contenedor Linux de desarrollo **sin motor Docker ni Windows**. Para probar las integraciones sin Docker se usaron los **binarios reales** de cada servicio:

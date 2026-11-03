@@ -32,9 +32,19 @@ def search(session, **params):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--demo-password-file', default='secrets/demo_password.txt')
+    parser.add_argument('--quick', action='store_true', help='Solo comprueba que catálogo, categorías y promociones persisten (tras reiniciar).')
     args = parser.parse_args()
-    demo_password = os.environ.get('DEMO_PASSWORD') or open(args.demo_password_file, encoding='utf-8').read().strip()
     anon = Session()
+    if args.quick:
+        print('Persistencia de la tienda')
+        _, categories, _ = anon.call('GET', '/api/catalog/categories', expect=200)
+        total = search(anon, size=1)['total']
+        _, promotions, _ = anon.call('GET', '/api/catalog/promotions', expect=200)
+        ok(total >= 300 and len(categories) >= 170 and promotions,
+           f'Tras reiniciar siguen {total} productos, {len(categories)} categorías y {len(promotions)} promociones en PostgreSQL')
+        print(f'\nOK tienda (persistencia): {len(checks)} comprobaciones')
+        return
+    demo_password = os.environ.get('DEMO_PASSWORD') or open(args.demo_password_file, encoding='utf-8').read().strip()
 
     print('Catálogo tecnológico')
     _, categories, _ = anon.call('GET', '/api/catalog/categories', expect=200)

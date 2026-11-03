@@ -362,6 +362,9 @@ function Invoke-Smoke {
     Write-Step 'Plataforma (portal, roles, ciclo de vida, logística)'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'platform_smoke.py'),
                     '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
+    Write-Step 'Tienda (catálogo, filtros, promociones, carrito, checkout y administración comercial)'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'store_smoke.py'),
+                    '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
     $running = & docker ps -q --filter 'label=com.docker.compose.project=hexaorders' --filter 'label=com.docker.compose.service=rabbitmq'
     if ($running) {
         Write-Step 'Integraciones del modo full (Redis, RabbitMQ, Mailpit, Loki, Tempo, OpenTelemetry)'
@@ -423,6 +426,8 @@ function Invoke-Check {
     Write-Step 'Sitio multipágina: páginas HTML al día, rutas, enlaces, CSP y reglas de seguridad por rol'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_pages.py'), '--check')
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_frontend.py'))
+    Write-Step 'Catálogo tecnológico: la migración V7 coincide con tools/catalog_v6_data.py'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_catalog.py'), '--check')
 }
 
 function Invoke-Test {
@@ -494,6 +499,9 @@ function Invoke-Verify {
         $env:PROMETHEUS_URL = 'http://127.0.0.1:9091'
         Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'platform_smoke.py'),
                         '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
+        Write-Step '[6c/10] Tienda: 300+ productos, filtros, promociones, carrito guardado, checkout y administración comercial'
+        Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'store_smoke.py'),
+                        '--demo-password-file', (Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt'))
 
         if ($FullMode) {
             Write-Step '[7/10] Integraciones reales: Redis, RabbitMQ, Mailpit, Tempo, OpenTelemetry, Loki y Grafana'
@@ -513,6 +521,7 @@ function Invoke-Verify {
         [void](Invoke-Compose @('restart', 'db', 'order-api'))
         [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', '180'))
         Invoke-IntegrationSmoke @('persist-read', '--state', $state)
+        Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'store_smoke.py'), '--quick')
 
         Write-Step '[8b/10] Contraseña de PostgreSQL distinta del secreto: se detecta y repair-db-password la corrige sin perder datos'
         if (-not (Test-DatabasePassword)) { throw 'La contraseña de PostgreSQL debería coincidir con secrets\db_password.txt' }

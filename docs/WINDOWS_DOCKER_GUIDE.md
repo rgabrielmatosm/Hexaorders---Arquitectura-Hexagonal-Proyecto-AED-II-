@@ -213,3 +213,23 @@ Lo siguiente lo cubren las pruebas automáticas en GitHub (Ubuntu con Docker y W
 10. **Modo completo:** en *Grafana → Explore → Loki*, la consulta `{service="order-api"}` muestra logs recientes.
 11. **Modo completo:** `docker compose stop redis rabbitmq` → el catálogo y las compras siguen funcionando; `docker compose start redis rabbitmq` → llegan los correos pendientes.
 12. `.\hexaorders.cmd smoke` termina con «Pruebas HTTP correctas».
+
+## 10. Actualizar desde la v5 a la v6 (tienda tecnológica)
+
+1. Detén la versión anterior conservando los datos:
+
+   ```powershell
+   .\hexaorders.cmd stop
+   ```
+
+2. Sustituye los archivos del proyecto por los de la v6 y **conserva tu carpeta `secrets\`**: la base de datos ya tiene esas contraseñas.
+3. Arranca:
+
+   ```powershell
+   .\hexaorders.cmd start
+   ```
+
+   La imagen se reconstruye y, al arrancar, la base aplica **sola y una única vez** las migraciones V6 y V7: catálogo tecnológico, promociones, carrito y datos de checkout. No se borra nada: usuarios, contraseñas y pedidos se conservan.
+4. Abre http://localhost:8080: verás la tienda. La documentación técnica y el laboratorio están en **Monitoreo → Documentación técnica**, con las cuentas `observador` o `admin`.
+
+Si `start` avisa de que `db_password.txt` no coincide con el volumen, restaura el archivo original o ejecuta `.\hexaorders.cmd repair-db-password` (sección 8).

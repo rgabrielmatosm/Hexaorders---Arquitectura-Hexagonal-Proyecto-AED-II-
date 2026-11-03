@@ -33,9 +33,9 @@ flowchart LR
 | Clave | Contenido | TTL |
 | --- | --- | --- |
 | `hexaorders:catalog:version` | Número de versión del catálogo | sin TTL |
-| `hexaorders:catalog:v{n}:categories` | Categorías | 60 s |
-| `hexaorders:catalog:v{n}:products:{all\|categoría}` | Productos activos | 60 s |
-| `hexaorders:catalog:v{n}:product:{id}` | Ficha de un producto | 60 s |
+| `hexaorders:catalog6:v{n}:categories` | Categorías (v6: con subcategorías) | 60 s |
+| `hexaorders:catalog6:v{n}:products:{all\|categoría}` | Productos activos con su ficha técnica | 60 s |
+| `hexaorders:catalog6:v{n}:product:{id}` | Ficha de un producto | 60 s |
 
 `invalidate()` ejecuta `INCR hexaorders:catalog:version`: todas las claves anteriores dejan de usarse a la vez y caducan solas. No hace falta recorrer claves con `KEYS` ni `SCAN`. Si Redis no responde durante una invalidación, queda **pendiente** y se aplica en cuanto Redis vuelve. Mientras tanto se lee de PostgreSQL.
 
@@ -75,3 +75,9 @@ Panel «Aciertos de caché del catálogo» en `/d/hexaorders-integrations`.
 | `InfrastructureAdaptersTest.withoutRedisTheCatalogIsServedFromPostgresqlAndRedisIsSkippedForAWhile` | Degradación real contra un Redis inalcanzable (sin colgarse y con *back-off*) |
 | `integration_smoke.py check` | Aciertos reales en Prometheus con el stack Docker |
 | `integration_smoke.py degraded` / `recovered` | Catálogo sin Redis en menos de 5 s; recuperación automática |
+
+## 8. Cambios de la v6
+
+- El prefijo pasa a `hexaorders:catalog6:`, porque el formato de los productos cambió (marca, modelo, ficha técnica): ninguna entrada guardada por la v5 se lee con la v6.
+- La búsqueda de la tienda (`/api/catalog/search`) filtra y pagina sobre el listado **cacheado** de productos activos (556). Los **precios no se cachean**: las promociones se aplican en cada consulta (`PricingService`), así que activar o desactivar una campaña se ve al momento.
+- Una categoría leída sin el campo `active` (dato anterior a la v6) se considera visible.

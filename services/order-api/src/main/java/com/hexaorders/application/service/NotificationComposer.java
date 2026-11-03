@@ -12,9 +12,9 @@ import java.util.Map;
 final class NotificationComposer {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm 'UTC'").withZone(ZoneOffset.UTC);
     private static final Map<String, String> STATUS = Map.ofEntries(
-            Map.entry("CREATED", "Creado"), Map.entry("RISK_APPROVED", "Aprobado por riesgo"), Map.entry("RISK_REVIEW", "En revisión de riesgo"),
-            Map.entry("CONFIRMED", "Confirmado"), Map.entry("PREPARING", "En preparación"), Map.entry("READY_FOR_DISPATCH", "Listo para despacho"),
-            Map.entry("IN_TRANSIT", "En tránsito"), Map.entry("DELIVERED", "Entregado"), Map.entry("REJECTED", "Rechazado"),
+            Map.entry("CREATED", "Pedido recibido"), Map.entry("RISK_APPROVED", "Pedido verificado"), Map.entry("RISK_REVIEW", "En verificación"),
+            Map.entry("CONFIRMED", "Confirmado"), Map.entry("PREPARING", "En preparación"), Map.entry("READY_FOR_DISPATCH", "Listo para envío"),
+            Map.entry("IN_TRANSIT", "En camino"), Map.entry("DELIVERED", "Entregado"), Map.entry("REJECTED", "No aprobado"),
             Map.entry("CANCELLED", "Cancelado"));
 
     private NotificationComposer() {}
@@ -27,17 +27,17 @@ final class NotificationComposer {
         switch (event.type()) {
             case ORDER_CREATED -> {
                 subject = "Pedido " + order + " recibido";
-                detail = "Hemos recibido tu pedido. El motor de riesgo lo está evaluando.";
+                detail = "¡Gracias por tu compra! Recibimos tu pedido y lo estamos verificando.";
             }
             case ORDER_APPROVED -> {
                 subject = "Pedido " + order + " aprobado";
                 detail = "risk-engine".equals(event.attributes().get("approvedBy"))
-                        ? "Tu pedido superó la evaluación de riesgo automática."
-                        : "El equipo de operaciones confirmó tu pedido.";
+                        ? "Tu pedido fue verificado y pronto pasará a preparación."
+                        : "Nuestro equipo confirmó tu pedido y lo está preparando.";
             }
             case ORDER_REJECTED -> {
                 subject = "Pedido " + order + " rechazado";
-                detail = "Tras la revisión, el pedido fue rechazado y las unidades volvieron al stock.";
+                detail = "No pudimos aprobar tu pedido tras la verificación. No se realizó ningún cobro; escríbenos si necesitas ayuda.";
             }
             case DELIVERY_SCHEDULED -> {
                 subject = "Entrega " + ("RESCHEDULED".equals(event.attributes().get("action")) ? "reprogramada" : "programada")
@@ -54,7 +54,8 @@ final class NotificationComposer {
                 + "Pedido: " + event.orderId() + "\n"
                 + "Fecha del evento: " + WHEN.format(event.occurredAt()) + "\n\n"
                 + "Puedes seguirlo en HexaOrders: /cliente/seguimiento.html?id=" + event.orderId() + "\n\n"
-                + "— HexaOrders (correo de demostración capturado por Mailpit; no se envía a Internet)\n"
+                + "— Equipo HexaOrders\n\n"
+                + "(Entorno de pruebas: este correo lo captura Mailpit y no se envía a Internet.)\n"
                 + "Referencia del evento: " + event.eventId() + "\n";
         return new MailMessage(recipient.email(), subject, body);
     }

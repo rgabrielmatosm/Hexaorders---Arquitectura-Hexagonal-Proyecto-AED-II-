@@ -1,4 +1,4 @@
-# Handoff técnico — HexaOrders v5 (preparado para Google Antigravity)
+# Handoff técnico — HexaOrders v6 (preparado para Google Antigravity)
 
 Documento de traspaso para **cualquier herramienta o equipo que continúe el proyecto**: Google Antigravity para los retoques visuales finales, otro asistente de IA, Copilot o personas. Describe el estado real del repositorio, **qué se puede retocar libremente**, qué requiere pruebas de regresión y **qué no se debe romper**.
 
@@ -11,11 +11,12 @@ Documento de traspaso para **cualquier herramienta o equipo que continúe el pro
 >    - Conserva también sus healthchecks, perfiles, límites, `read_only`, `cap_drop: ALL`, `no-new-privileges`, secretos en archivo, redes y volúmenes.
 > 3. **No ejecutes `docker compose down -v`** como solución: borra PostgreSQL, Prometheus, Grafana, RabbitMQ, Loki y Tempo. Usa `.\hexaorders.cmd stop` (conserva datos).
 > 4. **No edites a mano** `docker-compose.yml`, `k8s/10-monitoring-config.yaml`, los HTML generados ni `tools/ui-e2e/pages.json`: se generan con `tools/generate_delivery.py` y `tools/generate_pages.py`. El CI falla si no están al día.
-> 5. **No modifiques migraciones Flyway publicadas** (`V1`–`V5`). Crea `V6__…sql` no destructiva.
+> 5. **No modifiques migraciones Flyway publicadas** (`V1`–`V7`). Crea `V8__…sql` no destructiva. El catálogo de demostración se edita en `tools/catalog_v6_data.py`, y solo antes de publicar una migración nueva.
 > 6. **No pongas secretos en Git.** Viven en `secrets/*.txt` (ignorado) y los crea `tools/init-env.ps1` sin sobrescribir nunca.
 > 7. **No elimines pruebas, jobs del CI, scripts de Windows ni documentación útil.** Si algo falla, corrige la causa.
 > 8. **Mantén la arquitectura hexagonal**: `domain/` y `application/` no importan Spring, JDBC, HTTP, Jackson, Micrometer, Redis, AMQP ni JavaMail (ArchUnit y `test_architecture.py`). Las tecnologías nuevas entran solo por adaptadores.
-> 9. **Mantén la API original** `/api/orders` y el laboratorio (`/laboratorio.html` con `#inicio`, `#panel`, `#pedidos`, `#arquitectura`, `#observabilidad`).
+> 9. **Mantén la API original** `/api/orders` y el laboratorio (`/laboratorio.html` con `#inicio`, `#panel`, `#pedidos`, `#arquitectura`, `#observabilidad`). Desde la v6, el laboratorio y `/arquitectura/*` son **internos** (ADMIN y OBSERVABILITY_VIEWER, ADR 0014).
+> 13. **La tienda es comercial**: no añadas a las páginas públicas ni a las del cliente explicaciones técnicas o académicas (arquitectura, Docker, bases de datos, mensajería, observabilidad). `check_frontend.py` y `pages-e2e.js` fallan si aparecen.
 > 10. **No quites la protección de páginas** de `SecurityConfiguration` ni la sustituyas por ocultar enlaces.
 > 11. **No publiques en el host** PostgreSQL, Redis ni el puerto AMQP de RabbitMQ. No cambies Mailpit por un SMTP real.
 > 12. Trabaja en una rama, abre un Pull Request y espera la aprobación del propietario antes de fusionar con `main`. Sin force push.
@@ -187,3 +188,17 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
 - Entrega de eventos **al menos una vez**: un correo puede repetirse si el proceso cae justo tras enviarlo.
 - Alloy necesita el socket de Docker en solo lectura (ADR 0013).
 - El navegador no genera trazas: empiezan en el servidor.
+
+## 16. Versión 6: tienda tecnológica (qué retocar y qué no)
+
+- **Retoque visual libre:** `static/css/store.css` (cabecera, megamenú, tarjetas, filtros, ficha, carrito, checkout, ayuda, pie), los textos comerciales de `views/home.js` y `views/shop.js`, y los iconos de categoría (`components.js`, `MAIN_CATEGORY_ICONS`).
+- **Sin imágenes ni videos en la v6:** las tarjetas usan un degradado y el icono de la categoría. Si una versión futura añade imágenes, que sea con un campo nuevo del producto, nunca dentro de V7.
+- **Selectores que usan las pruebas** (si los cambias, actualiza `pages-e2e.js` y `ui-e2e.js`):
+  - catálogo y tarjetas: `.product-card`, `.product-card__brand`, `.pager__info`;
+  - filtros: `.filters .filter-option`, `.filter-group summary`;
+  - ficha: `.product-detail .btn--primary` («Comprar ahora»), `.spec-table`;
+  - checkout: `.choice input[value=…]`, `.summary-row--total`, «Confirmar pedido»;
+  - confirmación: `.order-thanks`;
+  - cabecera: `#cart-count`.
+- **No mover al navegador** reglas de precio, descuentos, envío o stock: viven en el dominio (ADR 0015).
+- **Documentación técnica:** [`TECH_STORE.md`](TECH_STORE.md).

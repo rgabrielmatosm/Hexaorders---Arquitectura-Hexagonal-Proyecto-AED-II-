@@ -335,3 +335,35 @@ sequenceDiagram
 ```
 
 Más detalle: [`ASYNCHRONOUS_EVENTS.md`](ASYNCHRONOUS_EVENTS.md), [`REDIS_INTEGRATION.md`](REDIS_INTEGRATION.md), [`OBSERVABILITY_STACK.md`](OBSERVABILITY_STACK.md) y [`DOCKER_ARCHITECTURE.md`](DOCKER_ARCHITECTURE.md).
+
+## 10. Versión 6: tienda tecnológica
+
+La v6 añade casos de uso comerciales **sin romper la separación hexagonal**. Detalle completo en [`TECH_STORE.md`](TECH_STORE.md).
+
+| Capa | Piezas nuevas |
+| --- | --- |
+| Dominio | `CatalogSearch`, `CatalogQuery`, `CatalogPage`, `PriceTag`, `Promotion`, `Spec`, `CommercialStatus`, `Availability`, `CheckoutSummary`, `DeliveryMethod`, `PaymentMethod`, `OrderCheckout` |
+| Puertos de entrada | `PromotionUseCases`, `CartUseCases`; amplía `CatalogUseCases` (búsqueda, precios, relacionados) y `CommerceUseCases` (resumen y checkout con entrega y pago) |
+| Aplicación | `PricingService`, `PromotionService`, `CartService`; amplía `CatalogService` y `CommerceService` |
+| Puertos de salida | `PromotionRepository`, `CartRepository`; amplía `CatalogRepository` y `CommerceOrderRepository` |
+| Adaptadores de salida | `JdbcPromotionRepository`, `JdbcCartRepository`; `JdbcCatalogRepository` (JSONB) y `JdbcCommerceOrderRepository` (checkout, número de pedido) |
+| Adaptadores de entrada | `CatalogController` (`/search`, `/promotions`, `/related`), `ShopController` (carrito, resumen), `AdminController` (promociones, categorías) |
+
+```mermaid
+sequenceDiagram
+    actor C as Cliente
+    participant W as ShopController
+    participant S as CommerceService
+    participant P as PricingService
+    participant D as Dominio (PriceTag · CheckoutSummary)
+    participant R as RiskAssessmentPort
+    participant DB as CommerceOrderRepository
+    C->>W: POST /api/shop/orders (entrega, pago, Idempotency-Key)
+    W->>S: placeOrder(...)
+    S->>P: promociones vigentes
+    S->>D: precio de cada línea + envío + reglas de pago
+    S->>R: evaluar riesgo (total en PEN)
+    S->>DB: una transacción: pedido, líneas, stock, historial, entrega, pago
+    S->>S: vaciar carrito guardado
+    W-->>C: 201 · HX-100123
+```
