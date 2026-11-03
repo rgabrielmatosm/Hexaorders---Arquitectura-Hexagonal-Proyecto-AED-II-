@@ -16,6 +16,7 @@ public class WebPagesConfiguration implements WebMvcConfigurer {
             {"/catalogo", "/catalogo.html"}, {"/tienda", "/catalogo.html"}, {"/carrito", "/carrito.html"},
             {"/checkout", "/checkout.html"}, {"/login", "/login.html"}, {"/registro", "/registro.html"},
             {"/nosotros", "/nosotros.html"}, {"/contacto", "/contacto.html"}, {"/laboratorio", "/laboratorio.html"},
+            {"/ofertas", "/ofertas.html"}, {"/ayuda", "/ayuda.html"},
             {"/cliente", "/cliente/dashboard.html"}, {"/admin", "/admin/dashboard.html"},
             {"/operaciones", "/operaciones/dashboard.html"}, {"/logistica", "/logistica/dashboard.html"},
             {"/monitoreo", "/monitoreo/dashboard.html"}, {"/arquitectura", "/arquitectura/overview.html"},

@@ -38,8 +38,9 @@ def status_without_redirect(url):
 
 
 # v4: páginas que Spring Security protege por rol (sin sesión redirigen a /login.html?next=…).
-PROTECTED_PREFIXES = ('/admin/', '/cliente/', '/operaciones/', '/logistica/', '/monitoreo/')
-PROTECTED_PAGES = {'/checkout.html'}
+PROTECTED_PREFIXES = ('/admin/', '/cliente/', '/operaciones/', '/logistica/', '/monitoreo/', '/arquitectura/')
+# v6: el laboratorio de la API y la documentación técnica son internos (personal autorizado).
+PROTECTED_PAGES = {'/checkout.html', '/laboratorio.html'}
 
 
 api = os.environ.get('API_URL', 'http://127.0.0.1:8080')
@@ -75,9 +76,12 @@ for file in sorted(STATIC_DIR.rglob('*')):
     assert body == file.read_bytes(), f'{path}: el contenedor sirve una versión distinta del repositorio'
 code, content_type, index = fetch_raw(api + '/')
 assert code == 200 and b'/js/page.js' in index and b'/css/base.css' in index, 'index.html no enlaza sus recursos'
-# El laboratorio original se conserva íntegro en /laboratorio.html con su app.js.
-code, content_type, lab = fetch_raw(api + '/laboratorio.html')
-assert code == 200 and b'js/app.js' in lab and b'id="arquitectura"' in lab, 'laboratorio.html no conserva el laboratorio'
+# El laboratorio original se conserva en /laboratorio.html (con su app.js) como herramienta interna:
+# sin sesión redirige al inicio de sesión; ui-e2e.js lo recorre entero como observador.
+lab_source = (STATIC_DIR / 'laboratorio.html').read_bytes()
+assert b'js/app.js' in lab_source and b'id="arquitectura"' in lab_source, 'laboratorio.html no conserva el laboratorio'
+code, location = status_without_redirect(api + '/laboratorio.html')
+assert code == 302 and '/login.html?next=' in location, ('laboratorio.html debería exigir sesión', code, location)
 # Página 404 diseñada para navegadores.
 try:
     urllib.request.urlopen(urllib.request.Request(api + '/no-existe.html', headers={'Accept': 'text/html'}), timeout=10)

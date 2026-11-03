@@ -32,9 +32,16 @@ async function apiJson(page, url) {
         && !(process.env.SKIP_PROMETHEUS && /ERR_CONNECTION_REFUSED/.test(message.text()))) problems.push(`console.error: ${message.text()}`);
     });
 
-    // v4: el laboratorio original vive en /laboratorio.html (la portada / es el inicio del sitio multipágina).
-    console.log(`Abriendo ${BASE_URL}/laboratorio.html`);
+    // v6: el laboratorio original vive en /laboratorio.html y es una herramienta interna del personal
+    // (observabilidad y administración): sin sesión redirige al inicio de sesión.
+    if (!process.env.DEMO_PASSWORD) throw new Error('DEMO_PASSWORD es obligatoria: el laboratorio solo lo ve el personal autorizado');
     await page.goto(`${BASE_URL}/laboratorio.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForURL(/\/login\.html\?next=/);
+    check(true, 'Sin sesión, el laboratorio interno redirige al inicio de sesión');
+    await page.fill('#view-root input[autocomplete="username"]', 'observador');
+    await page.fill('#view-root input[type="password"]', process.env.DEMO_PASSWORD);
+    await Promise.all([page.waitForURL(/\/laboratorio\.html/, { timeout: 15000 }), page.click('#view-root button[type="submit"]')]);
+    console.log(`Abriendo ${BASE_URL}/laboratorio.html como observador`);
     await page.waitForSelector('#splash');
     await page.waitForFunction(() => document.querySelector('#splash [data-check="api"] em').textContent !== 'comprobando…', null, { timeout: 15000 });
     check((await page.textContent('#splash [data-check="api"] em')).includes('disponible'), 'La bienvenida confirma la API con una consulta real');
@@ -129,22 +136,31 @@ async function apiJson(page, url) {
       const customerPage = await rolePage('cliente');
       await customerPage.goto(`${BASE_URL}/#/tienda`);
       await customerPage.waitForSelector('.product-card');
-      // v4: el catálogo se pagina (8 por página); el total de 18 productos sembrados aparece en el paginador.
+      // v6: el catálogo se pagina en el servidor (24 por página) sobre más de 300 productos.
       await customerPage.waitForSelector('.pager__info');
-      check((await customerPage.locator('.product-card').count()) >= 8 && /de (1[89]|[2-9]\d)/.test(await customerPage.textContent('.pager__info')),
-        'La tienda muestra el catálogo persistido (paginado)');
+      check((await customerPage.locator('.product-card').count()) >= 8 && /de ([3-9]\d\d|\d{4,}) productos/.test(await customerPage.textContent('.pager__info')),
+        'La tienda muestra el catálogo persistido (paginado en el servidor, más de 300 productos)');
       await customerPage.screenshot({ path: path.join(OUT, '09-tienda.png') });
       await customerPage.click('.product-card:has(button:not([disabled])) button.btn--primary');
+      // El carrito del cliente se guarda en el servidor: se espera a que el contador lo refleje.
+      await customerPage.waitForFunction(() => Number((document.querySelector('#cart-count') || {}).textContent) > 0, null, { timeout: 10000 });
+      check(true, 'Agregar al carrito actualiza el carrito guardado del cliente');
       // La URL antigua #/checkout redirige a /checkout.html, que en la v4 pide los datos de entrega.
       await customerPage.goto(`${BASE_URL}/#/checkout`);
       await customerPage.waitForSelector('.summary-row--total');
-      await customerPage.fill('#view-root input[autocomplete="street-address"]', 'Av. Laboratorio 100');
+      await customerPage.waitForSelector('.choice input[value="EXPRESS"]');
+      await customerPage.check('.choice input[value="EXPRESS"]');
+      await customerPage.waitForFunction(() => document.querySelector('.summary-row--total').closest('aside').textContent.includes('29.90'), null, { timeout: 10000 });
+      check(true, 'El checkout suma el envío express (S/ 29.90) al total calculado por el servidor');
+      await customerPage.fill('#view-root input[autocomplete="street-address"]', 'Av. Arequipa 1234, Miraflores');
       await customerPage.fill('#view-root input[autocomplete="address-level2"]', 'Lima');
+      await customerPage.check('.choice input[value="BANK_TRANSFER"]');
       await customerPage.screenshot({ path: path.join(OUT, '10-checkout.png') });
       await customerPage.click('button:has-text("Confirmar pedido")');
       await customerPage.waitForURL(/\/cliente\/seguimiento\.html\?id=/, { timeout: 20000 });
       await customerPage.waitForSelector('.timeline li');
       check((await customerPage.locator('.timeline li').count()) >= 2, 'Checkout desde la interfaz: pedido creado con historial CREATED → decisión de riesgo');
+      check(/HX-\d+/.test(await customerPage.textContent('.order-thanks')), 'La confirmación muestra el número de pedido (HX-…)');
       await customerPage.screenshot({ path: path.join(OUT, '11-seguimiento.png') });
 
       const adminPage = await rolePage('admin');
@@ -180,8 +196,8 @@ async function apiJson(page, url) {
     // Móvil
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     mobile.on('pageerror', (error) => problems.push(`Error de JavaScript (móvil): ${error.message}`));
-    await mobile.goto(`${BASE_URL}/laboratorio.html`);
-    await mobile.keyboard.press('Escape');
+    await mobile.goto(`${BASE_URL}/`);
+    await mobile.waitForSelector('.product-card', { timeout: 15000 });
     await mobile.waitForTimeout(800);
     check(!(await mobile.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'Sin desplazamiento horizontal en móvil (390 px)');
     await mobile.screenshot({ path: path.join(OUT, '08-movil.png') });

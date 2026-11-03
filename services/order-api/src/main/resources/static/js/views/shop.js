@@ -1,280 +1,521 @@
-// Portal comercial: catálogo, producto, carrito, checkout, mis pedidos, seguimiento, perfil y acceso.
-// Precios, stock, totales, permisos y estados los decide siempre el backend.
+// Tienda: catálogo con filtros, ficha de producto, carrito, checkout, mis pedidos, perfil y acceso.
+// Precios, descuentos, stock, totales, permisos y estados los decide siempre el servidor.
 
 import { ApiError, accountApi, authApi, catalogApi, shopApi } from '../api.js';
 import { cart } from '../cart.js';
 import {
-  TRANSITION_VERBS, emptyState, errorMessage, field, formError, icon, lifecycleBadge, modal, money,
-  paginated, productArt, progressBar, showFormError, skeletons, stockNote, submitting,
+  customerBadge, emptyState, errorMessage, field, formError, icon, modal, money, orderRef, paginated, productArt,
+  progressBar, showFormError, skeletons, submitting,
 } from '../components.js';
-import { link, navigate, rerender, route } from '../router.js';
+import { categoryTree, setBreadcrumbs, storeCategories } from '../layout.js';
+import { link, rerender, route } from '../router.js';
 import { ROLE_LABELS, homeFor, session } from '../session.js';
-import { $, $$, el, formatDateTime, formatRelative, toast } from '../ui.js';
+import { $$, el, formatDateTime, formatRelative, toast } from '../ui.js';
+import { addToCart, availabilityNote, badges, priceBlock, productCard, productRail, skeletonCards } from '../store-ui.js';
 
-const view = (...children) => el('section', { class: 'view' }, ...children);
+const view = (...children) => el('section', { class: 'view view--store' }, ...children);
 const head = (eyebrow, title, lead, ...actions) => el('div', { class: 'view__head' },
   el('div', {}, el('p', { class: 'eyebrow', text: eyebrow }), el('h1', { class: 'view__title', text: title }),
     lead ? el('p', { class: 'section__lead', text: lead }) : null),
-  actions.length ? el('div', { class: 'row-actions' }, actions) : null);
+  actions.filter(Boolean).length ? el('div', { class: 'row-actions' }, actions) : null);
 
-// ---- Catálogo ----------------------------------------------------------------
-export function productCard(product) {
-  const add = el('button', { type: 'button', class: 'btn btn--primary btn--sm', disabled: product.stock <= 0, text: product.stock <= 0 ? 'Agotado' : 'Añadir' });
-  add.addEventListener('click', () => {
-    cart.add(product.id, 1);
-    toast(`${product.name} añadido al carrito`, 'ok', 2200);
+export const DELIVERY_LABELS = { STANDARD: 'Envío estándar', EXPRESS: 'Envío express', PICKUP: 'Recojo en tienda' };
+export const PAYMENT_LABELS = { CASH_ON_DELIVERY: 'Pago contra entrega', BANK_TRANSFER: 'Transferencia bancaria', PAY_IN_STORE: 'Pago en tienda' };
+export { productCard };
+
+// ---- Catálogo -------------------------------------------------------------------------------------
+const SORTS = [['relevance', 'Más relevantes'], ['price_asc', 'Precio: menor a mayor'], ['price_desc', 'Precio: mayor a menor'],
+  ['name', 'Nombre (A-Z)'], ['newest', 'Novedades'], ['popular', 'Más vendidos'], ['discount', 'Mayor descuento']];
+const STATUS_FILTERS = { NEW: 'Nuevos', FEATURED: 'Destacados', BESTSELLER: 'Más vendidos', CLEARANCE: 'Liquidación' };
+const PAGE_SIZE = 24;
+
+/** Estado del catálogo ↔ URL (se puede compartir y recargar). */
+function readState(query, categories) {
+  const value = query.get('categoria');
+  const category = value ? categories.find((c) => c.slug === value || String(c.id) === value) || null : null;
+  const attrs = {};
+  for (const [key, val] of query.entries()) if (key.startsWith('attr.')) (attrs[key.slice(5)] ||= []).push(val);
+  return {
+    q: query.get('q') || '', category, brands: query.getAll('marca'), min: query.get('min') || '', max: query.get('max') || '',
+    available: query.get('disponible') === '1', offers: query.get('ofertas') === '1', status: query.get('estado') || '',
+    sort: query.get('orden') || 'relevance', page: Math.max(1, Number(query.get('pagina')) || 1), attrs,
+  };
+}
+
+function writeState(state) {
+  const params = new URLSearchParams();
+  if (state.q) params.set('q', state.q);
+  if (state.category) params.set('categoria', state.category.slug);
+  state.brands.forEach((b) => params.append('marca', b));
+  if (state.min) params.set('min', state.min);
+  if (state.max) params.set('max', state.max);
+  if (state.available) params.set('disponible', '1');
+  if (state.offers) params.set('ofertas', '1');
+  if (state.status) params.set('estado', state.status);
+  if (state.sort && state.sort !== 'relevance') params.set('orden', state.sort);
+  if (state.page > 1) params.set('pagina', String(state.page));
+  Object.entries(state.attrs).forEach(([key, values]) => values.forEach((v) => params.append(`attr.${key}`, v)));
+  const text = params.toString();
+  window.history.replaceState(null, '', `/catalogo.html${text ? `?${text}` : ''}`);
+}
+
+function apiParams(state) {
+  const params = new URLSearchParams();
+  if (state.q) params.set('q', state.q);
+  if (state.category) params.set('category', String(state.category.id));
+  state.brands.forEach((b) => params.append('brand', b));
+  if (state.min) params.set('min', state.min);
+  if (state.max) params.set('max', state.max);
+  if (state.available) params.set('available', 'true');
+  if (state.offers) params.set('offers', 'true');
+  if (state.status) params.set('status', state.status);
+  params.set('sort', state.sort || 'relevance');
+  params.set('page', String(state.page));
+  params.set('size', String(PAGE_SIZE));
+  Object.entries(state.attrs).forEach(([key, values]) => values.forEach((v) => params.append(`attr.${key}`, v)));
+  return params;
+}
+
+function pager(result, go) {
+  const from = result.total ? (result.page - 1) * result.size + 1 : 0;
+  const to = Math.min(result.total, result.page * result.size);
+  const numbers = [];
+  const window_ = new Set([1, result.pages, result.page - 1, result.page, result.page + 1].filter((n) => n >= 1 && n <= result.pages));
+  [...window_].sort((a, b) => a - b).forEach((n, i, list) => {
+    if (i && n - list[i - 1] > 1) numbers.push(el('span', { class: 'pager__gap', text: '…' }));
+    numbers.push(el('button', { type: 'button', class: `btn btn--sm ${n === result.page ? 'btn--primary' : 'btn--ghost'}`, text: String(n),
+      'aria-current': n === result.page ? 'page' : null, onclick: () => go(n) }));
   });
-  return el('article', { class: 'product-card', dataset: { productId: String(product.id) } },
-    el('a', { href: link(`/producto/${product.id}`), 'aria-label': product.name, tabindex: '-1' },
-      (() => { const art = productArt(product, 'product-card__media'); art.append(el('span', { class: 'badge badge--neutral product-card__tag', text: product.categoryName })); return art; })()),
-    el('div', { class: 'product-card__body' },
-      el('h3', {}, el('a', { href: link(`/producto/${product.id}`), text: product.name })),
-      el('p', { class: 'product-card__desc', text: product.description }),
-      stockNote(product.stock),
-      el('div', { class: 'product-card__foot' }, el('span', { class: 'price', text: money(product.price) }), add)));
+  return el('nav', { class: 'pager', 'aria-label': 'Paginación' },
+    el('span', { class: 'pager__info', text: `${from}–${to} de ${result.total} productos` }),
+    result.pages > 1 ? el('div', { class: 'row-actions' },
+      el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '‹ Anterior', disabled: result.page <= 1, onclick: () => go(result.page - 1) }),
+      ...numbers,
+      el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Siguiente ›', disabled: result.page >= result.pages, onclick: () => go(result.page + 1) }))
+      : null);
 }
 
 route('/tienda', async (root, { query }) => {
-  let category = query.get('categoria') || '';
-  let search = query.get('q') || '';
-  let sort = query.get('orden') || 'name';
-  let onlyAvailable = query.get('disponibles') === '1';
-  let maxPrice = Number(query.get('max')) || 0;
-  const grid = el('div', { class: 'catalog-results' }, el('div', { class: 'products' }, skeletons(8, 'skeleton--card')));
-  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'Categorías' });
-  const searchInput = el('input', { type: 'search', placeholder: 'Buscar productos…', value: search, 'aria-label': 'Buscar productos' });
-  const sortSelect = el('select', { 'aria-label': 'Ordenar' },
-    el('option', { value: 'name', text: 'Nombre' }), el('option', { value: 'price-asc', text: 'Precio: menor a mayor' }),
-    el('option', { value: 'price-desc', text: 'Precio: mayor a menor' }));
-  sortSelect.value = sort;
-  const availableToggle = el('input', { type: 'checkbox', checked: onlyAvailable });
-  const priceSelect = el('select', { 'aria-label': 'Precio máximo' },
-    [['0', 'Cualquier precio'], ['100', 'Hasta 100 USD'], ['300', 'Hasta 300 USD'], ['800', 'Hasta 800 USD'], ['1500', 'Hasta 1500 USD']]
-      .map(([value, label]) => el('option', { value, text: label })));
-  priceSelect.value = String(maxPrice);
-  const resultInfo = el('p', { class: 'muted small', 'aria-live': 'polite' });
-  // El estado de los filtros vive en la URL: la página se puede recargar o compartir.
-  const syncUrl = () => {
-    const params = new URLSearchParams();
-    if (category) params.set('categoria', category);
-    if (search) params.set('q', search);
-    if (sort !== 'name') params.set('orden', sort);
-    if (onlyAvailable) params.set('disponibles', '1');
-    if (maxPrice) params.set('max', String(maxPrice));
-    const qs = params.toString();
-    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  const categories = await storeCategories();
+  const tree = categoryTree(categories);
+  const state = readState(query, categories);
+  const title = el('h1', { class: 'view__title' });
+  const lead = el('p', { class: 'section__lead' });
+  const filters = el('aside', { class: 'filters', id: 'catalog-filters', 'aria-label': 'Filtros' });
+  const results = el('div', { class: 'catalog-results' }, skeletonCards(8));
+  const sort = el('select', { 'aria-label': 'Ordenar por', class: 'catalog-sort' }, SORTS.map(([value, text]) => el('option', { value, text })));
+  sort.value = state.sort;
+  const filtersToggle = el('button', { type: 'button', class: 'btn btn--ghost btn--sm filters-toggle', 'aria-controls': 'catalog-filters', 'aria-expanded': 'false' },
+    icon('layers'), ' Filtros');
+  filtersToggle.addEventListener('click', () => {
+    const open = !filters.classList.contains('is-open');
+    filters.classList.toggle('is-open', open);
+    filtersToggle.setAttribute('aria-expanded', String(open));
+  });
+  let requestId = 0;
+
+  const update = (changes, resetPage = true) => {
+    Object.assign(state, changes);
+    if (resetPage) state.page = 1;
+    writeState(state);
+    load();
   };
-  const stats = el('div', { class: 'shop-hero__stats' });
+  sort.addEventListener('change', () => update({ sort: sort.value }));
+
+  function checkbox(label, count, checked, onChange) {
+    const input = el('input', { type: 'checkbox', checked });
+    input.addEventListener('change', () => onChange(input.checked));
+    return el('label', { class: 'filter-option' }, input, el('span', { text: label }), count === undefined ? null : el('small', { text: String(count) }));
+  }
+
+  function group(titleText, ...content) {
+    return el('details', { class: 'filter-group', open: true }, el('summary', { text: titleText }), el('div', { class: 'filter-group__body' }, ...content.flat()));
+  }
+
+  function renderFilters(result) {
+    const facets = result.facets;
+    const parts = [];
+    // Categorías: principales, o subcategorías de la categoría elegida.
+    const main = state.category ? (state.category.parentId ? categories.find((c) => c.id === state.category.parentId) : state.category) : null;
+    const categoryLinks = [];
+    if (main) {
+      categoryLinks.push(el('button', { type: 'button', class: 'filter-link', text: '‹ Todas las categorías', onclick: () => update({ category: null }) }));
+      categoryLinks.push(el('button', { type: 'button', class: `filter-link filter-link--main${state.category.id === main.id ? ' is-active' : ''}`, text: main.name,
+        onclick: () => update({ category: main }) }));
+      facets.categories.forEach((count) => {
+        const sub = categories.find((c) => c.id === count.id);
+        if (sub) categoryLinks.push(el('button', { type: 'button', class: `filter-link filter-link--sub${state.category.id === sub.id ? ' is-active' : ''}`,
+          onclick: () => update({ category: sub }) }, el('span', { text: sub.name }), el('small', { text: String(count.count) })));
+      });
+    } else {
+      facets.categories.forEach((count) => {
+        const category = categories.find((c) => c.id === count.id);
+        if (category) categoryLinks.push(el('button', { type: 'button', class: 'filter-link', onclick: () => update({ category }) },
+          el('span', { text: category.name }), el('small', { text: String(count.count) })));
+      });
+    }
+    parts.push(group('Categoría', categoryLinks.length ? categoryLinks : el('p', { class: 'muted small', text: 'Sin categorías para esta búsqueda.' })));
+    // Marcas
+    if (facets.brands.length) {
+      const brands = [...facets.brands].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+      const options = brands.map((b) => checkbox(b.value, b.count, state.brands.includes(b.value), (on) => update({
+        brands: on ? [...state.brands, b.value] : state.brands.filter((x) => x !== b.value) })));
+      const visible = el('div', {}, options.slice(0, 10));
+      const more = options.length > 10 ? el('button', { type: 'button', class: 'filter-link', text: `Ver ${options.length - 10} marcas más`,
+        onclick: (event) => { visible.replaceChildren(...options); event.currentTarget.remove(); } }) : null;
+      parts.push(group('Marca', visible, more));
+    }
+    // Precio
+    const min = el('input', { type: 'number', min: '0', step: '1', inputmode: 'numeric', placeholder: 'Mín.', value: state.min, 'aria-label': 'Precio mínimo en soles' });
+    const max = el('input', { type: 'number', min: '0', step: '1', inputmode: 'numeric', placeholder: 'Máx.', value: state.max, 'aria-label': 'Precio máximo en soles' });
+    const apply = el('button', { type: 'submit', class: 'btn btn--ghost btn--sm', text: 'Aplicar' });
+    const priceForm = el('form', { class: 'price-filter' }, el('span', { text: 'S/' }), min, el('span', { text: '–' }), max, apply);
+    priceForm.addEventListener('submit', (event) => { event.preventDefault(); update({ min: min.value.trim(), max: max.value.trim() }); });
+    parts.push(group('Precio', priceForm, facets.minPrice ? el('p', { class: 'muted small', text: `En esta selección: ${money(facets.minPrice)} – ${money(facets.maxPrice)}` }) : null));
+    // Disponibilidad y ofertas
+    parts.push(group('Disponibilidad y ofertas',
+      checkbox('Solo con stock', facets.available, state.available, (on) => update({ available: on })),
+      checkbox('Solo ofertas', facets.offers, state.offers, (on) => update({ offers: on })),
+      el('div', { class: 'filter-chips' }, Object.entries(STATUS_FILTERS).map(([value, text]) => el('button', { type: 'button',
+        class: `chip${state.status === value ? ' is-active' : ''}`, text, 'aria-pressed': String(state.status === value),
+        onclick: () => update({ status: state.status === value ? '' : value }) })))));
+    // Filtros técnicos (solo los que existen en estos resultados)
+    facets.attributes.forEach((facet) => {
+      const selected = state.attrs[facet.key] || [];
+      parts.push(group(facet.label, facet.values.map((v) => checkbox(v.value, v.count, selected.includes(v.value), (on) => {
+        const next = on ? [...selected, v.value] : selected.filter((x) => x !== v.value);
+        const attrs = { ...state.attrs };
+        if (next.length) attrs[facet.key] = next; else delete attrs[facet.key];
+        update({ attrs });
+      }))));
+    });
+    const active = state.q || state.brands.length || state.min || state.max || state.available || state.offers || state.status || Object.keys(state.attrs).length;
+    filters.replaceChildren(el('div', { class: 'filters__head' }, el('strong', { text: 'Filtrar' }),
+      active ? el('button', { type: 'button', class: 'filter-link', text: 'Limpiar filtros', onclick: () => update({ q: '', brands: [], min: '', max: '',
+        available: false, offers: false, status: '', attrs: {} }) }) : null), ...parts);
+  }
+
+  function chips() {
+    const list = [];
+    if (state.q) list.push([`«${state.q}»`, () => update({ q: '' })]);
+    state.brands.forEach((b) => list.push([b, () => update({ brands: state.brands.filter((x) => x !== b) })]));
+    if (state.min || state.max) list.push([`S/ ${state.min || 0} – ${state.max || '…'}`, () => update({ min: '', max: '' })]);
+    if (state.available) list.push(['Con stock', () => update({ available: false })]);
+    if (state.offers) list.push(['Ofertas', () => update({ offers: false })]);
+    if (state.status) list.push([STATUS_FILTERS[state.status] || state.status, () => update({ status: '' })]);
+    Object.entries(state.attrs).forEach(([key, values]) => values.forEach((v) => list.push([v, () => {
+      const attrs = { ...state.attrs, [key]: values.filter((x) => x !== v) };
+      if (!attrs[key].length) delete attrs[key];
+      update({ attrs });
+    }])));
+    return list.length ? el('div', { class: 'active-filters' }, list.map(([text, remove]) => el('button', { type: 'button', class: 'chip is-active',
+      'aria-label': `Quitar filtro ${text}`, onclick: remove }, text, ' ×'))) : null;
+  }
+
+  async function load() {
+    const current = ++requestId;
+    results.setAttribute('aria-busy', 'true');
+    try {
+      const result = await catalogApi.search(apiParams(state));
+      if (current !== requestId) return;
+      if (state.page > result.pages && result.total) { update({ page: result.pages }, false); return; }
+      const label = state.category ? state.category.name : state.q ? `Resultados para «${state.q}»` : state.offers ? 'Ofertas' : 'Todos los productos';
+      title.textContent = label;
+      lead.textContent = `${result.total} productos${state.category && state.category.parentId ? ` en ${(categories.find((c) => c.id === state.category.parentId) || {}).name}` : ''}`;
+      document.title = `${label} · HexaOrders`;
+      const crumbs = [['/catalogo.html', 'Catálogo']];
+      if (state.category) {
+        const parent = state.category.parentId ? categories.find((c) => c.id === state.category.parentId) : null;
+        if (parent) crumbs.push([`/catalogo.html?categoria=${parent.slug}`, parent.name]);
+        crumbs.push([null, state.category.name]);
+      }
+      setBreadcrumbs(crumbs);
+      renderFilters(result);
+      results.replaceChildren(
+        chips() || el('span'),
+        result.items.length ? el('div', { class: 'product-grid' }, result.items.map(productCard))
+          : el('div', { class: 'card' }, emptyState('No encontramos productos', 'Prueba con otras palabras o quita algún filtro.', 'search',
+            el('button', { type: 'button', class: 'btn btn--ghost', text: 'Ver todo el catálogo', onclick: () => update({ q: '', category: null, brands: [], min: '', max: '',
+              available: false, offers: false, status: '', attrs: {} }) }))),
+        result.total ? pager(result, (page) => { update({ page }, false); window.scrollTo({ top: 0, behavior: 'smooth' }); }) : null);
+    } catch (error) {
+      if (current !== requestId) return;
+      results.replaceChildren(el('div', { class: 'card' }, emptyState('No se pudo cargar el catálogo', errorMessage(error), 'empty',
+        el('button', { type: 'button', class: 'btn btn--ghost', text: 'Reintentar', onclick: load }))));
+    } finally {
+      if (current === requestId) results.removeAttribute('aria-busy');
+    }
+  }
 
   root.append(view(
-    el('div', { class: 'shop-hero' },
-      el('p', { class: 'eyebrow', text: 'HexaOrders Store' }),
-      el('h1', {}, 'Tecnología y equipamiento con ', el('span', { class: 'gradient-text', text: 'evaluación de riesgo en tiempo real' })),
-      el('p', { text: 'Cada compra pasa por el mismo núcleo hexagonal: el backend calcula precios y stock, el motor de riesgo en Python evalúa el pedido y PostgreSQL lo guarda con su historial.' }),
-      stats),
-    el('div', { class: 'feature-row' },
-      [['shield', 'Precios del servidor', 'El total se calcula y valida en Java, nunca en el navegador.'],
-        ['bolt', 'Riesgo en milisegundos', 'Cada pedido consulta el motor FastAPI antes de guardarse.'],
-        ['truck', 'Seguimiento completo', 'Del pago de demostración a la entrega, con historial auditable.'],
-        ['box', 'Stock sin sobreventa', 'Reserva atómica en PostgreSQL y devolución al cancelar.']]
-        .map(([ic, title, text]) => el('div', { class: 'feature' }, el('div', { class: 'feature__icon' }, icon(ic)), el('strong', { text: title }), el('p', { text })))),
-    el('div', { class: 'catalog-toolbar catalog-toolbar--wide' }, searchInput, priceSelect, sortSelect,
-      el('label', { class: 'switch' }, availableToggle, 'Solo disponibles')),
-    chips,
-    resultInfo,
-    grid));
-  chips.style.marginBottom = '16px';
-
-  let products = [];
-  const render = () => {
-    syncUrl();
-    const list = [...products]
-      .filter((p) => !onlyAvailable || p.stock > 0)
-      .filter((p) => !maxPrice || Number(p.price) <= maxPrice)
-      .sort((a, b) => (sort === 'price-asc' ? a.price - b.price : sort === 'price-desc' ? b.price - a.price : a.name.localeCompare(b.name)));
-    resultInfo.textContent = `${list.length} producto(s) encontrados`;
-    if (!list.length) { grid.replaceChildren(emptyState('Sin resultados', 'Prueba con otra búsqueda, categoría o precio.', 'empty')); return; }
-    grid.replaceChildren(paginated(list, (page) => el('div', { class: 'products' }, page.map(productCard)), { pageSize: 8, label: 'productos' }));
-  };
-  const load = async () => {
-    grid.replaceChildren(el('div', { class: 'products' }, skeletons(8, 'skeleton--card')));
-    try {
-      products = await catalogApi.products(search || undefined, category || undefined);
-      render();
-    } catch (error) {
-      grid.replaceChildren(emptyState('No se pudo cargar el catálogo', errorMessage(error)));
-    }
-  };
-  try {
-    const categories = await catalogApi.categories();
-    const chip = (id, name) => {
-      const button = el('button', { type: 'button', class: `chip${String(category) === String(id) ? ' is-active' : ''}`, text: name, 'aria-pressed': String(String(category) === String(id)) });
-      button.addEventListener('click', () => {
-        category = id;
-        $$('.chip', chips).forEach((c) => { c.classList.toggle('is-active', c === button); c.setAttribute('aria-pressed', String(c === button)); });
-        load();
-      });
-      return button;
-    };
-    chips.replaceChildren(chip('', 'Todas'), ...categories.map((c) => chip(c.id, c.name)));
-    const all = await catalogApi.products();
-    stats.replaceChildren(
-      el('div', {}, el('strong', { text: String(all.length) }), el('span', { text: 'productos activos' })),
-      el('div', {}, el('strong', { text: String(categories.length) }), el('span', { text: 'categorías' })),
-      el('div', {}, el('strong', { text: String(all.reduce((s, p) => s + p.stock, 0)) }), el('span', { text: 'unidades en stock' })));
-  } catch (error) {
-    chips.replaceChildren(el('p', { class: 'muted small', text: errorMessage(error) }));
-  }
-  let timer = 0;
-  searchInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { search = searchInput.value.trim(); load(); }, 250); });
-  sortSelect.addEventListener('change', () => { sort = sortSelect.value; render(); });
-  availableToggle.addEventListener('change', () => { onlyAvailable = availableToggle.checked; render(); });
-  priceSelect.addEventListener('change', () => { maxPrice = Number(priceSelect.value) || 0; render(); });
+    el('div', { class: 'view__head catalog-head' }, el('div', {}, el('p', { class: 'eyebrow', text: 'Catálogo' }), title, lead),
+      el('div', { class: 'row-actions' }, filtersToggle, el('label', { class: 'sort-label' }, el('span', { text: 'Ordenar por' }), sort))),
+    !state.category && !state.q ? el('div', { class: 'category-chips' }, tree.map(({ main }) => el('button', { type: 'button', class: 'chip', text: main.name,
+      onclick: () => update({ category: main }) }))) : null,
+    el('div', { class: 'catalog-layout' }, filters, results)));
   await load();
-}, { title: 'Tienda' });
+}, { title: 'Catálogo' });
 
+// ---- Ficha de producto ----------------------------------------------------------------------------
 route('/producto/:id', async (root, { id }) => {
   const product = await catalogApi.product(id);
-  let quantity = 1;
-  const qtyInput = el('input', { type: 'number', min: '1', max: String(Math.max(1, Math.min(99, product.stock))), value: '1', 'aria-label': 'Cantidad' });
-  const change = (delta) => {
-    quantity = Math.max(1, Math.min(99, Math.min(product.stock || 1, quantity + delta)));
-    qtyInput.value = String(quantity);
-  };
-  qtyInput.addEventListener('change', () => { quantity = Math.max(1, Math.min(99, Number(qtyInput.value) || 1)); qtyInput.value = String(quantity); });
-  const add = el('button', { type: 'button', class: 'btn btn--primary', disabled: product.stock <= 0, text: product.stock <= 0 ? 'Agotado' : 'Añadir al carrito' });
-  add.addEventListener('click', () => { cart.add(product.id, quantity); toast(`${quantity} × ${product.name} en el carrito`, 'ok'); });
-  root.append(view(
-    el('nav', { class: 'breadcrumbs', 'aria-label': 'Ruta del producto' }, el('a', { href: '/catalogo.html', text: 'Catálogo' }), '/',
-      el('a', { href: `/catalogo.html?categoria=${product.categoryId}`, text: product.categoryName }), '/', el('span', { text: product.name })),
-    el('div', { class: 'product-detail' },
-      productArt(product, 'product-detail__media'),
-      el('div', { class: 'card' },
-        el('span', { class: 'badge badge--neutral', text: product.categoryName }),
-        el('h1', { text: product.name }),
-        el('p', { class: 'muted', text: product.description }),
-        el('span', { class: 'price', text: money(product.price) }),
-        stockNote(product.stock),
-        el('div', { class: 'row-actions', style: null }, el('div', { class: 'qty' },
-          el('button', { type: 'button', 'aria-label': 'Menos', onclick: () => change(-1), text: '−' }), qtyInput,
-          el('button', { type: 'button', 'aria-label': 'Más', onclick: () => change(1), text: '+' })), add),
-        el('ul', { class: 'spec-list' },
-          el('li', {}, icon('shield'), `SKU ${product.sku}`),
-          el('li', {}, icon('bolt'), 'Evaluación de riesgo automática al confirmar el pedido'),
-          el('li', {}, icon('truck'), 'Entrega programada por el equipo de logística'))))));
-  $('.row-actions', root).style.justifyContent = 'flex-start';
-  $('.row-actions', root).style.marginTop = '18px';
+  const categories = await storeCategories();
+  const sub = categories.find((c) => c.id === product.categoryId);
+  const main = categories.find((c) => c.id === product.mainCategoryId);
+  setBreadcrumbs([['/catalogo.html', 'Catálogo'], ...(main && main.id !== (sub && sub.id) ? [[`/catalogo.html?categoria=${main.slug}`, main.name]] : []),
+    ...(sub ? [[`/catalogo.html?categoria=${sub.slug}`, sub.name]] : []), [null, product.name]]);
   document.title = `${product.name} · HexaOrders`;
-  const crumb = document.querySelector('#breadcrumbs [aria-current="page"]');
-  if (crumb) crumb.textContent = product.name;
-  // Relacionados: otros productos activos de la misma categoría (datos de PostgreSQL).
-  try {
-    const related = (await catalogApi.products(undefined, product.categoryId)).filter((p) => p.id !== product.id).slice(0, 4);
-    if (related.length) {
-      root.firstElementChild.append(el('section', { class: 'related', 'aria-labelledby': 'related-title' },
-        el('h2', { class: 'section-title', id: 'related-title', text: `Más en ${product.categoryName}` }),
-        el('div', { class: 'products' }, related.map(productCard))));
-    }
-  } catch { /* los relacionados son opcionales */ }
+  let quantity = 1;
+  const maxQty = Math.max(1, Math.min(99, product.stock));
+  const qty = el('input', { type: 'number', min: '1', max: String(maxQty), value: '1', inputmode: 'numeric', 'aria-label': 'Cantidad', class: 'qty__input' });
+  const setQty = (value) => { quantity = Math.max(1, Math.min(maxQty, Number(value) || 1)); qty.value = String(quantity); };
+  qty.addEventListener('change', () => setQty(qty.value));
+  const stepper = el('div', { class: 'qty' },
+    el('button', { type: 'button', class: 'qty__btn', 'aria-label': 'Quitar una unidad', text: '−', onclick: () => setQty(quantity - 1) }), qty,
+    el('button', { type: 'button', class: 'qty__btn', 'aria-label': 'Agregar una unidad', text: '+', onclick: () => setQty(quantity + 1) }));
+  const soldOut = product.stock <= 0;
+  const add = el('button', { type: 'button', class: 'btn btn--ghost btn--lg', disabled: soldOut }, icon('cart'), soldOut ? ' Agotado' : ' Agregar al carrito');
+  const buy = el('button', { type: 'button', class: 'btn btn--primary btn--lg', disabled: soldOut, text: 'Comprar ahora' });
+  add.addEventListener('click', () => addToCart(product, quantity, add));
+  buy.addEventListener('click', async () => {
+    if (await addToCart(product, quantity, buy)) window.location.assign(session.has('CUSTOMER') ? '/checkout.html' : '/carrito.html');
+  });
+  const art = productArt(product, 'product-detail__art');
+  const tagNode = badges(product);
+  if (tagNode) art.append(tagNode);
+  const relatedHolder = el('div', {}, skeletonCards(4));
+  root.append(view(
+    el('div', { class: 'product-detail' },
+      art,
+      el('div', { class: 'product-detail__info' },
+        el('p', { class: 'product-card__brand', text: product.brand }),
+        el('h1', { class: 'product-detail__title', text: product.name }),
+        el('p', { class: 'product-detail__meta' }, `Modelo: ${product.model || '—'}`, el('span', { 'aria-hidden': 'true', text: ' · ' }), `SKU: ${product.sku}`,
+          el('span', { 'aria-hidden': 'true', text: ' · ' }), sub ? el('a', { href: `/catalogo.html?categoria=${sub.slug}`, text: sub.name }) : product.categoryName),
+        priceBlock(product, { large: true }),
+        product.previousPrice ? el('p', { class: 'product-detail__savings' }, `Ahorras ${money(Number(product.previousPrice) - Number(product.price))}`,
+          product.promotionName ? ` con ${product.promotionName}` : '') : null,
+        el('p', { class: 'product-detail__lead', text: product.description }),
+        availabilityNote(product),
+        el('div', { class: 'product-detail__buy' }, soldOut ? null : stepper, add, buy),
+        el('ul', { class: 'product-detail__perks' }, [
+          ['truck', 'Envío estándar gratis desde S/ 299 · express en 24–48 h'],
+          ['card', 'Pago contra entrega, transferencia o en tienda'],
+          ['shield', 'Producto nuevo y sellado con garantía de marca'],
+          ['refresh', 'Cambios por fallas de fábrica hasta 7 días'],
+        ].map(([ic, text]) => el('li', {}, icon(ic), el('span', { text })))))),
+    el('div', { class: 'product-sections' },
+      el('section', { class: 'card' }, el('h2', { class: 'card__title', text: 'Descripción' }),
+        el('p', { class: 'product-description', text: product.longDescription || product.description })),
+      el('section', { class: 'card' }, el('h2', { class: 'card__title', text: 'Especificaciones técnicas' }),
+        product.specs.length ? el('table', { class: 'spec-table' }, el('tbody', {}, product.specs.map((spec) => el('tr', {},
+          el('th', { scope: 'row', text: spec.label }), el('td', { text: spec.value })))))
+          : el('p', { class: 'muted small', text: 'Ficha técnica no disponible.' }))),
+    relatedHolder,
+    el('p', {}, el('a', { class: 'btn btn--ghost', href: sub ? `/catalogo.html?categoria=${sub.slug}` : '/catalogo.html', text: '‹ Volver al catálogo' }))));
+  catalogApi.related(product.id, 8).then((list) => relatedHolder.replaceChildren(productRail('Productos relacionados', list,
+    main ? `/catalogo.html?categoria=${main.slug}` : null) || el('span'))).catch(() => relatedHolder.replaceChildren());
 }, { title: 'Producto' });
 
-// ---- Carrito y checkout -----------------------------------------------------------
-async function renderCart(root, checkout) {
+// ---- Carrito ----------------------------------------------------------------------------------------
+async function cartView() {
+  if (cart.isSaved()) {
+    const saved = cart.saved() || await cart.sync();
+    if (saved) return saved;
+  }
   const items = cart.items();
-  if (!items.length) {
+  const products = await Promise.all(items.map((i) => catalogApi.product(i.productId).catch(() => null)));
+  const lines = [];
+  const problems = [];
+  items.forEach((item, index) => {
+    const product = products[index];
+    if (!product) { problems.push('Un producto ya no está disponible y se quitó del carrito'); cart.remove(item.productId); return; }
+    const purchasable = product.stock >= item.quantity;
+    if (product.stock <= 0) problems.push(`${product.name} está agotado`);
+    else if (!purchasable) problems.push(`Solo quedan ${product.stock} unidades de ${product.name}`);
+    lines.push({ product, quantity: item.quantity, lineTotal: (Number(product.price) * item.quantity).toFixed(2), purchasable });
+  });
+  const ok = lines.filter((l) => l.purchasable);
+  return {
+    lines, problems,
+    units: ok.reduce((s, l) => s + l.quantity, 0),
+    subtotal: ok.reduce((s, l) => s + Number(l.lineTotal), 0).toFixed(2),
+    savings: ok.reduce((s, l) => s + (l.product.previousPrice ? (Number(l.product.previousPrice) - Number(l.product.price)) * l.quantity : 0), 0).toFixed(2),
+  };
+}
+
+function cartLine(line, editable) {
+  const { product } = line;
+  const qty = el('input', { type: 'number', min: '1', max: '99', value: String(line.quantity), inputmode: 'numeric', class: 'qty__input',
+    'aria-label': `Cantidad de ${product.name}` });
+  const change = async (value) => {
+    try {
+      await cart.set(product.id, Math.max(0, Math.min(99, value)));
+      rerender();
+    } catch (error) {
+      toast(errorMessage(error), 'warn');
+      qty.value = String(line.quantity);
+    }
+  };
+  qty.addEventListener('change', () => change(Number(qty.value) || 0));
+  return el('div', { class: `cart-line${line.purchasable ? '' : ' cart-line--problem'}` },
+    el('a', { href: link(`/producto/${product.id}`), tabindex: '-1', 'aria-hidden': 'true' }, productArt(product, 'cart-line__thumb')),
+    el('div', { class: 'cart-line__info' },
+      el('small', { class: 'product-card__brand', text: product.brand }),
+      el('a', { class: 'cart-line__name', href: link(`/producto/${product.id}`), text: product.name }),
+      priceBlock(product), availabilityNote(product)),
+    editable ? el('div', { class: 'qty' },
+      el('button', { type: 'button', class: 'qty__btn', 'aria-label': `Quitar una unidad de ${product.name}`, text: '−', onclick: () => change(line.quantity - 1) }), qty,
+      el('button', { type: 'button', class: 'qty__btn', 'aria-label': `Agregar una unidad de ${product.name}`, text: '+', onclick: () => change(line.quantity + 1) }))
+      : el('span', { text: `× ${line.quantity}` }),
+    el('div', { class: 'cart-line__total' }, el('strong', { text: money(line.lineTotal) }),
+      editable ? el('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Quitar ${product.name}`, text: 'Quitar',
+        onclick: async () => { await cart.remove(product.id); rerender(); } }) : null));
+}
+
+route('/carrito', async (root) => {
+  const data = await cartView();
+  if (!data.lines.length) {
     root.append(view(head('Carrito', 'Tu carrito está vacío', ''), el('div', { class: 'card' },
-      emptyState('Aún no has añadido productos', 'Explora el catálogo y añade lo que necesites.', 'cart',
+      emptyState('Aún no agregaste productos', 'Explora el catálogo y agrega lo que necesites.', 'cart',
         el('a', { class: 'btn btn--primary', href: '/catalogo.html', text: 'Ir al catálogo' })))));
     return;
   }
-  let quote;
-  let products;
-  try {
-    [quote, products] = await Promise.all([shopApi.quote(items), catalogApi.products()]);
-  } catch (error) {
-    root.append(view(head('Carrito', 'Revisa tu carrito', ''), el('div', { class: 'card' },
-      emptyState('Algún producto ya no está disponible', errorMessage(error), 'empty',
-        el('button', { type: 'button', class: 'btn btn--ghost', text: 'Vaciar carrito', onclick: () => { cart.clear(); rerender(); } })))));
+  const blocked = data.lines.some((l) => !l.purchasable);
+  const proceed = cart.isSaved() || !session.isAuthenticated()
+    ? el('a', { class: `btn btn--primary btn--block${blocked ? ' is-disabled' : ''}`, href: blocked ? '#' : '/checkout.html', 'aria-disabled': String(blocked),
+      text: 'Continuar con la compra', onclick: (event) => { if (blocked) { event.preventDefault(); toast('Ajusta las cantidades marcadas antes de continuar', 'warn'); } } })
+    : el('p', { class: 'notice-box', text: 'Para comprar inicia sesión con una cuenta de cliente.' });
+  const summary = el('aside', { class: 'card cart-summary' },
+    el('h2', { class: 'card__title', text: 'Resumen' }),
+    el('div', { class: 'summary-row' }, el('span', { text: `Productos (${data.units})` }), el('span', { text: money(data.subtotal) })),
+    Number(data.savings) > 0 ? el('div', { class: 'summary-row summary-row--savings' }, el('span', { text: 'Ahorras' }), el('span', { text: `-${money(data.savings)}` })) : null,
+    el('div', { class: 'summary-row' }, el('span', { text: 'Envío' }), el('span', { text: Number(data.subtotal) >= 299 ? 'Gratis (estándar)' : 'Se calcula en el siguiente paso' })),
+    el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(data.subtotal) })),
+    el('p', { class: 'muted small', text: 'Precios en soles con IGV incluido. El envío estándar es gratis desde S/ 299.' }),
+    proceed,
+    el('a', { class: 'btn btn--ghost btn--block', href: '/catalogo.html', text: 'Seguir comprando' }),
+    el('button', { type: 'button', class: 'btn btn--ghost btn--block btn--danger-text', text: 'Vaciar carrito', onclick: async () => {
+      await cart.clear();
+      rerender();
+    } }));
+  root.append(view(
+    head('Carrito', 'Tu carrito', `${data.units} ${data.units === 1 ? 'producto' : 'productos'}`),
+    data.problems.length ? el('div', { class: 'notice-box notice-box--warn' }, el('strong', { text: 'Revisa tu carrito. ' }), data.problems.join(' · ')) : null,
+    el('div', { class: 'cart-layout' }, el('div', { class: 'card cart-lines' }, data.lines.map((l) => cartLine(l, true))), summary)));
+}, { title: 'Carrito' });
+
+// ---- Checkout -----------------------------------------------------------------------------------------
+route('/checkout', async (root) => {
+  const data = await cartView();
+  const items = data.lines.filter((l) => l.purchasable).map((l) => ({ productId: l.product.id, quantity: l.quantity }));
+  if (!items.length) {
+    root.append(view(head('Checkout', 'No hay productos para comprar', ''), el('div', { class: 'card' },
+      emptyState('Tu carrito está vacío o sin stock', 'Agrega productos disponibles para continuar.', 'cart',
+        el('a', { class: 'btn btn--primary', href: '/carrito.html', text: 'Volver al carrito' })))));
     return;
   }
-  const byId = new Map(products.map((p) => [p.id, p]));
-  let shippingCard = null;
-  const lines = quote.lines.map((line) => {
-    const product = byId.get(line.productId) || { hue: 260, categoryName: '' };
-    const qty = el('input', { type: 'number', min: '1', max: '99', value: String(line.quantity), 'aria-label': `Cantidad de ${line.productName}`, style: null });
-    qty.style.width = '72px';
-    qty.disabled = checkout;
-    qty.addEventListener('change', () => { cart.set(line.productId, Math.max(0, Number(qty.value) || 0)); handleReload(); });
-    return el('div', { class: 'cart-line' },
-      productArt(product, 'cart-line__thumb'),
-      el('div', {}, el('strong', { text: line.productName }), el('small', { text: `${money(line.unitPrice)} por unidad` }), product.stock !== undefined ? stockNote(product.stock) : null),
-      checkout ? el('span', { text: `× ${line.quantity}` }) : qty,
-      el('div', { class: 'row-actions' }, el('strong', { text: money(line.lineTotal) }),
-        checkout ? null : el('button', { type: 'button', class: 'btn btn--ghost btn--sm', 'aria-label': `Quitar ${line.productName}`, text: 'Quitar',
-          onclick: () => { cart.remove(line.productId); handleReload(); } })));
-  });
-  const summary = el('aside', { class: 'card' },
-    el('h3', { class: 'card__title', text: 'Resumen' }),
-    el('div', { class: 'summary-row' }, el('span', { text: 'Subtotal' }), el('span', { text: money(quote.total) })),
-    el('div', { class: 'summary-row' }, el('span', { text: 'Envío' }), el('span', { text: 'Incluido' })),
-    el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(quote.total) })),
-    el('p', { class: 'muted small', text: 'Total calculado por el servidor con los precios actuales del catálogo.' }));
-  if (!checkout) {
-    summary.append(el('a', { class: 'btn btn--primary btn--block', href: '/checkout.html', text: 'Continuar al checkout' }),
-      el('a', { class: 'btn btn--ghost btn--block', href: '/catalogo.html', text: 'Seguir comprando' }));
-  } else {
-    const errorNode = formError();
-    const confirm = el('button', { type: 'button', class: 'btn btn--primary btn--block', text: 'Confirmar pedido' });
-    // Datos de envío: el dominio (ShippingAddress) los valida de nuevo en el servidor.
-    const recipient = el('input', { autocomplete: 'name', maxlength: '80', required: true, value: session.user().displayName });
-    const address = el('input', { autocomplete: 'street-address', maxlength: '160', required: true, placeholder: 'Av. Ejemplo 123, dpto. 4' });
-    const city = el('input', { autocomplete: 'address-level2', maxlength: '60', required: true, placeholder: 'Lima' });
-    const phone = el('input', { type: 'tel', autocomplete: 'tel', maxlength: '20', placeholder: '+51 999 999 999' });
-    const instructions = el('textarea', { maxlength: '300', rows: '2', placeholder: 'Referencias para el repartidor (opcional)' });
-    shippingCard = el('form', { class: 'card form', novalidate: true, 'aria-labelledby': 'shipping-title' },
-      el('h3', { class: 'card__title', id: 'shipping-title', text: 'Datos de entrega' }),
-      el('div', { class: 'form-grid' }, field('Destinatario', recipient), field('Ciudad', city),
-        (() => { const f = field('Dirección', address); f.classList.add('field--full'); return f; })(),
-        field('Teléfono (opcional)', phone),
-        (() => { const f = field('Indicaciones', instructions); f.classList.add('field--full'); return f; })()));
-    const readShipping = () => ({ recipient: recipient.value.trim(), address: address.value.trim(), city: city.value.trim(),
-      phone: phone.value.trim(), instructions: instructions.value.trim() });
-    // Una clave por intento de compra: si la red falla y el usuario reintenta, no se duplica el pedido.
-    const idempotencyKey = `web-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`.slice(0, 64);
-    confirm.addEventListener('click', async () => {
-      try {
-        const shipping = readShipping();
-        if (shipping.address.length < 5 || shipping.city.length < 2 || shipping.recipient.length < 2) {
-          showFormError(errorNode, new Error('Completa destinatario, dirección (mínimo 5 caracteres) y ciudad.'));
-          address.focus();
-          return;
-        }
-        const result = await submitting(confirm, errorNode, () => shopApi.place(items, idempotencyKey, shipping));
-        cart.clear();
-        const order = result.data;
-        toast(order.status === 'RISK_REVIEW' ? 'Pedido creado: queda en revisión de riesgo' : 'Pedido creado y aprobado por riesgo', order.status === 'RISK_REVIEW' ? 'warn' : 'ok');
-        window.location.assign(`/cliente/seguimiento.html?id=${encodeURIComponent(order.id)}&nuevo=1`);
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 409) handleReload();
-      }
-    });
-    summary.append(el('div', { class: 'notice-box' }, el('strong', { text: 'Pago de demostración. ' }),
-      'No se solicitan ni almacenan datos bancarios: al confirmar, el pedido se evalúa y se registra.'), el('div', { style: null }), confirm, errorNode);
-    confirm.style.marginTop = '14px';
+  const options = await shopApi.options();
+  const user = session.user();
+  const state = { delivery: 'STANDARD', payment: 'CASH_ON_DELIVERY' };
+  const recipient = el('input', { autocomplete: 'name', maxlength: '80', required: true, value: user.displayName });
+  const phone = el('input', { type: 'tel', autocomplete: 'tel', maxlength: '20', placeholder: '+51 999 999 999' });
+  const address = el('input', { autocomplete: 'street-address', maxlength: '160', required: true, placeholder: 'Av. Ejemplo 123, dpto. 4, distrito' });
+  const city = el('input', { autocomplete: 'address-level2', maxlength: '60', required: true, placeholder: 'Lima' });
+  const instructions = el('textarea', { maxlength: '300', rows: '2', placeholder: 'Referencias para el repartidor (opcional)' });
+  const addressFields = el('div', { class: 'form-grid' }, field('Destinatario', recipient), field('Teléfono', phone),
+    (() => { const f = field('Dirección', address); f.classList.add('field--full'); return f; })(), field('Ciudad', city),
+    (() => { const f = field('Referencias', instructions); f.classList.add('field--full'); return f; })());
+  const pickupNote = el('div', { class: 'notice-box', hidden: true }, el('strong', { text: 'Recojo en tienda: ' }),
+    'Av. Tecnología 123, Lima. Lunes a sábado de 9:00 a 19:00. Te avisaremos por correo cuando tu pedido esté listo.');
+  const deliveryGroup = el('div', { class: 'choice-list', role: 'radiogroup', 'aria-label': 'Método de entrega' });
+  const paymentGroup = el('div', { class: 'choice-list', role: 'radiogroup', 'aria-label': 'Método de pago' });
+  const totals = el('div', {}, skeletons(3, 'skeleton--row'));
+  const errorNode = formError();
+  const confirm = el('button', { type: 'button', class: 'btn btn--primary btn--block btn--lg', text: 'Confirmar pedido' });
+  // Una clave por intento de compra: si la red falla y el cliente reintenta, no se duplica el pedido.
+  const idempotencyKey = `web-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`.slice(0, 64);
+
+  function choice(groupName, option, checked, detail, onPick, disabled = false) {
+    const input = el('input', { type: 'radio', name: groupName, value: option.code, checked, disabled });
+    input.addEventListener('change', () => onPick(option.code));
+    return el('label', { class: `choice${checked ? ' is-checked' : ''}${disabled ? ' is-disabled' : ''}` }, input,
+      el('span', { class: 'choice__body' }, el('strong', { text: option.label }), el('small', { text: detail })));
   }
+
+  function renderChoices(subtotal) {
+    deliveryGroup.replaceChildren(...options.delivery.map((d) => {
+      const free = d.freeFrom && Number(subtotal) >= Number(d.freeFrom);
+      const cost = Number(d.cost) === 0 || free ? 'Gratis' : money(d.cost);
+      return choice('delivery', d, state.delivery === d.code, `${d.eta} · ${cost}${d.freeFrom && !free ? ` (gratis desde ${money(d.freeFrom)})` : ''}`, (code) => {
+        state.delivery = code;
+        const allowed = options.payment.filter((p) => p.deliveries.includes(code));
+        if (!allowed.some((p) => p.code === state.payment)) state.payment = allowed[0].code;
+        refresh();
+      });
+    }));
+    paymentGroup.replaceChildren(...options.payment.map((p) => {
+      const allowed = p.deliveries.includes(state.delivery);
+      return choice('payment', p, state.payment === p.code, allowed ? p.instructions : `No disponible con ${DELIVERY_LABELS[state.delivery].toLowerCase()}`,
+        (code) => { state.payment = code; refresh(); }, !allowed);
+    }));
+    const pickup = state.delivery === 'PICKUP';
+    addressFields.hidden = pickup;
+    pickupNote.hidden = !pickup;
+  }
+
+  async function refresh() {
+    try {
+      const summary = await shopApi.summary(items, state.delivery, state.payment);
+      renderChoices(summary.subtotal);
+      totals.replaceChildren(
+        ...summary.lines.map((l) => el('div', { class: 'summary-row' }, el('span', { text: `${l.quantity} × ${l.productName}` }), el('span', { text: money(l.lineTotal) }))),
+        el('hr', { class: 'divider' }),
+        el('div', { class: 'summary-row' }, el('span', { text: 'Subtotal' }), el('span', { text: money(summary.subtotal) })),
+        Number(summary.savings) > 0 ? el('div', { class: 'summary-row summary-row--savings' }, el('span', { text: 'Ahorro en promociones' }), el('span', { text: `-${money(summary.savings)}` })) : null,
+        el('div', { class: 'summary-row' }, el('span', { text: summary.delivery.label }), el('span', { text: Number(summary.shippingCost) ? money(summary.shippingCost) : 'Gratis' })),
+        el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total a pagar' }), el('span', { text: money(summary.total) })));
+    } catch (error) {
+      totals.replaceChildren(el('div', { class: 'notice-box notice-box--error', text: errorMessage(error) }));
+    }
+  }
+
+  confirm.addEventListener('click', async () => {
+    const pickup = state.delivery === 'PICKUP';
+    const shipping = { recipient: recipient.value.trim(), address: address.value.trim(), city: city.value.trim(), phone: phone.value.trim(), instructions: instructions.value.trim() };
+    if (!pickup && (shipping.recipient.length < 2 || shipping.address.length < 5 || shipping.city.length < 2)) {
+      showFormError(errorNode, new Error('Completa destinatario, dirección (mínimo 5 caracteres) y ciudad.'));
+      address.focus();
+      return;
+    }
+    try {
+      const payload = { items, deliveryMethod: state.delivery, paymentMethod: state.payment, shipping: pickup ? null : shipping };
+      const result = await submitting(confirm, errorNode, () => shopApi.checkout(payload, idempotencyKey));
+      cart.forgetLocal();
+      window.location.assign(`/cliente/seguimiento.html?id=${encodeURIComponent(result.data.id)}&nuevo=1`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) toast('El stock cambió: revisa tu carrito', 'warn');
+    }
+  });
+
   root.append(view(
-    head(checkout ? 'Checkout' : 'Carrito', checkout ? 'Confirmar pedido' : 'Tu carrito', checkout ? `Cliente: ${session.user().displayName}` : `${cart.count()} unidades`),
-    checkout ? el('ol', { class: 'checkout-steps', 'aria-label': 'Pasos de la compra' },
-      el('li', { class: 'is-done', text: 'Carrito' }), el('li', { class: 'is-current', text: 'Entrega y confirmación' }), el('li', { text: 'Evaluación de riesgo y seguimiento' })) : null,
-    el('div', { class: 'cart-layout' }, el('div', { class: 'stack' }, el('div', { class: 'card' }, lines), shippingCard), summary)));
-}
+    head('Checkout', 'Finaliza tu compra', `Comprando como ${user.displayName}`),
+    el('ol', { class: 'checkout-steps', 'aria-label': 'Pasos de la compra' },
+      el('li', { class: 'is-done', text: 'Carrito' }), el('li', { class: 'is-current', text: 'Entrega y pago' }), el('li', { text: 'Confirmación' })),
+    el('div', { class: 'cart-layout' },
+      el('div', { class: 'stack' },
+        el('section', { class: 'card' }, el('h2', { class: 'card__title', text: '1. Método de entrega' }), deliveryGroup),
+        el('form', { class: 'card form', novalidate: true, 'aria-labelledby': 'shipping-title', onsubmit: (event) => event.preventDefault() },
+          el('h2', { class: 'card__title', id: 'shipping-title', text: '2. Datos de entrega' }), addressFields, pickupNote),
+        el('section', { class: 'card' }, el('h2', { class: 'card__title', text: '3. Método de pago' }), paymentGroup,
+          el('p', { class: 'muted small', text: 'No solicitamos datos de tarjeta ni bancarios en la web.' }))),
+      el('aside', { class: 'card cart-summary' }, el('h2', { class: 'card__title', text: 'Resumen del pedido' }), totals, confirm, errorNode,
+        el('a', { class: 'btn btn--ghost btn--block', href: '/carrito.html', text: 'Volver al carrito' })))));
+  renderChoices(data.subtotal);
+  await refresh();
+}, { roles: ['CUSTOMER'], title: 'Checkout' });
 
-function handleReload() { rerender(); }
-
-route('/carrito', (root) => renderCart(root, false), { title: 'Carrito' });
-route('/checkout', (root) => renderCart(root, true), { roles: ['CUSTOMER'], title: 'Checkout' });
-
-// ---- Mis pedidos y seguimiento -------------------------------------------------------
+// ---- Mis pedidos --------------------------------------------------------------------------------------
 route('/mis-pedidos', async (root) => {
   const list = el('div', { class: 'card' }, skeletons(4, 'skeleton--row'));
   root.append(view(head('Mi cuenta', 'Mis pedidos', 'Historial y seguimiento de tus compras.'), list));
@@ -286,13 +527,13 @@ route('/mis-pedidos', async (root) => {
       return;
     }
     list.replaceChildren(paginated(orders, (page) => el('div', { class: 'table-scroll' }, el('table', { class: 'table' },
-      el('thead', {}, el('tr', {}, ['Pedido', 'Fecha', 'Artículos', 'Total', 'Estado', ''].map((h) => el('th', { scope: 'col', text: h })))),
+      el('thead', {}, el('tr', {}, ['Pedido', 'Fecha', 'Productos', 'Total', 'Estado', ''].map((h) => el('th', { scope: 'col', text: h })))),
       el('tbody', {}, page.map((o) => el('tr', {},
-        el('td', {}, el('span', { class: 'table__id', text: o.id })),
+        el('td', {}, el('span', { class: 'table__id', text: orderRef(o) })),
         el('td', { text: formatDateTime(o.createdAt) }),
         el('td', { text: String(o.lines.reduce((s, l) => s + l.quantity, 0)) }),
-        el('td', { class: 'mono', text: money(o.amount) }),
-        el('td', {}, lifecycleBadge(o.status)),
+        el('td', { class: 'mono', text: money(o.amount, o.currency) }),
+        el('td', {}, customerBadge(o.status)),
         el('td', {}, el('div', { class: 'row-actions' },
           el('a', { class: 'btn btn--ghost btn--sm', href: link(`/mis-pedidos/${o.id}`), text: 'Detalle' }),
           el('a', { class: 'btn btn--ghost btn--sm', href: link(`/seguimiento/${o.id}`), text: 'Seguimiento' })))))))), { pageSize: 10, label: 'pedidos' }));
@@ -303,48 +544,53 @@ route('/mis-pedidos', async (root) => {
 
 route('/mis-pedidos/:id', async (root, { id }) => {
   const details = await shopApi.order(id);
-  const { order, history, delivery, allowedTransitions, shipping } = details;
+  const { order, history, delivery, allowedTransitions, shipping, checkout } = details;
+  const currency = order.currency;
   const cancelButton = allowedTransitions.includes('CANCELLED')
     ? el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar pedido' }) : null;
   if (cancelButton) {
     cancelButton.addEventListener('click', () => {
       const errorNode = formError();
       const confirm = el('button', { type: 'button', class: 'btn btn--primary', text: 'Sí, cancelar' });
-      const dialog = modal('Cancelar pedido', el('div', {}, el('p', { class: 'muted', text: 'Las unidades vuelven al stock. Esta acción queda registrada en el historial.' }), errorNode),
+      const dialog = modal('Cancelar pedido', el('div', {}, el('p', { class: 'muted', text: '¿Seguro que quieres cancelar este pedido? Esta acción no se puede deshacer.' }), errorNode),
         { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Volver', onclick: () => dialog.close() }), confirm] });
       confirm.addEventListener('click', async () => {
         await submitting(confirm, errorNode, () => shopApi.cancel(id), 'Pedido cancelado');
         dialog.close();
-        handleReload();
+        rerender();
       });
     });
   }
+  const lineSavings = order.lines.reduce((s, l) => s + (l.listUnitPrice ? (Number(l.listUnitPrice) - Number(l.unitPrice)) * l.quantity : 0), 0);
   root.append(view(
-    head('Detalle del pedido', `Pedido ${order.id.slice(0, 8)}`, `Creado ${formatRelative(order.createdAt)} · riesgo ${order.riskScore}/100`,
-      lifecycleBadge(order.status), el('a', { class: 'btn btn--primary btn--sm', href: link(`/seguimiento/${order.id}`), text: 'Ver seguimiento' }), cancelButton),
+    head('Detalle del pedido', orderRef(order), `Realizado ${formatRelative(order.createdAt)} · ${formatDateTime(order.createdAt)}`,
+      customerBadge(order.status), el('a', { class: 'btn btn--primary btn--sm', href: link(`/seguimiento/${order.id}`), text: 'Ver seguimiento' }), cancelButton),
     el('div', { class: 'grid-2' },
       el('div', { class: 'card' },
         el('h3', { class: 'card__title', text: 'Progreso' }), progressBar(order.status),
         delivery ? el('div', { class: 'notice-box' }, el('strong', { text: 'Entrega programada: ' }),
-          `${formatDateTime(delivery.start)} – ${new Date(delivery.end).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} · responsable ${delivery.assigneeName}`)
-          : el('p', { class: 'muted small', text: 'La entrega se programará cuando el pedido esté confirmado.' }),
+          `${formatDateTime(delivery.start)} – ${new Date(delivery.end).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`)
+          : el('p', { class: 'muted small', text: 'Programaremos la entrega cuando el pedido esté confirmado.' }),
         el('h3', { class: 'card__title card__title--spaced', text: 'Historial' }),
         el('ol', { class: 'timeline' }, history.map((h, index) => el('li', { class: index === history.length - 1 ? 'is-current' : '' },
-          el('strong', {}, lifecycleBadge(h.to)), el('small', { text: `${formatDateTime(h.at)} · ${h.actor}${h.note ? ` · ${h.note}` : ''}` }))))),
+          el('strong', {}, customerBadge(h.to)), el('small', { text: formatDateTime(h.at) }))))),
       el('div', { class: 'card' },
-        el('h3', { class: 'card__title', text: 'Artículos' }),
-        order.lines.map((l) => el('div', { class: 'summary-row' }, el('span', { text: `${l.quantity} × ${l.productName}` }), el('span', { text: money(l.lineTotal) }))),
-        el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(order.amount) })),
-        el('p', { class: 'muted small', text: `Decisión del motor de riesgo: ${order.riskDecision} (${order.riskScore}/100).` }),
+        el('h3', { class: 'card__title', text: 'Productos' }),
+        order.lines.map((l) => el('div', { class: 'summary-row' }, el('span', { text: `${l.quantity} × ${l.productName}` }), el('span', { text: money(l.lineTotal, currency) }))),
+        checkout ? el('div', { class: 'summary-row' }, el('span', { text: 'Subtotal' }), el('span', { text: money(checkout.subtotal, currency) })) : null,
+        lineSavings > 0 ? el('div', { class: 'summary-row summary-row--savings' }, el('span', { text: 'Ahorro en promociones' }), el('span', { text: `-${money(lineSavings, currency)}` })) : null,
+        checkout ? el('div', { class: 'summary-row' }, el('span', { text: DELIVERY_LABELS[checkout.delivery] }), el('span', { text: Number(checkout.shippingCost) ? money(checkout.shippingCost, currency) : 'Gratis' })) : null,
+        el('div', { class: 'summary-row summary-row--total' }, el('span', { text: 'Total' }), el('span', { text: money(order.amount, currency) })),
+        checkout && checkout.payment ? el('p', { class: 'small' }, el('strong', { text: 'Pago: ' }), PAYMENT_LABELS[checkout.payment]) : null,
         el('h3', { class: 'card__title card__title--spaced', text: 'Entrega' }),
-        shipping ? el('address', { class: 'address-card' }, el('strong', { text: shipping.recipient }), el('span', { text: shipping.address }),
-          el('span', { text: shipping.city }), shipping.phone ? el('span', { text: shipping.phone }) : null,
-          shipping.instructions ? el('small', { class: 'muted', text: shipping.instructions }) : null)
-          : el('p', { class: 'muted small', text: 'Pedido sin dirección registrada (creado antes de la versión 4 o desde la API).' })))));
-  void TRANSITION_VERBS;
+        checkout && checkout.delivery === 'PICKUP' ? el('p', { class: 'small', text: 'Recojo en tienda · Av. Tecnología 123, Lima.' })
+          : shipping ? el('address', { class: 'address-card' }, el('strong', { text: shipping.recipient }), el('span', { text: shipping.address }),
+            el('span', { text: shipping.city }), shipping.phone ? el('span', { text: shipping.phone }) : null,
+            shipping.instructions ? el('small', { class: 'muted', text: shipping.instructions }) : null)
+            : el('p', { class: 'muted small', text: 'Sin dirección registrada.' })))));
 }, { roles: ['CUSTOMER'], title: 'Detalle del pedido' });
 
-// ---- Perfil -------------------------------------------------------------------------
+// ---- Perfil ---------------------------------------------------------------------------------------------
 route('/perfil', async (root) => {
   const me = await accountApi.me();
   const name = el('input', { value: me.displayName, maxlength: '80', autocomplete: 'name' });
@@ -356,7 +602,7 @@ route('/perfil', async (root) => {
   const passError = formError();
   const savePass = el('button', { type: 'submit', class: 'btn btn--ghost', text: 'Cambiar contraseña' });
   const profileForm = el('form', { class: 'card form', novalidate: true }, el('h3', { class: 'card__title', text: 'Datos personales' }),
-    field('Nombre visible', name), field('Correo electrónico', email), saveProfile, profileError);
+    field('Nombre', name), field('Correo electrónico', email), saveProfile, profileError);
   const passForm = el('form', { class: 'card form', novalidate: true }, el('h3', { class: 'card__title', text: 'Seguridad' }),
     field('Contraseña actual', current), field('Nueva contraseña', next, 'Entre 8 y 72 caracteres, con letras y dígitos.'), savePass, passError);
   profileForm.addEventListener('submit', async (event) => {
@@ -367,14 +613,14 @@ route('/perfil', async (root) => {
     event.preventDefault();
     await submitting(savePass, passError, () => accountApi.password(current.value, next.value), 'Contraseña actualizada').then(() => { current.value = ''; next.value = ''; }).catch(() => {});
   });
-  root.append(view(head('Mi cuenta', 'Perfil', `@${me.username} · ${me.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}`),
+  root.append(view(head('Mi cuenta', 'Perfil y seguridad', `@${me.username} · ${me.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}`),
     el('div', { class: 'grid-2-even' }, profileForm, passForm)));
 }, { roles: ['auth'], title: 'Perfil' });
 
-// ---- Acceso -------------------------------------------------------------------------
+// ---- Acceso -------------------------------------------------------------------------------------------
 const DEMO = [
   ['cliente', 'CUSTOMER'], ['admin', 'ADMIN'], ['operador', 'ORDER_OPERATOR'],
-  ['logistica', 'LOGISTICS_OPERATOR'], ['observador', 'OBSERVABILITY_VIEWER'],
+  ['logistica', 'LOGISTICS_OPERATOR'], ['logistica2', 'LOGISTICS_OPERATOR'], ['observador', 'OBSERVABILITY_VIEWER'],
 ];
 
 route('/entrar', async (root, { query }) => {
@@ -387,12 +633,13 @@ route('/entrar', async (root, { query }) => {
   const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: 'Iniciar sesión' });
   const form = el('form', { class: 'card form', novalidate: true },
     el('h2', { class: 'card__title', text: 'Iniciar sesión' }), field('Usuario', username), field('Contraseña', password), submit, errorNode,
-    el('p', { class: 'muted small' }, '¿No tienes cuenta? ', el('a', { href: '/registro.html', text: 'Regístrate como cliente' })));
+    el('p', { class: 'muted small' }, '¿Eres nuevo? ', el('a', { href: '/registro.html', text: 'Crea tu cuenta' })));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
       const user = await submitting(submit, errorNode, () => session.login(username.value.trim(), password.value));
       toast(`Hola, ${user.displayName}`, 'ok');
+      await cart.sync(); // tu carrito de visitante pasa a tu cuenta
       // Solo rutas internas: evita redirecciones abiertas a otros dominios.
       window.location.assign(safeNext ? link(safeNext) : homeFor(user));
     } catch { /* el error ya se muestra */ }
@@ -400,11 +647,11 @@ route('/entrar', async (root, { query }) => {
   root.append(view(el('div', { class: 'auth' },
     el('div', { class: 'auth__aside' },
       el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: 'Un acceso, cinco roles' }),
-      el('p', { text: 'Cada rol ve su área y el servidor comprueba los permisos en cada petición.' }),
-      el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => { username.value = user; password.focus(); } },
-        el('span', {}, el('strong', { text: user }), el('small', { text: ` · ${ROLE_LABELS[role]}` })), el('small', { text: 'usar' })))),
-      el('p', { class: 'muted small', style: null, text: 'Cuentas de demostración: la contraseña está en secrets\\demo_password.txt (generada en tu equipo, fuera de Git).' })),
+      el('h2', { text: 'Bienvenido a HexaOrders' }),
+      el('p', { text: 'Inicia sesión para comprar, guardar tu carrito y seguir tus pedidos.' }),
+      el('details', { class: 'demo-accounts-box' }, el('summary', { text: 'Cuentas de demostración' }),
+        el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => { username.value = user; password.focus(); } },
+          el('span', {}, el('strong', { text: user }), el('small', { text: ` · ${ROLE_LABELS[role]}` })), el('small', { text: 'usar' })))))),
     form)));
   username.focus();
 }, { title: 'Iniciar sesión' });
@@ -416,8 +663,8 @@ route('/registro', async (root) => {
   const password = el('input', { type: 'password', autocomplete: 'new-password', maxlength: '72' });
   const errorNode = formError();
   const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: 'Crear cuenta' });
-  const form = el('form', { class: 'card form', novalidate: true }, el('h2', { class: 'card__title', text: 'Crear cuenta de cliente' }),
-    field('Usuario', username, '3 a 32 letras, dígitos, guion o guion bajo.'), field('Nombre visible', displayName),
+  const form = el('form', { class: 'card form', novalidate: true }, el('h2', { class: 'card__title', text: 'Crea tu cuenta' }),
+    field('Usuario', username, '3 a 32 letras, dígitos, guion o guion bajo.'), field('Nombre', displayName),
     field('Correo electrónico', email), field('Contraseña', password, 'Entre 8 y 72 caracteres, con letras y dígitos.'), submit, errorNode,
     el('p', { class: 'muted small' }, '¿Ya tienes cuenta? ', el('a', { href: '/login.html', text: 'Inicia sesión' })));
   form.addEventListener('submit', async (event) => {
@@ -427,15 +674,18 @@ route('/registro', async (root) => {
         await authApi.register({ username: username.value.trim(), displayName: displayName.value.trim(), email: email.value.trim(), password: password.value });
         return session.login(username.value.trim(), password.value);
       }, 'Cuenta creada');
-      window.location.assign('/cliente/dashboard.html');
+      await cart.sync();
+      window.location.assign(cart.count() ? '/carrito.html' : '/cliente/dashboard.html');
     } catch { /* el error ya se muestra */ }
   });
   root.append(view(el('div', { class: 'auth' },
     el('div', { class: 'auth__aside' }, el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
       el('h2', { text: 'Tu cuenta HexaOrders' }),
-      el('p', { text: 'Compra, sigue tus pedidos en tiempo real y gestiona tu perfil. La contraseña se guarda con BCrypt; nunca en texto plano.' })),
+      el('ul', { class: 'auth__perks' }, ['Guarda tu carrito en todos tus dispositivos', 'Sigue tus pedidos en tiempo real', 'Compra más rápido con tus datos guardados']
+        .map((text) => el('li', {}, icon('sparkle'), el('span', { text }))))),
     form)));
   username.focus();
 }, { title: 'Registro' });
 
 export function showError(node, error) { showFormError(node, error); }
+void $$;

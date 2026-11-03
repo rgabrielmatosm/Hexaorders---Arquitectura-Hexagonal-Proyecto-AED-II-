@@ -2,7 +2,7 @@
   {
     "path": "/index.html",
     "route": "/inicio",
-    "title": "Inicio",
+    "title": "Tienda de tecnología",
     "roles": [],
     "needsId": false
   },
@@ -19,6 +19,13 @@
     "title": "Producto",
     "roles": [],
     "needsId": true
+  },
+  {
+    "path": "/ofertas.html",
+    "route": "/ofertas",
+    "title": "Ofertas",
+    "roles": [],
+    "needsId": false
   },
   {
     "path": "/carrito.html",
@@ -47,6 +54,13 @@
     "path": "/registro.html",
     "route": "/registro",
     "title": "Crear cuenta",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/ayuda.html",
+    "route": "/ayuda",
+    "title": "Centro de ayuda",
     "roles": [],
     "needsId": false
   },
@@ -154,6 +168,15 @@
     "path": "/admin/inventario.html",
     "route": "/admin/:tab",
     "title": "Inventario",
+    "roles": [
+      "ADMIN"
+    ],
+    "needsId": false
+  },
+  {
+    "path": "/admin/promociones.html",
+    "route": "/admin/:tab",
+    "title": "Promociones",
     "roles": [
       "ADMIN"
     ],
@@ -327,15 +350,21 @@
   {
     "path": "/arquitectura/overview.html",
     "route": "/arquitectura/overview",
-    "title": "Arquitectura",
-    "roles": [],
+    "title": "Documentación técnica",
+    "roles": [
+      "ADMIN",
+      "OBSERVABILITY_VIEWER"
+    ],
     "needsId": false
   },
   {
     "path": "/arquitectura/flujo-pedidos.html",
     "route": "/arquitectura/flujo-pedidos",
     "title": "Flujo de pedidos",
-    "roles": [],
+    "roles": [
+      "ADMIN",
+      "OBSERVABILITY_VIEWER"
+    ],
     "needsId": false
   }
 ]

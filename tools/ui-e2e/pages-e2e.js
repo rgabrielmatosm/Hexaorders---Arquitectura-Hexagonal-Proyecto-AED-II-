@@ -87,6 +87,15 @@ async function checkLinks(session, label) {
   }
 }
 
+// v6: lo que ve un visitante o un cliente en la tienda no explica cómo está construida.
+const TECH_TERMS = ['hexagonal', 'docker', 'postgres', 'redis', 'rabbitmq', 'grafana', 'prometheus', 'microservicio',
+  'idempoten', 'laboratorio', 'arquitectura', 'backend', 'spring', 'motor de riesgo', 'kubernetes', 'caso de uso'];
+async function checkCommercialText(session, entry) {
+  const text = (await session.page.evaluate(() => document.body.innerText)).toLowerCase();
+  const found = TECH_TERMS.filter((term) => text.includes(term));
+  if (found.length) throw new Error(`FALLO: ${entry.path} muestra texto técnico en la tienda: ${found.join(', ')}`);
+}
+
 async function visitAll(session, role, ids) {
   let ok = 0;
   for (const entry of PAGES) {
@@ -113,6 +122,7 @@ async function visitAll(session, role, ids) {
     const error = await viewError(session.page);
     if (error) throw new Error(`FALLO: ${entry.path} (${role || 'visitante'}) muestra «${error}»`);
     await checkLinks(session, role || 'anon');
+    if (!role || role === 'cliente') await checkCommercialText(session, entry);
     ok += 1;
   }
   return ok;
@@ -138,15 +148,27 @@ async function visitAll(session, role, ids) {
     await anon.page.waitForURL(/\/catalogo\.html/);
     check(true, 'La URL antigua /#/tienda redirige a /catalogo.html (compatibilidad v3)');
     await anon.page.goto(`${BASE_URL}/#panel`);
-    await anon.page.waitForURL(/\/laboratorio\.html#panel/);
-    check(true, 'El ancla antigua /#panel redirige al laboratorio');
-    // Catálogo: filtros en la URL y recarga.
-    await anon.page.goto(`${BASE_URL}/catalogo.html`);
+    await anon.page.waitForURL(/\/login\.html\?next=%2Flaboratorio/);
+    check(true, 'El ancla antigua /#panel lleva al laboratorio interno, que exige iniciar sesión (personal autorizado)');
+    // Catálogo: filtros reales en la URL y recarga.
+    await anon.page.goto(`${BASE_URL}/catalogo.html?categoria=computadoras`);
     await rendered(anon.page);
-    await anon.page.check('.catalog-toolbar .switch input');
+    const stockFilter = '.filters .filter-option:has-text("Solo con stock") input';
+    await anon.page.waitForSelector(stockFilter);
+    await anon.page.check(stockFilter);
+    await anon.page.waitForFunction(() => window.location.search.includes('disponible=1'));
     await anon.page.reload();
     await rendered(anon.page);
-    check(anon.page.url().includes('disponibles=1') && await anon.page.isChecked('.catalog-toolbar .switch input'), 'El filtro del catálogo sobrevive a la recarga (estado en la URL)');
+    await anon.page.waitForSelector(stockFilter);
+    check(anon.page.url().includes('disponible=1') && anon.page.url().includes('categoria=computadoras') && await anon.page.isChecked(stockFilter),
+      'Los filtros del catálogo sobreviven a la recarga (estado en la URL)');
+    const brandBox = '.filters .filter-group:has(summary:has-text("Marca")) .filter-option input';
+    await anon.page.check(brandBox);
+    await anon.page.waitForFunction(() => window.location.search.includes('marca='));
+    await rendered(anon.page);
+    const brandName = new URL(anon.page.url()).searchParams.get('marca');
+    const brands = await anon.page.$$eval('.product-card .product-card__brand', (nodes) => nodes.map((n) => n.textContent.trim().toLowerCase()));
+    check(brands.length > 0 && brands.every((b) => b === brandName.toLowerCase()), `El filtro de marca (${brandName}) cambia los resultados del servidor`);
     await anon.page.screenshot({ path: path.join(OUT, 'v4-catalogo.png') });
     await anon.page.goto(`${BASE_URL}/`);
     await rendered(anon.page);
@@ -170,8 +192,9 @@ async function visitAll(session, role, ids) {
     check(new URL(customer.page.url()).pathname === '/cliente/dashboard.html', 'El cliente entra a su resumen tras iniciar sesión');
     await customer.page.goto(`${BASE_URL}/producto.html?id=${ids.product}`);
     await rendered(customer.page);
-    await customer.page.click('.product-detail .btn--primary');
-    await customer.page.goto(`${BASE_URL}/checkout.html`);
+    check((await customer.page.locator('.spec-table tr').count()) >= 3, 'La ficha del producto muestra sus especificaciones técnicas');
+    // «Comprar ahora» agrega al carrito guardado y lleva al checkout.
+    await Promise.all([customer.page.waitForURL(/\/checkout\.html/, { timeout: 15000 }), customer.page.click('.product-detail .btn--primary')]);
     await rendered(customer.page);
     await customer.page.fill('#view-root input[autocomplete="street-address"]', 'Av. Prueba 742, dpto. 3');
     await customer.page.fill('#view-root input[autocomplete="address-level2"]', 'Arequipa');
@@ -241,13 +264,13 @@ async function visitAll(session, role, ids) {
 
     // ---- Móvil ------------------------------------------------------------------------------
     const mobile = await newSession(browser, 'móvil', { width: 390, height: 844 });
-    for (const target of ['/', '/catalogo.html', '/contacto.html', '/arquitectura/flujo-pedidos.html']) {
+    for (const target of ['/', '/catalogo.html', `/producto.html?id=${ids.product}`, '/ofertas.html', '/ayuda.html', '/contacto.html']) {
       await mobile.page.goto(`${BASE_URL}${target}`);
       await rendered(mobile.page);
       check(!(await mobile.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `Móvil (390 px): ${target} sin desplazamiento horizontal`);
     }
     await mobile.page.click('.nav-toggle');
-    check(await mobile.page.isVisible('#primary-nav a[href="/catalogo.html"]'), 'Móvil: el menú desplegable muestra la navegación');
+    check(await mobile.page.isVisible('#primary-nav a[href="/ofertas.html"]'), 'Móvil: el menú desplegable muestra la navegación');
     await mobile.page.screenshot({ path: path.join(OUT, 'v4-movil-menu.png') });
     failuresAll.push(...mobile.failures);
   } finally {

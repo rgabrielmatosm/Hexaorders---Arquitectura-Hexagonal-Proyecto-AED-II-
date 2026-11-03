@@ -26,6 +26,8 @@ const PAGE_URLS = [
   [/^\/tienda$/, () => '/catalogo.html'],
   [/^\/producto\/([^/]+)$/, (id) => `/producto.html?id=${encodeURIComponent(id)}`],
   [/^\/carrito$/, () => '/carrito.html'],
+  [/^\/ofertas$/, () => '/ofertas.html'],
+  [/^\/ayuda$/, () => '/ayuda.html'],
   [/^\/checkout$/, () => '/checkout.html'],
   [/^\/entrar$/, () => '/login.html'],
   [/^\/registro$/, () => '/registro.html'],

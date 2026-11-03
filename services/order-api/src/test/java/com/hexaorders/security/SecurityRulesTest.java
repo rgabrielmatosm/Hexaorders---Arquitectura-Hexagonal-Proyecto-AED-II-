@@ -153,8 +153,15 @@ class SecurityRulesTest {
     @Test
     void publicPagesAndTheContactFormNeedNoLogin() throws Exception {
         for (String page : new String[] {"/", "/index.html", "/catalogo.html", "/producto.html", "/carrito.html", "/login.html",
-                "/registro.html", "/nosotros.html", "/contacto.html", "/laboratorio.html", "/arquitectura/overview.html", "/404.html", "/403.html"}) {
+                "/registro.html", "/nosotros.html", "/contacto.html", "/ofertas.html", "/ayuda.html", "/404.html", "/403.html"}) {
             http.perform(get(page)).andExpect(status().isOk());
+        }
+        // v6: the technical documentation and the API laboratory are internal, not part of the store.
+        for (String page : new String[] {"/laboratorio.html", "/arquitectura/overview.html", "/arquitectura/flujo-pedidos.html"}) {
+            http.perform(get(page)).andExpect(status().is3xxRedirection());
+            http.perform(get(page).with(as(Role.CUSTOMER))).andExpect(status().isForbidden());
+            http.perform(get(page).with(as(Role.OBSERVABILITY_VIEWER))).andExpect(status().isOk());
+            http.perform(get(page).with(as(Role.ADMIN))).andExpect(status().isOk());
         }
         when(contact.send(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any())).thenReturn(new com.hexaorders.domain.contact.ContactMessage(9, "Ana", "ana@example.com",

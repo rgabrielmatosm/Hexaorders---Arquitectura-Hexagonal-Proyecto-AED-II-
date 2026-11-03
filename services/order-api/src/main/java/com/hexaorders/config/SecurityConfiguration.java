@@ -99,6 +99,8 @@ public class SecurityConfiguration {
                     .requestMatchers("/operaciones", "/operaciones/**").hasAnyRole("ORDER_OPERATOR", "ADMIN")
                     .requestMatchers("/logistica", "/logistica/**").hasAnyRole("LOGISTICS_OPERATOR", "ADMIN")
                     .requestMatchers("/monitoreo", "/monitoreo/**").hasAnyRole("OBSERVABILITY_VIEWER", "ADMIN")
+                    // v6: la documentación técnica y el laboratorio de la API son internos (no forman parte de la tienda).
+                    .requestMatchers("/arquitectura/**", "/laboratorio.html").hasAnyRole("OBSERVABILITY_VIEWER", "ADMIN")
                     .anyRequest().permitAll())
             .exceptionHandling(errors -> errors
                     .authenticationEntryPoint((request, response, failure) -> {

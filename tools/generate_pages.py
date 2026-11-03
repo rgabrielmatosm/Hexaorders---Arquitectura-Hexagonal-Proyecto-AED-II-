@@ -28,23 +28,25 @@ FRAGMENTS = Path(__file__).resolve().parent / 'page_fragments'
 #   roles: [] = pública; ['auth'] = cualquier sesión; si no, roles de Spring Security.
 #   parent: breadcrumb intermedio "url|texto"; active: enlace resaltado de la barra lateral.
 PAGES: list[dict] = [
-    # ---- Portal público
-    dict(path='index.html', route='/inicio', title='Inicio', description='HexaOrders: pedidos, riesgo y logística sobre una arquitectura hexagonal real.'),
-    dict(path='catalogo.html', route='/tienda', title='Catálogo', description='Catálogo de productos con búsqueda, filtros, orden y paginación (PostgreSQL).'),
-    dict(path='producto.html', route='/producto/:id', title='Producto', description='Detalle de producto, disponibilidad y productos relacionados.', parent='/catalogo.html|Catálogo'),
-    dict(path='carrito.html', route='/carrito', title='Carrito', description='Carrito con totales calculados por el servidor y validación de stock.'),
-    dict(path='checkout.html', route='/checkout', title='Checkout', description='Confirmación del pedido con datos de entrega y evaluación de riesgo.', roles=['CUSTOMER'], parent='/carrito.html|Carrito'),
-    dict(path='login.html', route='/entrar', title='Iniciar sesión', description='Acceso para clientes y equipos (cinco roles).'),
-    dict(path='registro.html', route='/registro', title='Crear cuenta', description='Registro de clientes con contraseña cifrada con BCrypt.'),
-    dict(path='nosotros.html', route='/nosotros', title='Nosotros', description='Misión, principios y roles de ingeniería del proyecto HexaOrders.'),
-    dict(path='contacto.html', route='/contacto', title='Contacto', description='Formulario de contacto: los mensajes se guardan en PostgreSQL.'),
-    dict(path='403.html', route='/error/403', title='Acceso restringido', description='Tu rol no tiene permiso para esta página.'),
+    # ---- Tienda (v6: contenido comercial; nada técnico ni académico)
+    dict(path='index.html', route='/inicio', title='Tienda de tecnología', description='HexaOrders: laptops, componentes, monitores, smartphones, gaming y smart home con envío a todo el Perú.'),
+    dict(path='catalogo.html', route='/tienda', title='Catálogo', description='Catálogo de tecnología con búsqueda, filtros por marca, precio y características técnicas.'),
+    dict(path='producto.html', route='/producto/:id', title='Producto', description='Ficha del producto con especificaciones técnicas, precio, disponibilidad y productos relacionados.', parent='/catalogo.html|Catálogo'),
+    dict(path='ofertas.html', route='/ofertas', title='Ofertas', description='Ofertas y promociones vigentes en tecnología.'),
+    dict(path='carrito.html', route='/carrito', title='Carrito', description='Tu carrito de compras.'),
+    dict(path='checkout.html', route='/checkout', title='Checkout', description='Finaliza tu compra: entrega, pago y confirmación.', roles=['CUSTOMER'], parent='/carrito.html|Carrito'),
+    dict(path='login.html', route='/entrar', title='Iniciar sesión', description='Inicia sesión en tu cuenta HexaOrders.'),
+    dict(path='registro.html', route='/registro', title='Crear cuenta', description='Crea tu cuenta HexaOrders para comprar y seguir tus pedidos.'),
+    dict(path='ayuda.html', route='/ayuda', title='Centro de ayuda', description='Envíos, métodos de pago, garantías, devoluciones y tu cuenta.'),
+    dict(path='nosotros.html', route='/nosotros', title='Nosotros', description='Conoce HexaOrders, tu tienda de tecnología.'),
+    dict(path='contacto.html', route='/contacto', title='Contacto', description='Escríbenos: pedidos, soporte técnico, garantías y ventas corporativas.'),
+    dict(path='403.html', route='/error/403', title='Acceso restringido', description='Tu cuenta no tiene permiso para esta página.'),
     dict(path='404.html', route='/error/404', title='Página no encontrada', description='La página solicitada no existe.'),
     # ---- Portal del cliente
-    dict(path='cliente/dashboard.html', route='/cliente', title='Mi cuenta', description='Resumen de pedidos del cliente.', section='cliente', roles=['CUSTOMER']),
-    dict(path='cliente/pedidos.html', route='/mis-pedidos', title='Mis pedidos', description='Historial de pedidos del cliente.', section='cliente', roles=['CUSTOMER']),
-    dict(path='cliente/pedido-detalle.html', route='/mis-pedidos/:id', title='Detalle del pedido', description='Artículos, totales, entrega y cancelación.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
-    dict(path='cliente/seguimiento.html', route='/seguimiento/:id', title='Seguimiento', description='Estado real del pedido y su historial.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
+    dict(path='cliente/dashboard.html', route='/cliente', title='Mi cuenta', description='Resumen de tus compras y pedidos.', section='cliente', roles=['CUSTOMER']),
+    dict(path='cliente/pedidos.html', route='/mis-pedidos', title='Mis pedidos', description='Historial de tus pedidos.', section='cliente', roles=['CUSTOMER']),
+    dict(path='cliente/pedido-detalle.html', route='/mis-pedidos/:id', title='Detalle del pedido', description='Productos, totales, entrega, pago y cancelación.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
+    dict(path='cliente/seguimiento.html', route='/seguimiento/:id', title='Seguimiento', description='Estado de tu pedido paso a paso.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
     dict(path='cliente/perfil.html', route='/perfil', title='Perfil y seguridad', description='Datos personales y cambio de contraseña.', section='cliente', roles=['auth']),
     # ---- Administración
     *[dict(path=f'admin/{name}.html', route='/admin/:tab', params={'tab': tab}, title=title, description=desc, section='admin', roles=['ADMIN'])
@@ -53,10 +55,11 @@ PAGES: list[dict] = [
           ('productos', 'productos', 'Productos', 'Alta y edición de productos con búsqueda y paginación.'),
           ('categorias', 'categorias', 'Categorías', 'Categorías del catálogo y su contenido.'),
           ('inventario', 'inventario', 'Inventario', 'Existencias, stock bajo y ajustes auditados.'),
+          ('promociones', 'promociones', 'Promociones', 'Campañas comerciales con vigencia y descuento.'),
           ('pedidos', 'pedidos', 'Pedidos', 'Todos los pedidos con su ciclo de vida.'),
           ('usuarios', 'usuarios', 'Usuarios y roles', 'Gestión de usuarios, roles y activación.'),
           ('incidencias', 'incidencias', 'Incidencias', 'Incidencias operativas.'),
-          ('reportes', 'reportes', 'Reportes', 'Ventas por categoría exportables a CSV.'),
+          ('reportes', 'reportes', 'Reportes', 'Ventas por categoría y productos más vendidos.'),
           ('auditoria', 'auditoria', 'Auditoría', 'Registro de auditoría con filtros.'),
       ]],
     # ---- Operaciones
@@ -74,9 +77,9 @@ PAGES: list[dict] = [
     dict(path='monitoreo/servicios.html', route='/monitoreo/servicios', title='Servicios', description='Targets de Prometheus y dependencias.', section='monitoreo', roles=['OBSERVABILITY_VIEWER', 'ADMIN']),
     dict(path='monitoreo/metricas.html', route='/monitoreo/metricas', title='Métricas', description='Indicadores operativos calculados por Prometheus.', section='monitoreo', roles=['OBSERVABILITY_VIEWER', 'ADMIN']),
     dict(path='monitoreo/alertas.html', route='/monitoreo/alertas', title='Alertas', description='Reglas de alerta y su estado.', section='monitoreo', roles=['OBSERVABILITY_VIEWER', 'ADMIN']),
-    # ---- Arquitectura
-    dict(path='arquitectura/overview.html', route='/arquitectura/overview', title='Arquitectura', description='Arquitectura hexagonal y explorador interactivo.', section='arquitectura', fragment='arquitectura-explorer.html'),
-    dict(path='arquitectura/flujo-pedidos.html', route='/arquitectura/flujo-pedidos', title='Flujo de pedidos', description='Secuencia del checkout y ciclo de vida del pedido.', section='arquitectura'),
+    # ---- Documentación técnica interna (v6: fuera de la tienda, solo personal autorizado)
+    dict(path='arquitectura/overview.html', route='/arquitectura/overview', title='Documentación técnica', description='Documentación técnica interna para el personal autorizado.', section='arquitectura', roles=['ADMIN', 'OBSERVABILITY_VIEWER'], fragment='arquitectura-explorer.html'),
+    dict(path='arquitectura/flujo-pedidos.html', route='/arquitectura/flujo-pedidos', title='Flujo de pedidos', description='Documentación técnica interna para el personal autorizado.', section='arquitectura', roles=['ADMIN', 'OBSERVABILITY_VIEWER']),
 ]
 
 TEMPLATE = """<!doctype html>
@@ -93,6 +96,7 @@ TEMPLATE = """<!doctype html>
   <link rel="stylesheet" href="/css/effects.css">
   <link rel="stylesheet" href="/css/platform.css">
   <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/store.css">
   <script type="module" src="/js/page.js"></script>
 </head>
 <!-- Página generada por tools/generate_pages.py: edita el registro o la vista, no este archivo. -->
@@ -104,7 +108,7 @@ TEMPLATE = """<!doctype html>
 {sidebar}  <main id="main" class="page-main" tabindex="-1">
     <nav id="breadcrumbs" class="breadcrumbs" aria-label="Ruta de navegación"></nav>
     <div id="view-root" class="view-root" aria-live="polite">
-      <noscript><p class="card">HexaOrders necesita JavaScript para cargar los datos de esta página desde la API.</p></noscript>
+      <noscript><p class="card">Activa JavaScript en tu navegador para comprar en HexaOrders.</p></noscript>
       <div class="page-loading" aria-hidden="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton skeleton--row"></div></div>
     </div>
 {fragment}  </main>

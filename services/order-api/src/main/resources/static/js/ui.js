@@ -23,12 +23,16 @@ export function el(tag, props = {}, ...children) {
 
 export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+const moneyFormats = {
+  USD: new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }),
+  PEN: new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 }),
+};
 const integer = new Intl.NumberFormat('es-ES');
 const dateTime = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'medium' });
 const relative = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
 
-export const formatMoney = (value) => money.format(Number(value));
+/** El laboratorio usa USD (contrato de la API original); la tienda, soles (PEN). */
+export const formatMoney = (value, currency = 'USD') => (moneyFormats[currency] || moneyFormats.USD).format(Number(value));
 export const formatInt = (value) => integer.format(value);
 export const formatDateTime = (iso) => dateTime.format(new Date(iso));
 
