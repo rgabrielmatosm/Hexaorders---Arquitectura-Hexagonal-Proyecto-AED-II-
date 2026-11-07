@@ -109,7 +109,7 @@ public class IntegrationConfiguration {
 
         @Bean
         NotificationUseCases notifications(JdbcTemplate jdbc, JavaMailSender smtp, IntegrationTelemetry telemetry,
-                                           @Value("${hexaorders.mail.from:HexaOrders <no-reply@hexaorders.local>}") String from) {
+                                           @Value("${hexaorders.mail.from:Polymer <no-reply@hexaorders.local>}") String from) {
             return new NotificationService(new JdbcProcessedEvents(jdbc), new JdbcNotificationRecipients(jdbc),
                     new SmtpMailSender(smtp, from), telemetry);
         }

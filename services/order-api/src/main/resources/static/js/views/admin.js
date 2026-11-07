@@ -22,7 +22,7 @@ const TITLES = {
   reportes: ['Reportes comerciales', 'Ventas por categoría y productos más vendidos, exportables a CSV.'],
   auditoria: ['Auditoría', 'Quién hizo qué y cuándo.'],
 };
-const CONTACT_TOPICS = { ORDERS: 'Pedidos y envíos', SUPPORT: 'Soporte técnico', WARRANTY: 'Garantías', SALES: 'Ventas corporativas',
+const CONTACT_TOPICS = { ORDERS: 'Pedidos y envíos', SUPPORT: 'Soporte técnico', WARRANTY: 'Garantías', SALES: 'Ventas corporativas', CLAIM: 'Libro de reclamaciones',
   OTHER: 'Otro', DEMO: 'Demostración', ACADEMIC: 'Consulta' };
 const STATUS_OPTIONS = [['STANDARD', 'Estándar'], ['NEW', 'Nuevo'], ['FEATURED', 'Destacado'], ['BESTSELLER', 'Más vendido'], ['CLEARANCE', 'Liquidación']];
 const slugify = (text) => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

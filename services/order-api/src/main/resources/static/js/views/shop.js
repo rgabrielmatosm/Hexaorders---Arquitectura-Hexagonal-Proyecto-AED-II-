@@ -222,7 +222,7 @@ route('/tienda', async (root, { query }) => {
       const label = state.category ? state.category.name : state.q ? `Resultados para «${state.q}»` : state.offers ? 'Ofertas' : 'Todos los productos';
       title.textContent = label;
       lead.textContent = `${result.total} productos${state.category && state.category.parentId ? ` en ${(categories.find((c) => c.id === state.category.parentId) || {}).name}` : ''}`;
-      document.title = `${label} · HexaOrders`;
+      document.title = `${label} · POLYMER`;
       const crumbs = [['/catalogo.html', 'Catálogo']];
       if (state.category) {
         const parent = state.category.parentId ? categories.find((c) => c.id === state.category.parentId) : null;
@@ -264,7 +264,7 @@ route('/producto/:id', async (root, { id }) => {
   const main = categories.find((c) => c.id === product.mainCategoryId);
   setBreadcrumbs([['/catalogo.html', 'Catálogo'], ...(main && main.id !== (sub && sub.id) ? [[`/catalogo.html?categoria=${main.slug}`, main.name]] : []),
     ...(sub ? [[`/catalogo.html?categoria=${sub.slug}`, sub.name]] : []), [null, product.name]]);
-  document.title = `${product.name} · HexaOrders`;
+  document.title = `${product.name} · POLYMER`;
   let quantity = 1;
   const maxQty = Math.max(1, Math.min(99, product.stock));
   const qty = el('input', { type: 'number', min: '1', max: String(maxQty), value: '1', inputmode: 'numeric', 'aria-label': 'Cantidad', class: 'qty__input' });
@@ -647,7 +647,7 @@ route('/entrar', async (root, { query }) => {
   root.append(view(el('div', { class: 'auth' },
     el('div', { class: 'auth__aside' },
       el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: 'Bienvenido a HexaOrders' }),
+      el('h2', { text: 'Bienvenido a POLYMER' }),
       el('p', { text: 'Inicia sesión para comprar, guardar tu carrito y seguir tus pedidos.' }),
       el('details', { class: 'demo-accounts-box' }, el('summary', { text: 'Cuentas de demostración' }),
         el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => { username.value = user; password.focus(); } },
@@ -680,7 +680,7 @@ route('/registro', async (root) => {
   });
   root.append(view(el('div', { class: 'auth' },
     el('div', { class: 'auth__aside' }, el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: 'Tu cuenta HexaOrders' }),
+      el('h2', { text: 'Tu cuenta POLYMER' }),
       el('ul', { class: 'auth__perks' }, ['Guarda tu carrito en todos tus dispositivos', 'Sigue tus pedidos en tiempo real', 'Compra más rápido con tus datos guardados']
         .map((text) => el('li', {}, icon('sparkle'), el('span', { text }))))),
     form)));

@@ -92,7 +92,8 @@ class IntegrationServicesTest {
         order.verify(processed).markProcessed("order-status-11", "email-notifications");
         assertThat(message.getValue().to()).isEqualTo("cliente@hexaorders.local");
         assertThat(message.getValue().subject()).contains("aaaaaaaa").contains("aprobado");
-        assertThat(message.getValue().body()).contains("verificado").contains("Mailpit");
+        assertThat(message.getValue().body()).contains("verificado").contains("Mailpit")
+                .contains("Equipo Polymer").doesNotContain("HexaOrders"); // POLYMER: marca comercial en los correos
 
         when(processed.alreadyProcessed("order-status-11", "email-notifications")).thenReturn(true);
         assertThat(service.handle(approved)).isEqualTo("duplicate");

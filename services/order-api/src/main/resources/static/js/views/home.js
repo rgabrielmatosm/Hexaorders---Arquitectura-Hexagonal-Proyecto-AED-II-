@@ -2,6 +2,7 @@
 // Cada sección de productos procede de la búsqueda real del catálogo (PostgreSQL).
 
 import { catalogApi, contactApi } from '../api.js';
+import { BRAND, CONTACT } from '../brand.js';
 import { MAIN_CATEGORY_ICONS, emptyState, errorMessage, field, formError, icon, submitting } from '../components.js';
 import { categoryTree, storeCategories } from '../layout.js';
 import { route } from '../router.js';
@@ -106,7 +107,7 @@ const FAQ = [
     ['¿Cómo sigo mi pedido?', 'En «Mi cuenta → Mis pedidos» verás el número de pedido (HX-…), su estado actualizado y la ventana de entrega programada.'],
   ]],
   ['pagos', 'Métodos de pago', 'card', [
-    ['¿Qué métodos de pago aceptan?', 'Pago contra entrega (efectivo o tarjeta al recibir), transferencia bancaria y pago en tienda al recoger. No solicitamos datos de tarjeta en la web.'],
+    ['¿Qué métodos de pago aceptan?', 'Pago contra entrega (en efectivo al recibir), transferencia bancaria y pago en tienda al recoger. Los pagos con tarjeta y billeteras digitales todavía no están disponibles: no solicitamos datos de tarjeta en la web.'],
     ['¿Cuándo se despacha si pago por transferencia?', 'Te enviamos los datos de la cuenta por correo y despachamos cuando se confirma el abono.'],
     ['¿Los precios incluyen IGV?', 'Sí. Todos los precios están en soles (S/) e incluyen IGV. El precio que ves en el carrito es el que pagas.'],
   ]],
@@ -137,7 +138,7 @@ route('/ayuda', async (root) => {
 // ---- Nosotros -----------------------------------------------------------------------------------
 route('/nosotros', async (root) => {
   root.append(view(
-    pageHead('Nosotros', 'Somos HexaOrders', 'Una tienda de tecnología hecha por especialistas, para que compres con confianza.'),
+    pageHead('Nosotros', `Somos ${BRAND.displayName}`, `${BRAND.slogan} Una tienda de tecnología hecha por especialistas, para que compres con confianza.`),
     el('div', { class: 'about-grid' }, [
       ['sparkle', 'Especialistas en tecnología', 'Solo vendemos tecnología: computadoras, componentes, gaming, redes, smart home y equipos empresariales. Te asesoramos con compatibilidad y rendimiento.'],
       ['shield', 'Productos originales', 'Trabajamos con marcas y distribuidores oficiales. Cada producto llega nuevo, sellado y con garantía de marca.'],
@@ -145,6 +146,11 @@ route('/nosotros', async (root) => {
       ['users', 'Atención cercana', 'Un equipo de operaciones y logística revisa cada pedido y te acompaña antes y después de la compra.'],
     ].map(([ic, title, text]) => el('article', { class: 'card about-card' }, el('span', { class: 'category-tile__icon' }, icon(ic)),
       el('h3', { text: title }), el('p', { class: 'muted', text })))),
+    el('section', { class: 'info-block', id: 'historia' },
+      el('h2', { text: 'Nuestra historia' }),
+      el('p', { text: `${BRAND.displayName} nació en ${CONTACT.city} con una idea simple: que comprar tecnología sea tan fácil como usarla. Empezamos asesorando a estudiantes y profesionales que armaban su primera PC, y hoy ofrecemos más de 500 productos de 20 categorías.` }),
+      el('p', { text: 'Nuestro nombre viene de los polímeros: cadenas de piezas pequeñas que, unidas, forman algo más fuerte. Así vemos la tecnología y a nuestros clientes: conectados.' }),
+      el('p', { class: 'small muted', text: 'Proyecto de demostración: la historia y los datos de la empresa son ilustrativos.' })),
     el('section', { class: 'help-banner' },
       el('div', {}, el('h2', { text: '¿Compras para tu empresa?' }), el('p', { text: 'Cotizaciones por volumen, facturación y equipos para oficinas, data centers y puntos de venta.' })),
       el('a', { class: 'btn btn--primary', href: '/contacto.html?tema=SALES', text: 'Solicitar cotización' }))));
@@ -185,8 +191,11 @@ route('/contacto', async (root, { query }) => {
     el('div', { class: 'contact-layout' }, form,
       el('aside', { class: 'stack' },
         el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Atención al cliente' }),
-          el('p', { class: 'muted small', text: 'Lunes a sábado de 9:00 a 19:00.' }),
-          el('p', { class: 'small', text: 'ventas@hexaorders.local · soporte@hexaorders.local' })),
+          el('p', { class: 'muted small', text: CONTACT.hours }),
+          el('p', { class: 'small' }, el('a', { href: `mailto:${CONTACT.supportEmail}`, text: CONTACT.supportEmail }), ' · ',
+            el('a', { href: `mailto:${CONTACT.corporateEmail}`, text: CONTACT.corporateEmail })),
+          el('p', { class: 'muted small', text: `WhatsApp y teléfono: ${CONTACT.phone} (dato de demostración)` }),
+          el('a', { class: 'btn btn--ghost btn--sm', href: '/libro-reclamaciones.html', text: 'Libro de reclamaciones' })),
         el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Antes de escribir' }),
           el('p', { class: 'muted small', text: 'Revisa el centro de ayuda: allí respondemos las dudas más frecuentes sobre envíos, pagos y garantías.' }),
           el('a', { class: 'btn btn--ghost btn--sm', href: '/ayuda.html', text: 'Centro de ayuda' })),

@@ -4,6 +4,8 @@
 // esa información, de las categorías reales del catálogo y de la sesión.
 
 import { catalogApi } from './api.js';
+import { onSoundChange, play, setSound, soundEnabled } from './audio.js';
+import { BRAND, CONTACT, LEGAL, PAYMENTS, SOCIAL, SOCIAL_FALLBACK } from './brand.js';
 import { cart } from './cart.js';
 import { MAIN_CATEGORY_ICONS, icon } from './components.js';
 import { ROLE_LABELS, session } from './session.js';
@@ -180,6 +182,32 @@ function megaMenu() {
   return el('div', { class: 'mega' }, button, panel);
 }
 
+/** Logotipo horizontal de POLYMER (SVG generado por tools/generate_brand.py). */
+function brandLink(height = 34) {
+  return el('a', { class: 'brand brand--logo', href: '/', 'aria-label': `${BRAND.name}, inicio` },
+    el('img', { class: 'brand__lockup', src: BRAND.logo, alt: BRAND.name, height: String(height), width: String(Math.round(height * 3.8)) }),
+    el('img', { class: 'brand__mark', src: BRAND.mark, alt: '', height: String(height), width: String(height) }));
+}
+
+/** Silencio global de los sonidos de la interfaz (apagados por defecto). */
+function soundToggle() {
+  const button = el('button', { type: 'button', class: 'icon-btn sound-toggle', id: 'sound-toggle' });
+  const paint = (on) => {
+    button.replaceChildren(icon(on ? 'volume' : 'volumeOff'));
+    button.setAttribute('aria-pressed', String(on));
+    button.setAttribute('aria-label', on ? 'Sonidos activados: pulsa para silenciar' : 'Sonidos silenciados: pulsa para activarlos');
+    button.title = on ? 'Silenciar sonidos' : 'Activar sonidos';
+  };
+  paint(soundEnabled());
+  button.addEventListener('click', () => {
+    const on = !soundEnabled();
+    setSound(on);
+    if (on) play('notify', { force: true });
+  });
+  onSoundChange(paint);
+  return button;
+}
+
 function renderHeader() {
   const header = $('#site-header');
   if (!header) return;
@@ -217,11 +245,9 @@ function renderHeader() {
       el('span', { class: 'hide-sm' }, icon('card'), ' Pago contra entrega, transferencia o en tienda'),
       el('a', { href: '/cliente/pedidos.html' }, 'Sigue tu pedido')),
     el('div', { class: 'store-bar' },
-      el('a', { class: 'brand', href: '/', 'aria-label': 'HexaOrders, inicio' },
-        el('img', { src: '/img/logo.svg', alt: '', width: '38', height: '38' }),
-        el('span', { class: 'brand__name' }, 'HEXA', el('span', { text: 'ORDERS' }))),
+      brandLink(),
       searchForm(),
-      el('div', { class: 'topbar__actions' }, accountMenu(), cartLink, burger)),
+      el('div', { class: 'topbar__actions' }, soundToggle(), accountMenu(), cartLink, burger)),
     el('div', { class: 'store-nav' }, megaMenu(), nav));
 }
 
@@ -273,11 +299,14 @@ export function setBreadcrumbs(items) {
   nav.hidden = false;
 }
 
-// ---- Pie de página -----------------------------------------------------------------------------
+// ---- Pie de página comercial (5 columnas) -------------------------------------------------------
+// Todos los enlaces llevan a páginas reales. Los datos de contacto y legales salen de brand.js y son
+// de demostración (se marcan como tales).
 function renderFooter() {
   const footer = $('#site-footer');
   if (!footer) return;
-  const column = (title, links) => el('div', { class: 'site-footer__col' }, el('strong', { text: title }),
+  footer.classList.add('pm-footer');
+  const column = (title, links) => el('nav', { class: 'site-footer__col', 'aria-label': title }, el('strong', { text: title }),
     el('ul', {}, links.map(([href, label]) => el('li', {}, el('a', { href, text: label })))));
   const benefits = el('div', { class: 'store-benefits' }, [
     ['truck', 'Envíos a todo el Perú', 'Gratis desde S/ 299 en Lima Metropolitana'],
@@ -285,27 +314,63 @@ function renderFooter() {
     ['shield', 'Garantía oficial', 'Productos nuevos y sellados de marca'],
     ['refresh', 'Cambios y devoluciones', 'Hasta 7 días por fallas de fábrica'],
   ].map(([ic, title, text]) => el('div', { class: 'store-benefit' }, icon(ic), el('div', {}, el('strong', { text: title }), el('small', { text })))));
-  const shopColumn = el('div', { class: 'site-footer__col' }, el('strong', { text: 'Categorías' }), el('ul', {}));
-  storeCategories().then((list) => {
-    shopColumn.querySelector('ul').replaceChildren(...categoryTree(list).slice(0, 8)
-      .map(({ main }) => el('li', {}, el('a', { href: `/catalogo.html?categoria=${main.slug}`, text: main.name }))));
+  const demo = CONTACT.demo ? el('span', { class: 'demo-pill', title: 'Dato de demostración', text: 'DEMO' }) : null;
+  const contact = el('ul', { class: 'pm-footer__contact' },
+    el('li', {}, icon('whatsapp'), el('span', {}, `WhatsApp: ${CONTACT.whatsapp}`, demo)),
+    el('li', {}, icon('call'), el('span', {}, `Teléfono: ${CONTACT.phone}`, demo?.cloneNode(true))),
+    el('li', {}, icon('clock'), el('span', { text: CONTACT.hours })),
+    el('li', {}, icon('mail'), el('span', {}, 'Soporte: ', el('a', { href: `mailto:${CONTACT.supportEmail}`, text: CONTACT.supportEmail }))),
+    el('li', {}, icon('mail'), el('span', {}, 'Corporativo: ', el('a', { href: `mailto:${CONTACT.corporateEmail}`, text: CONTACT.corporateEmail }))),
+    el('li', {}, icon('map'), el('span', { text: CONTACT.city })));
+  const brandColumn = el('div', { class: 'site-footer__brand' },
+    brandLink(30),
+    el('p', { class: 'pm-footer__slogan', text: BRAND.slogan }),
+    el('p', { class: 'muted small', text: BRAND.description }),
+    contact,
+    el('a', { class: 'pm-footer__claims', href: '/libro-reclamaciones.html' }, icon('book'), 'Libro de reclamaciones'));
+  const pay = el('div', { class: 'footer-pay', 'aria-label': 'Métodos de pago' },
+    el('span', { class: 'footer-pay__label', text: 'Métodos de pago' }),
+    el('div', { class: 'footer-pay__list' },
+      ...PAYMENTS.available.map((name) => el('span', { class: 'pay-badge', title: 'Disponible en el checkout' }, icon('card'), name)),
+      ...PAYMENTS.notIntegrated.map((name) => el('span', { class: 'pay-badge pay-badge--off', title: 'Aún no integrado: no se acepta' }, `${name} · próximamente`)),
+      el('a', { class: 'small', href: '/empresa.html#metodos-pago', text: 'Detalles' })));
+  const social = el('ul', { class: 'pm-social', 'aria-label': 'Redes sociales' }, SOCIAL.map(({ id, label, url }) => el('li', {},
+    el('a', url ? { href: url, target: '_blank', rel: 'noopener noreferrer', 'aria-label': label, title: label }
+      : { href: SOCIAL_FALLBACK, 'aria-label': `${label}: cuenta oficial aún no disponible`, title: `${label} (próximamente)` }, icon(id)))));
+  const replay = el('button', { type: 'button', text: 'Ver la intro' });
+  replay.addEventListener('click', () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('intro', '1');
+    window.location.assign(url.pathname + url.search);
   });
+  const legal = el('p', { class: 'pm-footer__legal' },
+    el('strong', { text: `© ${new Date().getFullYear()} ${BRAND.name}. ` }), `${BRAND.slogan} `,
+    `Razón social: ${LEGAL.companyName || 'no configurada'} · RUC: ${LEGAL.taxId || 'no configurado'} · ${LEGAL.address}. `,
+    'Precios en soles (S/) con IGV. Tienda de demostración: precios, stock y promociones ilustrativos; no se procesan pagos en línea.');
   footer.replaceChildren(
     benefits,
     el('div', { class: 'site-footer__grid' },
-      el('div', { class: 'site-footer__brand' },
-        el('a', { class: 'brand', href: '/' }, el('img', { src: '/img/logo.svg', alt: '', width: '30', height: '30' }),
-          el('span', { class: 'brand__name' }, 'HEXA', el('span', { text: 'ORDERS' }))),
-        el('p', { class: 'muted small', text: 'Tu tienda de tecnología: computadoras, componentes, gaming, smartphones, redes, smart home y mucho más, con atención de especialistas.' }),
-        el('p', { class: 'muted small', text: 'Atención: lunes a sábado de 9:00 a 19:00 · ventas@hexaorders.local' })),
-      shopColumn,
-      column('Ayuda', [['/ayuda.html', 'Centro de ayuda'], ['/ayuda.html#envios', 'Envíos y entregas'], ['/ayuda.html#pagos', 'Métodos de pago'],
-        ['/ayuda.html#garantias', 'Garantías y devoluciones'], ['/contacto.html', 'Contáctanos']]),
-      column('Mi cuenta', [['/login.html', 'Iniciar sesión'], ['/registro.html', 'Crear cuenta'], ['/cliente/pedidos.html', 'Mis pedidos'],
-        ['/carrito.html', 'Mi carrito']]),
-      column('HexaOrders', [['/nosotros.html', 'Sobre nosotros'], ['/ofertas.html', 'Ofertas y promociones'],
-        ['/contacto.html?tema=SALES', 'Ventas corporativas'], ['/login.html?next=%2Fmonitoreo%2Fdashboard.html', 'Acceso del personal']])),
-    el('p', { class: 'site-footer__legal muted small', text: `© ${new Date().getFullYear()} HexaOrders · Precios en soles (S/) con IGV incluido. Precios, stock y promociones de demostración: no se procesan pagos en línea ni se almacenan datos bancarios.` }));
+      brandColumn,
+      column('Sobre nosotros', [['/nosotros.html', 'Quiénes somos'], ['/nosotros.html#historia', 'Nuestra historia'],
+        ['/empresa.html#canales', 'Canales de atención'], ['/empresa.html#compra-segura', 'Compra fácil y segura'],
+        ['/empresa.html#metodos-pago', 'Métodos de pago']]),
+      column('Te informamos', [['/empresa.html#tiendas', 'Nuestras tiendas'], ['/empresa.html#cobertura', 'Cobertura de delivery'],
+        ['/legal.html#garantias', 'Garantías'], ['/legal.html#terminos', 'Términos y condiciones'], ['/legal.html#privacidad', 'Política de privacidad'],
+        ['/legal.html#cookies', 'Política de cookies'], ['/legal.html#devoluciones', 'Cambios y devoluciones']]),
+      column('Servicio al cliente', [['/contacto.html', 'Contacto'], ['/cliente/pedidos.html', 'Seguimiento de pedidos'],
+        ['/ayuda.html', 'Preguntas frecuentes'], ['/legal.html#facturacion', 'Facturación'], ['/contacto.html?tema=SALES', 'Ventas corporativas'],
+        ['/empresa.html#disponibilidad', 'Disponibilidad de productos'], ['/login.html?next=%2Fmonitoreo%2Fdashboard.html', 'Acceso del personal']]),
+      column('Destacados', [['/cliente/pedidos.html', 'Mis compras'], ['/ofertas.html', 'Ofertas'], ['/catalogo.html?categoria=computadoras', 'Laptops y PC'],
+        ['/catalogo.html?categoria=componentes', 'Componentes'], ['/catalogo.html?categoria=perifericos', 'Periféricos'],
+        ['/catalogo.html?categoria=accesorios-moviles', 'Accesorios'], ['/catalogo.html', 'Catálogo completo']])),
+    pay,
+    el('div', { class: 'pm-footer__bottom' },
+      social,
+      el('ul', { class: 'pm-quick', 'aria-label': 'Enlaces rápidos' },
+        [['/legal.html#terminos', 'Términos'], ['/legal.html#privacidad', 'Privacidad'], ['/legal.html#cookies', 'Cookies'],
+          ['/libro-reclamaciones.html', 'Libro de reclamaciones'], ['/ayuda.html', 'Ayuda']].map(([href, label]) => el('li', {}, el('a', { href, text: label }))),
+        el('li', {}, replay)),
+      legal));
 }
 
 export function updateCartCount() {

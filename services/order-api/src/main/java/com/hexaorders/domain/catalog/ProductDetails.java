@@ -40,7 +40,7 @@ public record ProductDetails(String sku, String name, String description, long c
             throw new IllegalArgumentException("hue: entre 0 y 359");
         }
         price = price.setScale(2);
-        brand = brand == null || brand.isBlank() ? "HexaOrders" : brand.strip();
+        brand = brand == null || brand.isBlank() ? "Polymer" : brand.strip();
         if (brand.length() > 60) throw new IllegalArgumentException("brand: máximo 60 caracteres");
         model = model == null ? "" : model.strip();
         if (model.length() > 80) throw new IllegalArgumentException("model: máximo 80 caracteres");

@@ -2,8 +2,10 @@
 // PostgreSQL a través de /api/shop (el servidor solo devuelve los pedidos del propio cliente).
 
 import { shopApi } from '../api.js';
+import { play } from '../audio.js';
 import { cart } from '../cart.js';
 import { CUSTOMER_LIFECYCLE, HAPPY_PATH, customerBadge, emptyState, kpi, money, orderRef, progressBar, skeletons } from '../components.js';
+import { animatedCheck } from '../motion.js';
 import { link, route } from '../router.js';
 import { session } from '../session.js';
 import { el, formatDateTime, formatRelative, toast } from '../ui.js';
@@ -49,6 +51,7 @@ route('/seguimiento/:id', async (root, { id, query }) => {
   const isNew = query.get('nuevo') === '1';
   if (isNew) {
     toast(`¡Gracias por tu compra! Tu número de pedido es ${orderRef(order)}`, 'ok', 6000);
+    play('confirm'); // solo si la persona activó los sonidos
     window.history.replaceState(null, '', `${window.location.pathname}?id=${encodeURIComponent(id)}`);
   }
   const reached = new Set(history.map((h) => h.to));
@@ -66,8 +69,10 @@ route('/seguimiento/:id', async (root, { id, query }) => {
       el('h1', { class: 'view__title', text: orderRef(order) }),
       el('p', { class: 'section__lead', text: `Estado actual: ${CUSTOMER_LIFECYCLE[order.status] || order.status} · actualizado ${formatRelative(history.length ? history[history.length - 1].at : order.createdAt)}` })),
     el('div', { class: 'row-actions' }, customerBadge(order.status), el('a', { class: 'btn btn--ghost btn--sm', href: link(`/mis-pedidos/${order.id}`), text: 'Detalle y productos' }))),
-    isNew ? el('div', { class: 'notice-box notice-box--ok order-thanks' }, el('strong', { text: '¡Gracias por tu compra! ' }),
-      `Registramos tu pedido ${orderRef(order)} por ${money(order.amount, order.currency)}. Te enviamos la confirmación por correo y aquí puedes seguir cada paso.`) : null,
+    isNew ? el('div', { class: 'order-confirmed order-thanks', role: 'status' }, animatedCheck(),
+      el('div', {}, el('h2', { text: '¡Gracias por tu compra!' }),
+        el('p', {}, 'Registramos tu pedido ', el('strong', { class: 'order-confirmed__ref', text: orderRef(order) }),
+          ` por ${money(order.amount, order.currency)}. Te enviamos la confirmación por correo y aquí puedes seguir cada paso.`))) : null,
     failed ? el('div', { class: 'notice-box notice-box--error' }, el('strong', { text: `${CUSTOMER_LIFECYCLE[order.status]}. ` }),
       order.status === 'REJECTED' ? 'No pudimos aprobar este pedido tras la verificación. No se realizó ningún cobro; escríbenos si necesitas ayuda.'
         : 'El pedido fue cancelado. No se realizó ningún cobro.') : null,

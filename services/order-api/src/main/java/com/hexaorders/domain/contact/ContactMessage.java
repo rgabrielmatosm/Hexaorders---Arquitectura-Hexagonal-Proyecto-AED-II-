@@ -4,14 +4,14 @@ import java.time.Instant;
 
 /** A message sent from the public contact page. Validated in the domain, persisted by an adapter. */
 public record ContactMessage(long id, String name, String email, String topic, String message, Instant createdAt) {
-    /** v6: ORDERS, WARRANTY and SALES are the store topics; DEMO and ACADEMIC remain valid for older messages. */
-    public static final java.util.Set<String> TOPICS = java.util.Set.of("DEMO", "SUPPORT", "ACADEMIC", "OTHER", "ORDERS", "WARRANTY", "SALES");
+    /** v6: ORDERS, WARRANTY and SALES are the store topics; CLAIM is the complaints book (POLYMER); DEMO and ACADEMIC remain valid for older messages. */
+    public static final java.util.Set<String> TOPICS = java.util.Set.of("DEMO", "SUPPORT", "ACADEMIC", "OTHER", "ORDERS", "WARRANTY", "SALES", "CLAIM");
 
     public ContactMessage {
         name = text(name, 2, 80, "name");
         email = text(email, 5, 254, "email");
         if (!email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) throw new IllegalArgumentException("email: formato no válido");
-        if (topic == null || !TOPICS.contains(topic)) throw new IllegalArgumentException("topic: ORDERS, SUPPORT, WARRANTY, SALES u OTHER");
+        if (topic == null || !TOPICS.contains(topic)) throw new IllegalArgumentException("topic: ORDERS, SUPPORT, WARRANTY, SALES, CLAIM u OTHER");
         message = text(message, 10, 2000, "message");
     }
 

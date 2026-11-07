@@ -1,4 +1,4 @@
-// Navegación de HexaOrders.
+// Navegación de POLYMER (sitio multipágina).
 //
 // v4 — sitio multipágina: cada página HTML real (catalogo.html, admin/usuarios.html…) declara en
 // <body data-route="…"> qué vista renderiza, y esta capa la busca en el registro de rutas.
@@ -12,7 +12,7 @@ const routes = [];
 let current = null;
 
 /** path con parámetros ":id"; roles = roles permitidos (vacío = público, 'auth' = cualquier sesión). */
-export function route(path, render, { roles = [], title = 'HexaOrders' } = {}) {
+export function route(path, render, { roles = [], title = 'POLYMER' } = {}) {
   const keys = [];
   const pattern = new RegExp(`^${path.replace(/:[a-zA-Z]+/g, (m) => { keys.push(m.slice(1)); return '([^/]+)'; })}$`);
   routes.push({ path, pattern, keys, render, roles, title });
@@ -28,6 +28,9 @@ const PAGE_URLS = [
   [/^\/carrito$/, () => '/carrito.html'],
   [/^\/ofertas$/, () => '/ofertas.html'],
   [/^\/ayuda$/, () => '/ayuda.html'],
+  [/^\/empresa$/, () => '/empresa.html'],
+  [/^\/legal$/, () => '/legal.html'],
+  [/^\/libro-reclamaciones$/, () => '/libro-reclamaciones.html'],
   [/^\/checkout$/, () => '/checkout.html'],
   [/^\/entrar$/, () => '/login.html'],
   [/^\/registro$/, () => '/registro.html'],
@@ -147,7 +150,7 @@ export async function startPage(path) {
     messageView(root, 'Falta el identificador', 'Esta página necesita un parámetro ?id= en la URL.', '/', 'Volver al inicio');
     return;
   }
-  document.title = `${document.body.dataset.title || r.title} · HexaOrders`;
+  document.title = `${document.body.dataset.title || r.title} · POLYMER`;
   await render(r, params);
 }
 

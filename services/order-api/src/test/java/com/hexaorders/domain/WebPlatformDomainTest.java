@@ -36,5 +36,8 @@ class WebPlatformDomainTest {
                 .hasMessageContaining("topic");
         assertThatThrownBy(() -> new ContactMessage(0, "Ana", "ana@example.com", "OTHER", "corto", Instant.EPOCH))
                 .hasMessageContaining("message");
+        // POLYMER: el Libro de reclamaciones usa el tema CLAIM (migración V8).
+        assertThat(new ContactMessage(0, "Ana", "ana@example.com", "CLAIM", "Tipo: RECLAMO. El producto llegó dañado.", Instant.EPOCH).topic())
+                .isEqualTo("CLAIM");
     }
 }

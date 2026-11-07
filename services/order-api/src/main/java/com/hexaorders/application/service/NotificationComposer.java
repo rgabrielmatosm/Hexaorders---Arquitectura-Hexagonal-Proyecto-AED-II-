@@ -53,8 +53,8 @@ final class NotificationComposer {
         String body = "Hola, " + recipient.displayName() + ":\n\n" + detail + "\n\n"
                 + "Pedido: " + event.orderId() + "\n"
                 + "Fecha del evento: " + WHEN.format(event.occurredAt()) + "\n\n"
-                + "Puedes seguirlo en HexaOrders: /cliente/seguimiento.html?id=" + event.orderId() + "\n\n"
-                + "— Equipo HexaOrders\n\n"
+                + "Puedes seguirlo en tu cuenta Polymer: /cliente/seguimiento.html?id=" + event.orderId() + "\n\n"
+                + "— Equipo Polymer · Tecnología que conecta contigo.\n\n"
                 + "(Entorno de pruebas: este correo lo captura Mailpit y no se envía a Internet.)\n"
                 + "Referencia del evento: " + event.eventId() + "\n";
         return new MailMessage(recipient.email(), subject, body);
