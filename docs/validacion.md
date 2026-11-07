@@ -25,6 +25,14 @@ Entorno local: el mismo de la v6. Contenedor Linux **sin Docker ni Windows**, co
 | `check_frontend.py` | Correcto, con comprobaciones nuevas: la marca anterior no aparece en ningún texto de la tienda, todo enlace `/….html` existe, y las 45 páginas cargan `intro-gate.js` y `polymer.css` con el título «· POLYMER» |
 | `generate_brand.py --check`, `generate_pages.py --check`, `generate_catalog.py --check`, `generate_delivery.py --check`, `validate_delivery.py`, `check_observability.py` | Correctos |
 
+### CI con Docker real (GitHub Actions, ejecución 42348398511)
+
+| Job | Resultado |
+| --- | --- |
+| `compose` (`verify -Mode full`: 13 contenedores y migración V8 sobre la base) | **Correcto**, también los pasos `ui-e2e.js`, `pages-e2e.js` y el nuevo **`intro-e2e.js`** contra el stack completo |
+| `compose-basic` (6 contenedores) | **Correcto** |
+| `windows` (PowerShell 5.1: `check` con `generate_brand.py --check` y pruebas unitarias) | **Correcto** |
+
 ### Errores encontrados y corregidos durante la prueba
 
 - La API View Transitions dejaba un rechazo de promesa sin capturar («Transition was aborted… opt-in disabled») al navegar mediante código o hacia `laboratorio.html`, que no carga `polymer.css`. Ahora `intro-gate.js` lo captura en todas las páginas, también en el laboratorio, y omite la transición mientras se muestra la intro.
