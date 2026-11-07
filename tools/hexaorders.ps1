@@ -428,6 +428,8 @@ function Invoke-Check {
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_frontend.py'))
     Write-Step 'Catálogo tecnológico: la migración V7 coincide con tools/catalog_v6_data.py'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_catalog.py'), '--check')
+    Write-Step 'Marca POLYMER: los SVG del logotipo coinciden con tools/generate_brand.py'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_brand.py'), '--check')
 }
 
 function Invoke-Test {

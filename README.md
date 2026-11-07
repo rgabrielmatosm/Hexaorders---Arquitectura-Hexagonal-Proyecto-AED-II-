@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="services/order-api/src/main/resources/static/img/logo.svg" alt="Logo de HexaOrders" width="112">
+<img src="services/order-api/src/main/resources/static/img/polymer-logo-light.svg" alt="POLYMER" width="320">
 
-# HEXAORDERS
+**Tecnología que conecta contigo.**
 
-**Order Management & Risk Assessment System**
+Tienda de tecnología **POLYMER**, construida sobre **HexaOrders** (nombre técnico del sistema): *Order Management & Risk Assessment System*
 
 Gestión de pedidos con evaluación determinista de riesgo, construida con **arquitectura hexagonal** (puertos y adaptadores) en **Java 21** y **Python**, persistida en **PostgreSQL**, orquestada con **Docker Compose** y observada con **Prometheus** y **Grafana**.
 
@@ -20,6 +20,7 @@ Gestión de pedidos con evaluación determinista de riesgo, construida con **arq
 <summary>Mostrar el índice completo</summary>
 
 1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+1. [**Marca POLYMER**](#-marca-polymer): [manual de marca](docs/brand/BRAND_POLYMER.md) · [ADR 0016](docs/adr/0016-polymer-brand-in-the-presentation-layer.md) · [actualizar](docs/WINDOWS_DOCKER_GUIDE.md#11-actualizar-a-polymer)
 1. [**Tienda tecnológica v6**](#-tienda-tecnológica-v6): [documentación técnica](docs/TECH_STORE.md) · [ADR 0014](docs/adr/0014-commercial-store-and-internal-technical-docs.md) · [ADR 0015](docs/adr/0015-pricing-promotions-and-currency-in-the-domain.md) · [actualizar desde la v5](docs/WINDOWS_DOCKER_GUIDE.md#10-actualizar-desde-la-v5-a-la-v6-tienda-tecnológica)
 1. [**Plataforma Docker v5 (13 contenedores)**](#-plataforma-docker-v5-13-contenedores): [arquitectura](docs/DOCKER_ARCHITECTURE.md) · [servicios](docs/DOCKER_SERVICES.md) · [eventos](docs/ASYNCHRONOUS_EVENTS.md) · [Redis](docs/REDIS_INTEGRATION.md) · [observabilidad](docs/OBSERVABILITY_STACK.md) · [Windows](docs/WINDOWS_DOCKER_GUIDE.md)
 1. [**Sitio web multipágina v4**](#-sitio-web-multipágina-v4): [páginas](docs/FRONTEND_PAGES.md) · [arquitectura](docs/HEXAGONAL_ARCHITECTURE.md) · [Windows y Docker](docs/WINDOWS_DOCKER_GUIDE.md) · [capturas](#capturas-del-sitio-v4-datos-reales)
@@ -57,6 +58,33 @@ El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma
 | Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
 | Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
 | Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## ✨ Marca POLYMER
+
+La tienda v6 se presenta ahora como **POLYMER**: *Tecnología que conecta contigo.* Es un cambio de la **capa de presentación**. Se mantienen igual la arquitectura hexagonal, los 13 contenedores, la base de datos, la seguridad, la observabilidad y los números de pedido `HX-…`. HexaOrders sigue siendo el nombre técnico: paquetes, tablas, métricas y contenedores.
+
+- **Logotipo original:**
+  - isotipo «Enlace»: una P trazada como pista de circuito con tres nodos encadenados, como un polímero;
+  - versiones horizontal oscura y clara, monocromo, favicon y animada;
+  - todo se genera con `tools/generate_brand.py`;
+  - tres conceptos evaluados en [`docs/brand/`](docs/brand/BRAND_POLYMER.md).
+- **Intro cinematográfica** de unos 4 s, una vez por sesión:
+  - el isotipo se arma con líneas de luz y aparecen las letras P·O·L·Y·M·E·R;
+  - se abre el telón y la tienda entra de forma escalonada;
+  - se puede omitir (botón o `Esc`) y el sonido solo suena con «Entrar con sonido»;
+  - no aparece con movimiento reducido ni en los paneles internos.
+- **Movimiento:** transiciones entre páginas (View Transitions), indicador de navegación, aparición al desplazarse, tarjetas, vuelo al carrito y confirmación animada del pedido.
+- **Audio** sintetizado con Web Audio (bienvenida, confirmación, notificación y error), con silencio global en la cabecera. Está apagado por defecto.
+- **Pie comercial** de 5 columnas:
+  - contacto de demostración marcado como tal;
+  - métodos de pago reales frente a «próximamente»;
+  - redes sociales sin cuentas inventadas;
+  - Libro de reclamaciones funcional.
+  
+  Todos sus enlaces llevan a páginas reales: [`/empresa.html`](services/order-api/src/main/resources/static/empresa.html), [`/legal.html`](services/order-api/src/main/resources/static/legal.html) y [`/libro-reclamaciones.html`](services/order-api/src/main/resources/static/libro-reclamaciones.html).
+- **Paneles internos** con la identidad común y un color de acento por área, sin fondos que distraigan.
+
+Los datos de contacto, legales y de redes son **de demostración** y se configuran en `static/js/brand.js`. No se inventa un RUC ni se anuncian pagos con tarjeta o billeteras que no están integrados.
 
 ## 🛒 Tienda tecnológica v6
 

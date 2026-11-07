@@ -202,3 +202,16 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
   - cabecera: `#cart-count`.
 - **No mover al navegador** reglas de precio, descuentos, envío o stock: viven en el dominio (ADR 0015).
 - **Documentación técnica:** [`TECH_STORE.md`](TECH_STORE.md).
+
+## 17. POLYMER: marca, intro y movimiento (qué retocar y qué no)
+
+- **Marca:** todo lo configurable está en `static/js/brand.js`: nombre, eslogan, contacto, datos legales, redes, métodos de pago y duración de la intro. Los datos son de demostración. **No inventes un RUC** ni enlaces a cuentas sociales que no existan.
+- **Logotipo:** no edites los SVG a mano. Cambia la geometría en `tools/generate_brand.py` y ejecútalo. `--check` corre en `check` y en el CI.
+- **Estilos de marca:** `static/css/polymer.css`, que se carga al final. Sus secciones son tokens, intro, cabecera, botones, fondos por área, movimiento, pie, confirmación, View Transitions, movimiento reducido y responsive.
+- **Intro:**
+  - `intro-gate.js` es un script clásico del `<head>`: decide antes de pintar. No lo conviertas en módulo, porque provocaría un destello;
+  - `intro.js` contiene la animación;
+  - la intro se repite con `?intro=1`; con `?intro=0` se desactiva en esa visita.
+- **Selectores nuevos que usan las pruebas** (`intro-e2e.js`): `#polymer-intro`, `.intro__word span`, «Entrar con sonido», «Omitir intro», `#sound-toggle`, `.pm-footer`, `.pm-social`, `.fly-dot`, `#cart-button.is-bumped`, `.order-thanks` (confirmación animada).
+- **Pruebas e intro:** las pruebas que no prueban la intro la marcan como vista con `addInitScript` (`sessionStorage['polymer.intro.seen'] = '1'`). Haz lo mismo si escribes una prueba nueva.
+- **No renombres** paquetes, tablas, métricas, contenedores, claves de configuración ni claves de `localStorage` o `sessionStorage` existentes. HexaOrders es el nombre técnico (ADR 0016).

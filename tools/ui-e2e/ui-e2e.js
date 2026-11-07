@@ -25,6 +25,8 @@ async function apiJson(page, url) {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    // POLYMER: la intro se prueba en intro-e2e.js; aquí se marca como vista para no tapar la portada.
+    await page.addInitScript(() => { try { sessionStorage.setItem('polymer.intro.seen', '1'); } catch { /* sin almacenamiento */ } });
     page.on('pageerror', (error) => problems.push(`Error de JavaScript: ${error.message}`));
     page.on('console', (message) => {
       // El 400 de la prueba de validación del explorador es intencionado.
@@ -122,6 +124,7 @@ async function apiJson(page, url) {
     if (process.env.DEMO_PASSWORD) {
       const rolePage = async (user) => {
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        await context.addInitScript(() => { try { sessionStorage.setItem('polymer.intro.seen', '1'); } catch { /* sin almacenamiento */ } });
         const rp = await context.newPage();
         rp.on('pageerror', (error) => problems.push(`Error de JavaScript (${user}): ${error.message}`));
         await rp.goto(`${BASE_URL}/#/entrar`);
@@ -196,6 +199,7 @@ async function apiJson(page, url) {
     // Móvil
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     mobile.on('pageerror', (error) => problems.push(`Error de JavaScript (móvil): ${error.message}`));
+    await mobile.addInitScript(() => { try { sessionStorage.setItem('polymer.intro.seen', '1'); } catch { /* sin almacenamiento */ } });
     await mobile.goto(`${BASE_URL}/`);
     await mobile.waitForSelector('.product-card', { timeout: 15000 });
     await mobile.waitForTimeout(800);

@@ -2,6 +2,43 @@
 
 Este registro separa cuatro tipos de evidencia: **ejecución real**, **pruebas automáticas**, **revisión estática** y **pendiente de verificación**. Un resultado esperado nunca se presenta como observado.
 
+## POLYMER — marca, intro, movimiento y pie comercial (7 de noviembre de 2026)
+
+Entorno local: el mismo de la v6. Contenedor Linux **sin Docker ni Windows**, con Java 21, PostgreSQL 16, motor de riesgo en Python, Node 22 y Chromium con Playwright. Integraciones desactivadas y sin Prometheus (`SKIP_PROMETHEUS=1`). **No probé Docker Desktop en Windows.** El stack Docker completo lo ejecuta el CI.
+
+### Migración V8 sobre la base v6 existente
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Arranque sobre la base v6 con datos (11 pedidos y 12 usuarios) | `Migrating schema "public" to version "8 - polymer brand"` y `Successfully applied 1 migration … now at version v8` |
+| Estado tras migrar | Siguen los **11 pedidos y 12 usuarios**. Los 32 productos de marca propia ahora tienen la marca `Polymer`, y ningún nombre ni descripción conserva «HexaOrders». La búsqueda `brand=Polymer` los devuelve |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn test` | **110 pruebas**, cero fallos. Se reforzaron dos: el correo lleva «Equipo Polymer» y no «HexaOrders», y el tema `CLAIM` es válido |
+| `tools/ui-e2e/intro-e2e.js` (nuevo) | `OK: intro y movimiento de POLYMER (41 comprobaciones)`. Cubre: la página cubierta antes de pintar, las 7 letras, los botones «Entrar con sonido» y «Omitir intro», el foco de teclado, la página preparada detrás, el cierre automático, que no se repita al navegar ni al recargar, el silencio por defecto, el botón global de sonido, el pie de 5 columnas con 16 páginas enlazadas (42 enlaces) que responden, el contacto marcado DEMO, que no haya RUC inventado ni marcas de pago no integradas, la aparición escalonada, el vuelo al carrito, el Libro de reclamaciones guardado, `Esc`, `?intro=1`, «Entrar con sonido», el movimiento reducido sin intro y con todo visible, el móvil de 390 px, que la intro no salga en los paneles de admin, operaciones, logística y monitoreo, y que no haya errores de JavaScript |
+| `tools/ui-e2e/pages-e2e.js` | `Páginas E2E correctas: 284 comprobaciones` (antes 266). Recorre las 45 páginas con visitante y los 5 roles, más las tres páginas nuevas; **ningún texto técnico ni la marca anterior es visible** para el visitante ni el cliente; enlaces sin 404, móvil y sin errores de JavaScript |
+| `tools/ui-e2e/ui-e2e.js` | `UI E2E correcta: 25 comprobaciones`: laboratorio interno, compra completa con número HX y roles |
+| `tools/store_smoke.py` / `tools/platform_smoke.py` | `OK tienda: 38 comprobaciones` / `OK plataforma: 35 comprobaciones` |
+| `check_frontend.py` | Correcto, con comprobaciones nuevas: la marca anterior no aparece en ningún texto de la tienda, todo enlace `/….html` existe, y las 45 páginas cargan `intro-gate.js` y `polymer.css` con el título «· POLYMER» |
+| `generate_brand.py --check`, `generate_pages.py --check`, `generate_catalog.py --check`, `generate_delivery.py --check`, `validate_delivery.py`, `check_observability.py` | Correctos |
+
+### Errores encontrados y corregidos durante la prueba
+
+- La API View Transitions dejaba un rechazo de promesa sin capturar («Transition was aborted… opt-in disabled») al navegar mediante código o hacia `laboratorio.html`, que no carga `polymer.css`. Ahora `intro-gate.js` lo captura en todas las páginas, también en el laboratorio, y omite la transición mientras se muestra la intro.
+- En móvil, el logotipo horizontal dejaba sin espacio al buscador. Por debajo de 640 px la cabecera muestra solo el isotipo.
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Docker Desktop en Windows | No disponible en este entorno. El job `windows` del CI ejecuta `check` y las pruebas unitarias en PowerShell 5.1, pero no Docker Desktop |
+| Sonido audible | En el navegador sin interfaz se comprueba que «Entrar con sonido» y el botón de la cabecera funcionen sin errores y guarden la preferencia; que el sonido se oiga solo puede confirmarlo una persona |
+| Transiciones entre páginas | Chromium las aplica. Firefox y Safari antiguos navegan sin ellas (mejora progresiva): no lo comprobé en esos navegadores |
+| Sitio de referencia del encargo | La URL de referencia devolvió 403 desde este entorno y no se adjuntó la imagen del pie, así que el diseño no la copia |
+
 ## Versión 6 — tienda tecnológica (3 de noviembre de 2026)
 
 Entorno local: contenedor Linux **sin Docker ni Windows**, con Java 21, PostgreSQL 16, Python 3.13 (motor de riesgo), Node 22 y Chromium con Playwright. Integraciones desactivadas (`HEXAORDERS_INTEGRATIONS=off`) y sin Prometheus. El stack Docker completo lo ejecuta el CI (tabla final).

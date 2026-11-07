@@ -30,6 +30,8 @@ const allowed = (page, role) => !page.roles.length || page.roles.includes('auth'
 
 async function newSession(browser, label, viewport = { width: 1440, height: 900 }) {
   const context = await browser.newContext({ viewport });
+  // POLYMER: la intro se prueba en intro-e2e.js; aquí se marca como vista para no tapar la portada.
+  await context.addInitScript(() => { try { sessionStorage.setItem('polymer.intro.seen', '1'); } catch { /* sin almacenamiento */ } });
   const page = await context.newPage();
   const failures = [];
   page.on('pageerror', (error) => problems.push(`[${label}] JavaScript: ${error.message} (${page.url()})`));
@@ -89,7 +91,8 @@ async function checkLinks(session, label) {
 
 // v6: lo que ve un visitante o un cliente en la tienda no explica cómo está construida.
 const TECH_TERMS = ['hexagonal', 'docker', 'postgres', 'redis', 'rabbitmq', 'grafana', 'prometheus', 'microservicio',
-  'idempoten', 'laboratorio', 'arquitectura', 'backend', 'spring', 'motor de riesgo', 'kubernetes', 'caso de uso'];
+  'idempoten', 'laboratorio', 'arquitectura', 'backend', 'spring', 'motor de riesgo', 'kubernetes', 'caso de uso',
+  'hexaorders']; // POLYMER: la marca anterior tampoco es visible en la tienda
 async function checkCommercialText(session, entry) {
   const text = (await session.page.evaluate(() => document.body.innerText)).toLowerCase();
   const found = TECH_TERMS.filter((term) => text.includes(term));

@@ -48,6 +48,7 @@ jobs:
           set -euo pipefail
           python tools/generate_pages.py --check
           python tools/check_frontend.py
+          python tools/generate_brand.py --check
       - name: UI end to end against the real stack (Playwright)
         shell: bash
         working-directory: tools/ui-e2e
@@ -66,6 +67,14 @@ jobs:
         env:
           SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
         run: node pages-e2e.js
+      # POLYMER: intro (una vez por sesión, omitir, sonido opcional, movimiento reducido, móvil, paneles
+      # internos sin intro), pie comercial con enlaces reales, Libro de reclamaciones y vuelo al carrito.
+      - name: POLYMER brand, intro and motion end to end
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: node intro-e2e.js
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

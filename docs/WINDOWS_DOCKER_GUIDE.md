@@ -233,3 +233,39 @@ Lo siguiente lo cubren las pruebas automáticas en GitHub (Ubuntu con Docker y W
 4. Abre http://localhost:8080: verás la tienda. La documentación técnica y el laboratorio están en **Monitoreo → Documentación técnica**, con las cuentas `observador` o `admin`.
 
 Si `start` avisa de que `db_password.txt` no coincide con el volumen, restaura el archivo original o ejecuta `.\hexaorders.cmd repair-db-password` (sección 8).
+
+## 11. Actualizar a POLYMER
+
+POLYMER es un cambio de marca de la tienda v6. Se actualiza igual que una versión normal y **no borra datos**.
+
+1. Detén la versión anterior **conservando los volúmenes** (nunca uses `down -v`):
+
+   ```powershell
+   .\hexaorders.cmd stop
+   ```
+
+2. Sustituye los archivos del proyecto y **conserva tu carpeta `secrets\`**.
+3. Comprueba los archivos (marca, páginas, catálogo y entrega):
+
+   ```powershell
+   .\hexaorders.cmd check
+   ```
+
+4. Arranca. La imagen se reconstruye y la base aplica una sola vez la migración **V8**, que no es destructiva:
+
+   ```powershell
+   .\hexaorders.cmd start
+   ```
+
+5. Verifica todo, incluido que usuarios, contraseñas y pedidos sigan ahí:
+
+   ```powershell
+   .\hexaorders.cmd verify
+   ```
+
+6. Abre http://localhost:8080:
+   - la primera visita de cada sesión muestra la intro;
+   - pulsa **«Entrar con sonido»** para oír la bienvenida, u **«Omitir intro»**;
+   - para verla otra vez, usa **«Ver la intro»** en el pie o abre http://localhost:8080/?intro=1.
+
+**Si no ves los cambios**, recarga sin caché con `Ctrl + F5`. Si la intro no aparece, revisa **Configuración → Accesibilidad → Efectos visuales → Efectos de animación**. Con esa opción desactivada, el navegador pide «movimiento reducido» y la intro se omite a propósito.

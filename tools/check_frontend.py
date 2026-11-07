@@ -102,7 +102,8 @@ for page in store_pages:
     for word in BANNED:
         if word in text:
             errors.append(f'{page["path"]}: texto técnico en la tienda («{word}» en título o descripción)')
-STORE_MODULES = ['js/views/home.js', 'js/views/shop.js', 'js/views/customer.js', 'js/store-ui.js', 'js/cart.js', 'js/layout.js']
+STORE_MODULES = ['js/views/home.js', 'js/views/shop.js', 'js/views/customer.js', 'js/views/info.js', 'js/store-ui.js', 'js/cart.js',
+                 'js/layout.js', 'js/brand.js', 'js/intro.js', 'js/motion.js', 'js/audio.js']
 string_literal = re.compile(r"'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\"|`(?:[^`\\]|\\.)*`")
 for module in STORE_MODULES:
     source = (STATIC / module).read_text(encoding='utf-8')
@@ -120,6 +121,24 @@ for module in STORE_MODULES:
                 errors.append(f'{module}: texto técnico en la tienda («{word}»): {value[:70]}')
         if re.search(r'/(arquitectura|laboratorio)', value):
             errors.append(f'{module}: la tienda enlaza la documentación técnica interna: {value[:70]}')
+        # 9a. POLYMER: la marca anterior no aparece en ningún texto visible de la tienda.
+        if 'HexaOrders' in value or 'HEXA' in value:
+            errors.append(f'{module}: marca anterior visible en la tienda: {value[:70]}')
+        # 9b. Los enlaces internos de la tienda (pie incluido) llevan a páginas que existen.
+        target = re.match(r'^(/[A-Za-z0-9/_-]+\.html)', value)
+        if target and not (STATIC / target.group(1).lstrip('/')).exists():
+            errors.append(f'{module}: enlace a una página inexistente: {target.group(1)}')
+
+# 9c. POLYMER: todas las páginas cargan la marca, la intro y el sistema de movimiento.
+for page in PAGES:
+    html_text = (STATIC / page['path']).read_text(encoding='utf-8')
+    for needle in ('· POLYMER</title>', '<script src="/js/intro-gate.js"></script>', '/css/polymer.css'):
+        if needle not in html_text:
+            errors.append(f'{page["path"]}: falta «{needle}»')
+    if 'HexaOrders' in f"{page['title']} {page['description']}":
+        errors.append(f'{page["path"]}: marca anterior en título o descripción')
+if 'js/intro-gate.js' not in (STATIC / 'laboratorio.html').read_text(encoding='utf-8'):
+    errors.append('laboratorio.html: falta js/intro-gate.js (controla las transiciones entre páginas)')
 
 if errors:
     print('Frontend con problemas:\n  ' + '\n  '.join(errors), file=sys.stderr)
