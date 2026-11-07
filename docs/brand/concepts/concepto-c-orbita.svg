@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256">
+  <!-- Concepto C · «Órbita de datos»: un anillo segmentado con un nodo que lo atraviesa, como una señal en tránsito. -->
+  <defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="12" y1="10" x2="52" y2="54"><stop offset="0" stop-color="#3DE2D0"/><stop offset="1" stop-color="#A6B8FF"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="#101827"/>
+  <g fill="none" stroke="url(#g)" stroke-width="3.4" stroke-linecap="round">
+    <path d="M20 50 V14"/>
+    <path d="M20 14 A16 16 0 1 1 20 44" stroke-dasharray="10 5"/>
+  </g>
+  <circle cx="36" cy="30" r="5" fill="#3DE2D0"/>
+</svg>

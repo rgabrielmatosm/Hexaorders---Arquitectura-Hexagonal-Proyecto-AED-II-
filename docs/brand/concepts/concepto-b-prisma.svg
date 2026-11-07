@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256">
+  <!-- Concepto B · «Prisma plegado»: dos planos facetados forman una P con volumen, como una lámina de silicio doblada. -->
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3DE2D0"/><stop offset="1" stop-color="#2BB3A6"/></linearGradient>
+    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A6B8FF"/><stop offset="1" stop-color="#6D7CF5"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#101827"/>
+  <path d="M16 12 H38 L48 22 L38 32 H27 L16 43 Z" fill="url(#b)"/>
+  <path d="M16 12 L27 23 V54 L16 54 Z" fill="url(#a)"/>
+  <path d="M27 23 H35 L37 22 L35 21 H27 Z" fill="#101827" opacity=".6"/>
+</svg>
