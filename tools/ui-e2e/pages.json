@@ -79,6 +79,27 @@
     "needsId": false
   },
   {
+    "path": "/empresa.html",
+    "route": "/empresa",
+    "title": "Empresa",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/legal.html",
+    "route": "/legal",
+    "title": "Información legal",
+    "roles": [],
+    "needsId": false
+  },
+  {
+    "path": "/libro-reclamaciones.html",
+    "route": "/libro-reclamaciones",
+    "title": "Libro de reclamaciones",
+    "roles": [],
+    "needsId": false
+  },
+  {
     "path": "/403.html",
     "route": "/error/403",
     "title": "Acceso restringido",

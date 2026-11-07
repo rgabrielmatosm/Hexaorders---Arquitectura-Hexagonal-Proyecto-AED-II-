@@ -5,8 +5,8 @@
 //  - prefers-reduced-motion: sin estela animada; solo se resalta la celda actual.
 
 const FADE_MS = 1700;
-const VIOLET = [139, 92, 246];
-const VIOLET_LIGHT = [167, 139, 250];
+const VIOLET = [61, 226, 208];
+const VIOLET_LIGHT = [166, 184, 255];
 
 export function initGrid(canvas) {
   if (!canvas || !canvas.getContext) return;

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   HexaOrders v4 — sitio multipágina.
+   POLYMER — sitio multipágina (estructura heredada de la v4).
    Usa SOLO los tokens de base.css/platform.css (colores, radios, sombras, tipografía).
    Secciones: tokens extra · layout · cabecera móvil · barra lateral · pie · componentes
    compartidos · inicio · portales · monitoreo · arquitectura · responsive · movimiento.
@@ -8,7 +8,7 @@
 :root {
   --sidebar-w: 248px;
   --content-max: 1320px;
-  --glow: 0 0 0 1px rgba(139, 92, 246, 0.25), 0 18px 60px rgba(139, 92, 246, 0.12);
+  --glow: 0 0 0 1px rgba(61, 226, 208, 0.25), 0 18px 60px rgba(61, 226, 208, 0.12);
   --blue: #3B82F6;
 }
 
@@ -46,7 +46,7 @@ body.site .view-root > * { animation: page-in 0.32s var(--ease) both; }
 .side-nav a:focus-visible { outline: 2px solid var(--violet-2); outline-offset: 2px; }
 
 /* ---- Pie de página -------------------------------------------------------- */
-.site-footer { position: relative; z-index: 1; border-top: 1px solid var(--line); background: rgba(11, 15, 20, 0.85); padding: 36px 24px 28px; margin-top: auto; }
+.site-footer { position: relative; z-index: 1; border-top: 1px solid var(--line); background: rgba(16, 24, 39, 0.85); padding: 36px 24px 28px; margin-top: auto; }
 .site-footer__grid { max-width: var(--content-max); margin: 0 auto; display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 28px; }
 .site-footer__brand p { margin-top: 12px; max-width: 360px; }
 .site-footer__col strong { display: block; font-size: 0.82rem; margin-bottom: 10px; }
@@ -89,8 +89,8 @@ body.site .view-root > * { animation: page-in 0.32s var(--ease) both; }
 .checkout-steps li { counter-increment: step; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--text-2); font-size: 0.84rem; }
 .checkout-steps li::before { content: counter(step); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(148, 163, 184, 0.14); font-size: 0.74rem; font-weight: 700; }
 .checkout-steps li.is-done::before { background: var(--green-soft); color: var(--green); }
-.checkout-steps li.is-current { color: var(--text); border-color: rgba(139, 92, 246, 0.5); background: var(--violet-soft); }
-.checkout-steps li.is-current::before { background: var(--violet); color: #fff; }
+.checkout-steps li.is-current { color: var(--text); border-color: rgba(61, 226, 208, 0.5); background: var(--violet-soft); }
+.checkout-steps li.is-current::before { background: var(--violet); color: #101827; }
 
 /* ---- Inicio ----------------------------------------------------------------- */
 .hero--home { max-width: none; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 40px; align-items: center; padding: 64px 0 36px; }
@@ -100,10 +100,10 @@ body.site .view-root > * { animation: page-in 0.32s var(--ease) both; }
 .hero-stats span { color: var(--text-2); font-size: 0.84rem; }
 .hero-stats .skeleton { width: 120px; }
 .hero-visual { --orbit: 175px; position: relative; aspect-ratio: 1; max-width: 440px; width: 100%; justify-self: center; }
-.hero-visual::before { content: ''; position: absolute; inset: 12%; border-radius: 50%; border: 1px dashed rgba(139, 92, 246, 0.35); }
-.hero-visual::after { content: ''; position: absolute; inset: 26%; border-radius: 50%; background: radial-gradient(circle, rgba(139, 92, 246, 0.28), transparent 70%); filter: blur(10px); }
+.hero-visual::before { content: ''; position: absolute; inset: 12%; border-radius: 50%; border: 1px dashed rgba(61, 226, 208, 0.35); }
+.hero-visual::after { content: ''; position: absolute; inset: 26%; border-radius: 50%; background: radial-gradient(circle, rgba(61, 226, 208, 0.28), transparent 70%); filter: blur(10px); }
 .hero-visual__core { position: absolute; inset: 33%; z-index: 1; display: grid; place-content: center; text-align: center; gap: 2px;
-  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); background: linear-gradient(145deg, var(--violet), #4C1D95); box-shadow: var(--glow); }
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); background: linear-gradient(145deg, var(--violet), #1E6F86); box-shadow: var(--glow); }
 .hero-visual__core span { font-weight: 780; font-size: 1.05rem; }
 .hero-visual__core small { color: rgba(248, 250, 252, 0.8); font-size: 0.72rem; }
 .hero-visual__node { position: absolute; left: 50%; top: 50%; z-index: 1; padding: 7px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 650;
@@ -120,11 +120,11 @@ body.site .view-root > * { animation: page-in 0.32s var(--ease) both; }
 .role-card { display: grid; gap: 8px; align-content: start; padding: 18px; border-radius: var(--radius); border: 1px solid var(--line); background: rgba(21, 27, 35, 0.75);
   color: var(--text); text-decoration: none; transition: transform 0.22s var(--ease), border-color 0.22s, box-shadow 0.22s; }
 .role-card p { color: var(--text-2); font-size: 0.86rem; margin: 0; }
-a.role-card:hover, a.role-card:focus-visible { transform: translateY(-3px); border-color: rgba(139, 92, 246, 0.45); box-shadow: var(--glow); }
+a.role-card:hover, a.role-card:focus-visible { transform: translateY(-3px); border-color: rgba(61, 226, 208, 0.45); box-shadow: var(--glow); }
 .role-card__cta { color: var(--violet-2); font-size: 0.84rem; font-weight: 650; }
 .cta-band { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; margin: 30px 0 10px; padding: 26px 28px;
-  border-radius: calc(var(--radius) + 4px); border: 1px solid rgba(139, 92, 246, 0.35);
-  background: linear-gradient(120deg, rgba(139, 92, 246, 0.18), rgba(59, 130, 246, 0.10)); }
+  border-radius: calc(var(--radius) + 4px); border: 1px solid rgba(61, 226, 208, 0.35);
+  background: linear-gradient(120deg, rgba(61, 226, 208, 0.18), rgba(59, 130, 246, 0.10)); }
 .cta-band h2 { margin: 0 0 6px; font-size: 1.35rem; }
 .cta-band p { margin: 0; color: var(--text-2); }
 
@@ -167,7 +167,7 @@ a.role-card:hover, a.role-card:focus-visible { transform: translateY(-3px); bord
 .metric-card__key { color: var(--text-2); font-size: 0.7rem; opacity: 0.8; }
 .dash-links { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .dash-links a { display: grid; gap: 4px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); color: var(--text); text-decoration: none; transition: border-color 0.2s; }
-.dash-links a:hover, .dash-links a:focus-visible { border-color: rgba(139, 92, 246, 0.5); }
+.dash-links a:hover, .dash-links a:focus-visible { border-color: rgba(61, 226, 208, 0.5); }
 .dash-links small { color: var(--text-2); }
 
 /* ---- Arquitectura -------------------------------------------------------------------- */
@@ -194,7 +194,7 @@ a.role-card:hover, a.role-card:focus-visible { transform: translateY(-3px); bord
   .site .topbar { flex-wrap: nowrap; height: var(--topbar-h); min-height: 0; padding-top: 0; padding-bottom: 0; }
   .site { --topbar-h: 64px; }
   .site .nav { display: none; position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch; gap: 2px; width: auto;
-    padding: 12px 16px 16px; background: rgba(11, 15, 20, 0.98); border-bottom: 1px solid var(--line); overflow: visible; }
+    padding: 12px 16px 16px; background: rgba(16, 24, 39, 0.98); border-bottom: 1px solid var(--line); overflow: visible; }
   .site .topbar.is-open .nav { display: flex; }
   .site .nav a { padding: 10px 12px; }
   .site .nav__group { flex-direction: column; border-left: 0; padding: 8px 0 0; margin: 6px 0 0; border-top: 1px solid var(--line); }

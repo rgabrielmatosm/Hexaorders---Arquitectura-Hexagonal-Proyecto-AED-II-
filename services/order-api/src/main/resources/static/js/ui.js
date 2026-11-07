@@ -1,5 +1,7 @@
 // Utilidades de presentación. Todo el texto dinámico se inserta con textContent (sin innerHTML).
 
+import { play } from './audio.js';
+
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
@@ -68,6 +70,7 @@ export function toast(message, kind = 'ok', timeout = 4200) {
   const node = el('div', { class: `toast toast--${kind}`, role: kind === 'error' ? 'alert' : 'status' },
     el('span', { class: `dot dot--${dotKind}` }), el('span', { text: message }));
   container.append(node);
+  play(kind === 'ok' ? 'notify' : 'error'); // solo suena si la persona activó los sonidos
   setTimeout(() => {
     node.classList.add('is-leaving');
     setTimeout(() => node.remove(), 320);

@@ -29,17 +29,20 @@ FRAGMENTS = Path(__file__).resolve().parent / 'page_fragments'
 #   parent: breadcrumb intermedio "url|texto"; active: enlace resaltado de la barra lateral.
 PAGES: list[dict] = [
     # ---- Tienda (v6: contenido comercial; nada técnico ni académico)
-    dict(path='index.html', route='/inicio', title='Tienda de tecnología', description='HexaOrders: laptops, componentes, monitores, smartphones, gaming y smart home con envío a todo el Perú.'),
+    dict(path='index.html', route='/inicio', title='Tienda de tecnología', description='POLYMER, tecnología que conecta contigo: laptops, componentes, monitores, smartphones, gaming y smart home con envío a todo el Perú.'),
     dict(path='catalogo.html', route='/tienda', title='Catálogo', description='Catálogo de tecnología con búsqueda, filtros por marca, precio y características técnicas.'),
     dict(path='producto.html', route='/producto/:id', title='Producto', description='Ficha del producto con especificaciones técnicas, precio, disponibilidad y productos relacionados.', parent='/catalogo.html|Catálogo'),
     dict(path='ofertas.html', route='/ofertas', title='Ofertas', description='Ofertas y promociones vigentes en tecnología.'),
     dict(path='carrito.html', route='/carrito', title='Carrito', description='Tu carrito de compras.'),
     dict(path='checkout.html', route='/checkout', title='Checkout', description='Finaliza tu compra: entrega, pago y confirmación.', roles=['CUSTOMER'], parent='/carrito.html|Carrito'),
-    dict(path='login.html', route='/entrar', title='Iniciar sesión', description='Inicia sesión en tu cuenta HexaOrders.'),
-    dict(path='registro.html', route='/registro', title='Crear cuenta', description='Crea tu cuenta HexaOrders para comprar y seguir tus pedidos.'),
+    dict(path='login.html', route='/entrar', title='Iniciar sesión', description='Inicia sesión en tu cuenta POLYMER.'),
+    dict(path='registro.html', route='/registro', title='Crear cuenta', description='Crea tu cuenta POLYMER para comprar y seguir tus pedidos.'),
     dict(path='ayuda.html', route='/ayuda', title='Centro de ayuda', description='Envíos, métodos de pago, garantías, devoluciones y tu cuenta.'),
-    dict(path='nosotros.html', route='/nosotros', title='Nosotros', description='Conoce HexaOrders, tu tienda de tecnología.'),
+    dict(path='nosotros.html', route='/nosotros', title='Nosotros', description='Conoce POLYMER, tu tienda de tecnología: quiénes somos y nuestra historia.'),
     dict(path='contacto.html', route='/contacto', title='Contacto', description='Escríbenos: pedidos, soporte técnico, garantías y ventas corporativas.'),
+    dict(path='empresa.html', route='/empresa', title='Empresa', description='Canales de atención, compra segura, métodos de pago, tiendas, cobertura de delivery y disponibilidad.'),
+    dict(path='legal.html', route='/legal', title='Información legal', description='Términos y condiciones, privacidad, cookies, cambios y devoluciones, garantías y facturación.'),
+    dict(path='libro-reclamaciones.html', route='/libro-reclamaciones', title='Libro de reclamaciones', description='Registra un reclamo o una queja sobre tu compra.'),
     dict(path='403.html', route='/error/403', title='Acceso restringido', description='Tu cuenta no tiene permiso para esta página.'),
     dict(path='404.html', route='/error/404', title='Página no encontrada', description='La página solicitada no existe.'),
     # ---- Portal del cliente
@@ -88,15 +91,18 @@ TEMPLATE = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{description}">
-  <meta name="theme-color" content="#0B0F14">
-  <title>{title} · HexaOrders</title>
+  <meta name="theme-color" content="#101827">
+  <meta name="application-name" content="POLYMER">
+  <title>{title} · POLYMER</title>
   <link rel="icon" href="/img/logo.svg" type="image/svg+xml">
+  <script src="/js/intro-gate.js"></script>
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/effects.css">
   <link rel="stylesheet" href="/css/platform.css">
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/store.css">
+  <link rel="stylesheet" href="/css/polymer.css">
   <script type="module" src="/js/page.js"></script>
 </head>
 <!-- Página generada por tools/generate_pages.py: edita el registro o la vista, no este archivo. -->
@@ -108,7 +114,7 @@ TEMPLATE = """<!doctype html>
 {sidebar}  <main id="main" class="page-main" tabindex="-1">
     <nav id="breadcrumbs" class="breadcrumbs" aria-label="Ruta de navegación"></nav>
     <div id="view-root" class="view-root" aria-live="polite">
-      <noscript><p class="card">Activa JavaScript en tu navegador para comprar en HexaOrders.</p></noscript>
+      <noscript><p class="card">Activa JavaScript en tu navegador para comprar en POLYMER.</p></noscript>
       <div class="page-loading" aria-hidden="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton skeleton--row"></div></div>
     </div>
 {fragment}  </main>

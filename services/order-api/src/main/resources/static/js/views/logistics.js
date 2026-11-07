@@ -12,7 +12,7 @@ import { reportIncidentModal } from './admin.js';
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 – 20:00
 const HOUR_PX = 44;
-const PALETTE = ['#8B5CF6', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#14B8A6'];
+const PALETTE = ['#3DE2D0', '#A6B8FF', '#10B981', '#F59E0B', '#EC4899', '#14B8A6'];
 const monthFmt = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' });
 const dayFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric' });
 const longDayFmt = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });

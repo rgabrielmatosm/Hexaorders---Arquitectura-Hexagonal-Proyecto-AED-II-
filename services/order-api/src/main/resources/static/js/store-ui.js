@@ -3,6 +3,7 @@
 
 import { cart } from './cart.js';
 import { errorMessage, icon, money, productArt } from './components.js';
+import { flyToCart } from './motion.js';
 import { link } from './router.js';
 import { el, toast } from './ui.js';
 
@@ -36,6 +37,7 @@ export async function addToCart(product, quantity, button) {
   if (button) button.disabled = true;
   try {
     await cart.add(product.id, quantity);
+    flyToCart(button);
     toast(`${quantity > 1 ? `${quantity} × ` : ''}${product.name} se agregó al carrito`, 'ok', 2600);
     return true;
   } catch (error) {

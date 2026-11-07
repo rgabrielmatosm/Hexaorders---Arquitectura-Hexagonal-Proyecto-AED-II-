@@ -101,6 +101,19 @@ const ICONS = {
   card: 'M2 5h20v14H2z M2 10h20',
   refresh: 'M3 12a9 9 0 0 1 15-6.7L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-15 6.7L3 16 M3 21v-5h5',
   sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z',
+  // POLYMER: pie comercial, sonido y redes (trazos genéricos, no logotipos oficiales).
+  volume: 'M4 9h4l5-4v14l-5-4H4z M16 9a4 4 0 0 1 0 6 M18.5 6.5a8 8 0 0 1 0 11',
+  volumeOff: 'M4 9h4l5-4v14l-5-4H4z M17 9l5 6 M22 9l-5 6',
+  call: 'M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z',
+  book: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z M5 17a3 3 0 0 1 3-3h11 M9 8h6',
+  store: 'M3 9l2-5h14l2 5 M3 9h18v1a3 3 0 0 1-6 0a3 3 0 0 1-6 0a3 3 0 0 1-6 0z M5 13v7h14v-7 M10 20v-4h4v4',
+  play: 'M7 4l13 8-13 8z',
+  facebook: 'M15 3h-3a4 4 0 0 0-4 4v3H6v4h2v7h4v-7h3l1-4h-4V7a1 1 0 0 1 1-1h3z',
+  instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z M17.5 6.5h.01',
+  tiktok: 'M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5 M14 3c.5 2.5 2.5 4.5 5 4.8',
+  youtube: 'M3 8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z M10 9l5 3-5 3z',
+  linkedin: 'M4 4h16v16H4z M8 10v6 M8 7.5v.01 M12 16v-6 M12 12.5a2.5 2.5 0 0 1 5 0V16',
+  whatsapp: 'M4 20l1.3-3.9A8 8 0 1 1 8 19z M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8c-1-.4-1.8-1.2-2.2-2.2l.8-1-1-2z',
 };
 
 export function icon(name, extraClass = '') {
@@ -273,7 +286,7 @@ export function barChart(series, { label = (k) => k, height = 220 } = {}) {
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', entries.map(([k, v]) => `${label(k)}: ${v}`).join(', '));
   const defs = document.createElementNS(SVG, 'defs');
-  defs.innerHTML = '<linearGradient id="bar-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#3B82F6"/></linearGradient>';
+  defs.innerHTML = '<linearGradient id="bar-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3DE2D0"/><stop offset="1" stop-color="#A6B8FF"/></linearGradient>';
   svg.append(defs);
   for (let i = 0; i <= 4; i += 1) {
     const y = pad.top + (innerH * i) / 4;
