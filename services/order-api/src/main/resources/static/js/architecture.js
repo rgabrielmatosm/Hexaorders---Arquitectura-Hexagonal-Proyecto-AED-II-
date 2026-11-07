@@ -213,7 +213,7 @@ function drawEdges(highlight = new Set(), activeEdges = new Set()) {
   const ns = 'http://www.w3.org/2000/svg';
   svg.replaceChildren();
   const defs = document.createElementNS(ns, 'defs');
-  for (const [id, color] of [['arrow', 'rgba(148,163,184,0.45)'], ['arrow-related', '#A78BFA'], ['arrow-active', '#10B981']]) {
+  for (const [id, color] of [['arrow', 'rgba(148,163,184,0.45)'], ['arrow-related', '#A6B8FF'], ['arrow-active', '#10B981']]) {
     const marker = document.createElementNS(ns, 'marker');
     marker.setAttribute('id', id);
     marker.setAttribute('viewBox', '0 0 10 10');

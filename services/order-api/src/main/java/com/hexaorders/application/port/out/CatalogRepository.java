@@ -12,6 +12,11 @@ public interface CatalogRepository {
     List<Category> categories();
     Optional<Category> category(long id);
     Category createCategory(String slug, String name);
+    /** v6: creates a subcategory (parentId) or a main category (parentId null). */
+    default Category createCategory(String slug, String name, Long parentId) {
+        if (parentId != null) throw new UnsupportedOperationException("subcategories");
+        return createCategory(slug, name);
+    }
     List<Product> products(String query, Long categoryId, boolean onlyActive);
     Optional<Product> product(long id);
     Map<Long, Product> productsByIds(Collection<Long> ids);

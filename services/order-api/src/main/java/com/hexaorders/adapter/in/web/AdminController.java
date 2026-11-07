@@ -31,12 +31,15 @@ public final class AdminController {
     private final AdministrationUseCases administration;
     private final CatalogUseCases catalog;
     private final com.hexaorders.application.port.in.ContactUseCases contact;
+    private final com.hexaorders.application.port.in.PromotionUseCases promotions;
 
     public AdminController(AdministrationUseCases administration, CatalogUseCases catalog,
-                           com.hexaorders.application.port.in.ContactUseCases contact) {
+                           com.hexaorders.application.port.in.ContactUseCases contact,
+                           com.hexaorders.application.port.in.PromotionUseCases promotions) {
         this.administration = administration;
         this.catalog = catalog;
         this.contact = contact;
+        this.promotions = promotions;
     }
 
     /** Messages received from the public contact page. */
@@ -80,9 +83,14 @@ public final class AdminController {
         return ResponseEntity.created(URI.create("/api/catalog/products/" + created.id())).body(created);
     }
 
+    /** Fields left out of the request keep their current value (v5 clients only send the basic fields). */
     @PutMapping("/products/{id}")
     public ProductView update(@PathVariable long id, @RequestBody ProductRequest request) {
-        return ProductView.of(catalog.updateProduct(CurrentUser.require(), id, request.details()));
+        var admin = CurrentUser.require();
+        ProductDetails current = catalog.allProducts(admin).stream().filter(p -> p.id() == id).findFirst()
+                .map(com.hexaorders.domain.catalog.Product::details)
+                .orElseThrow(() -> new com.hexaorders.application.exception.ResourceNotFoundException("Producto no encontrado"));
+        return ProductView.of(catalog.updateProduct(admin, id, request.details(current)));
     }
 
     @PostMapping("/products/{id}/stock")
@@ -92,20 +100,69 @@ public final class AdminController {
 
     @PostMapping("/categories")
     public ResponseEntity<Category> category(@RequestBody CategoryRequest request) {
-        Category created = catalog.createCategory(CurrentUser.require(), request.slug(), request.name());
+        Category created = catalog.createCategory(CurrentUser.require(), request.slug(), request.name(), request.parentId());
         return ResponseEntity.created(URI.create("/api/catalog/categories")).body(created);
+    }
+
+    /** Every category, including the ones hidden from the store. */
+    @GetMapping("/categories")
+    public List<Category> categories() { return catalog.allCategories(CurrentUser.require()); }
+
+    // ---- v6: promotions -----------------------------------------------------------------------
+    @GetMapping("/promotions")
+    public List<PromotionView> promotions() { return promotions.all(CurrentUser.require()).stream().map(PromotionView::of).toList(); }
+
+    @PostMapping("/promotions")
+    public ResponseEntity<PromotionView> createPromotion(@RequestBody PromotionRequest request) {
+        PromotionView created = PromotionView.of(promotions.create(CurrentUser.require(), request.toPromotion(0)));
+        return ResponseEntity.created(URI.create("/api/admin/promotions/" + created.id())).body(created);
+    }
+
+    @PutMapping("/promotions/{id}")
+    public PromotionView updatePromotion(@PathVariable long id, @RequestBody PromotionRequest request) {
+        return PromotionView.of(promotions.update(CurrentUser.require(), id, request.toPromotion(id)));
+    }
+
+    @PutMapping("/promotions/{id}/active")
+    public PromotionView activatePromotion(@PathVariable long id, @RequestBody EnabledRequest request) {
+        return PromotionView.of(promotions.setActive(CurrentUser.require(), id, Boolean.TRUE.equals(request.enabled())));
     }
 
     public record RolesRequest(List<String> roles) {}
     public record EnabledRequest(Boolean enabled) {}
     public record StockRequest(Integer delta, String reason) {}
-    public record CategoryRequest(String slug, String name) {}
+    public record CategoryRequest(String slug, String name, Long parentId) {}
 
     public record ProductRequest(String sku, String name, String description, Long categoryId, BigDecimal price,
-                                 Boolean active, Integer hue, Integer stock) {
-        ProductDetails details() {
+                                 Boolean active, Integer hue, Integer stock,
+                                 String brand, String model, String longDescription, List<com.hexaorders.domain.catalog.Spec> specs,
+                                 java.util.Map<String, String> attributes, BigDecimal compareAtPrice, String status) {
+        ProductDetails details() { return details(null); }
+
+        /** current: the product being edited (null when creating); missing v6 fields keep its values. */
+        ProductDetails details(ProductDetails current) {
+            com.hexaorders.domain.catalog.CommercialStatus parsed = status == null || status.isBlank()
+                    ? (current == null ? null : current.status())
+                    : com.hexaorders.domain.catalog.CommercialStatus.valueOf(status.strip().toUpperCase(java.util.Locale.ROOT));
+            boolean keepCompare = compareAtPrice == null && current != null && current.compareAtPrice() != null
+                    && price != null && current.compareAtPrice().compareTo(price) > 0;
             return new ProductDetails(sku, name, description == null ? "" : description, categoryId == null ? 0 : categoryId,
-                    price, active == null || active, hue == null ? 260 : hue);
+                    price, active == null || active, hue == null ? (current == null ? 260 : current.hue()) : hue,
+                    brand != null ? brand : current == null ? null : current.brand(),
+                    model != null ? model : current == null ? null : current.model(),
+                    longDescription != null ? longDescription : current == null ? null : current.longDescription(),
+                    specs != null ? specs : current == null ? null : current.specs(),
+                    attributes != null ? attributes : current == null ? null : current.attributes(),
+                    compareAtPrice != null && compareAtPrice.signum() > 0 ? compareAtPrice : keepCompare ? current.compareAtPrice() : null,
+                    parsed);
+        }
+    }
+
+    public record PromotionRequest(String slug, String name, String description, Integer discountPercent, java.time.Instant startsAt,
+                                   java.time.Instant endsAt, Boolean active, java.util.Set<Long> categoryIds, java.util.Set<Long> productIds) {
+        com.hexaorders.domain.catalog.Promotion toPromotion(long id) {
+            return new com.hexaorders.domain.catalog.Promotion(id, slug, name, description, discountPercent == null ? 0 : discountPercent,
+                    startsAt, endsAt, active == null || active, categoryIds, productIds);
         }
     }
 }

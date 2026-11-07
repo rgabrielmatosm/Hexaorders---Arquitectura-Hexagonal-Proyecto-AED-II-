@@ -18,15 +18,18 @@ jobs:
       DB_PASSWORD: ci-only-ephemeral-db-password
       GRAFANA_PASSWORD: ci-only-ephemeral-grafana-password
       DEMO_PASSWORD: ci-only-demo-password-2026
+      RABBITMQ_PASSWORD: ci-only-ephemeral-rabbitmq-password
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # Pasos 1-8: entregable al día, build con tests, promtool, cinco servicios sanos,
-      # smoke HTTP (pedidos, persistencia, métricas, dashboard) y HTTP 503 sin risk-engine.
-      - name: Verify delivery end to end (tools/hexaorders.ps1 verify)
-        run: ./tools/hexaorders.ps1 verify -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery') -KeepRunning
+      # Pasos 1-10 (modo full, 13 contenedores): entregable al día, build con tests, promtool y
+      # validación del collector, servicios sanos, smoke y plataforma a través del gateway Nginx,
+      # integraciones reales (Redis, RabbitMQ, Mailpit, Tempo, OpenTelemetry, Loki, Grafana),
+      # degradación sin Redis/RabbitMQ, persistencia tras reiniciar y HTTP 503 sin risk-engine.
+      - name: Verify delivery end to end (tools/hexaorders.ps1 verify, modo full)
+        run: ./tools/hexaorders.ps1 verify -Mode full -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery') -KeepRunning
       # Interfaz web contra el stack REAL que verify deja en marcha: formulario, panel,
       # explorador de arquitectura, observabilidad con Prometheus/Grafana y vista móvil.
       - uses: actions/setup-node@v4
@@ -45,6 +48,7 @@ jobs:
           set -euo pipefail
           python tools/generate_pages.py --check
           python tools/check_frontend.py
+          python tools/generate_brand.py --check
       - name: UI end to end against the real stack (Playwright)
         shell: bash
         working-directory: tools/ui-e2e
@@ -63,6 +67,14 @@ jobs:
         env:
           SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
         run: node pages-e2e.js
+      # POLYMER: intro (una vez por sesión, omitir, sonido opcional, movimiento reducido, móvil, paneles
+      # internos sin intro), pie comercial con enlaces reales, Libro de reclamaciones y vuelo al carrito.
+      - name: POLYMER brand, intro and motion end to end
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: node intro-e2e.js
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -121,7 +133,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $second = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
           if ($first -ne $second) { throw 'secrets no es idempotente' }
-          foreach ($f in 'db_password.txt', 'grafana_password.txt', 'demo_password.txt') {
+          foreach ($f in 'db_password.txt', 'grafana_password.txt', 'demo_password.txt', 'rabbitmq_password.txt') {
             $value = [IO.File]::ReadAllText((Join-Path $dir "secrets\$f"))
             if ($value -notmatch '^[0-9a-f]{48}$') { throw "Secreto inválido en ${f}: longitud $($value.Length)" }
           }
@@ -138,3 +150,30 @@ jobs:
         run: |
           .\hexaorders.cmd test
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  # v5: el modo básico (6 contenedores, sin el perfil "full") también debe funcionar completo:
+  # gateway, pedidos, plataforma, persistencia tras reiniciar y HTTP 503 sin risk-engine.
+  compose-basic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DB_PASSWORD: ci-only-ephemeral-db-password
+      GRAFANA_PASSWORD: ci-only-ephemeral-grafana-password
+      DEMO_PASSWORD: ci-only-demo-password-2026
+      RABBITMQ_PASSWORD: ci-only-ephemeral-rabbitmq-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify basic mode end to end (tools/hexaorders.ps1 verify -Mode basic)
+        run: ./tools/hexaorders.ps1 verify -Mode basic -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-basic')
+      - name: Show diagnostics on failure
+        if: failure()
+        run: ./tools/hexaorders.ps1 diagnose -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-basic')
+      - name: Cleanup ephemeral CI resources
+        if: always()
+        run: ./tools/hexaorders.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-basic')

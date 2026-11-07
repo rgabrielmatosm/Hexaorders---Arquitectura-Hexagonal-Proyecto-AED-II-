@@ -17,4 +17,36 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: [localhost:9090]
-
+  # v5 (perfil "full"): descubrimiento por DNS de Docker. Si el servicio no está desplegado (modo
+  # básico) el job no tiene targets, en lugar de aparecer caído. Los 3 jobs anteriores no cambian.
+  - job_name: rabbitmq
+    dns_sd_configs:
+      - names: [rabbitmq]
+        type: A
+        port: 15692
+  - job_name: otel-collector
+    dns_sd_configs:
+      - names: [otel-collector]
+        type: A
+        port: 8888
+  - job_name: nginx
+    # Métricas de stub_status de Nginx convertidas por el OpenTelemetry Collector.
+    dns_sd_configs:
+      - names: [otel-collector]
+        type: A
+        port: 8889
+  - job_name: loki
+    dns_sd_configs:
+      - names: [loki]
+        type: A
+        port: 3100
+  - job_name: tempo
+    dns_sd_configs:
+      - names: [tempo]
+        type: A
+        port: 3200
+  - job_name: alloy
+    dns_sd_configs:
+      - names: [alloy]
+        type: A
+        port: 12345

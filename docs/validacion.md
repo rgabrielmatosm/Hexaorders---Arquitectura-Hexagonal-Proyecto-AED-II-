@@ -2,6 +2,156 @@
 
 Este registro separa cuatro tipos de evidencia: **ejecución real**, **pruebas automáticas**, **revisión estática** y **pendiente de verificación**. Un resultado esperado nunca se presenta como observado.
 
+## POLYMER — marca, intro, movimiento y pie comercial (7 de noviembre de 2026)
+
+Entorno local: el mismo de la v6. Contenedor Linux **sin Docker ni Windows**, con Java 21, PostgreSQL 16, motor de riesgo en Python, Node 22 y Chromium con Playwright. Integraciones desactivadas y sin Prometheus (`SKIP_PROMETHEUS=1`). **No probé Docker Desktop en Windows.** El stack Docker completo lo ejecuta el CI.
+
+### Migración V8 sobre la base v6 existente
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Arranque sobre la base v6 con datos (11 pedidos y 12 usuarios) | `Migrating schema "public" to version "8 - polymer brand"` y `Successfully applied 1 migration … now at version v8` |
+| Estado tras migrar | Siguen los **11 pedidos y 12 usuarios**. Los 32 productos de marca propia ahora tienen la marca `Polymer`, y ningún nombre ni descripción conserva «HexaOrders». La búsqueda `brand=Polymer` los devuelve |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn test` | **110 pruebas**, cero fallos. Se reforzaron dos: el correo lleva «Equipo Polymer» y no «HexaOrders», y el tema `CLAIM` es válido |
+| `tools/ui-e2e/intro-e2e.js` (nuevo) | `OK: intro y movimiento de POLYMER (41 comprobaciones)`. Cubre: la página cubierta antes de pintar, las 7 letras, los botones «Entrar con sonido» y «Omitir intro», el foco de teclado, la página preparada detrás, el cierre automático, que no se repita al navegar ni al recargar, el silencio por defecto, el botón global de sonido, el pie de 5 columnas con 16 páginas enlazadas (42 enlaces) que responden, el contacto marcado DEMO, que no haya RUC inventado ni marcas de pago no integradas, la aparición escalonada, el vuelo al carrito, el Libro de reclamaciones guardado, `Esc`, `?intro=1`, «Entrar con sonido», el movimiento reducido sin intro y con todo visible, el móvil de 390 px, que la intro no salga en los paneles de admin, operaciones, logística y monitoreo, y que no haya errores de JavaScript |
+| `tools/ui-e2e/pages-e2e.js` | `Páginas E2E correctas: 284 comprobaciones` (antes 266). Recorre las 45 páginas con visitante y los 5 roles, más las tres páginas nuevas; **ningún texto técnico ni la marca anterior es visible** para el visitante ni el cliente; enlaces sin 404, móvil y sin errores de JavaScript |
+| `tools/ui-e2e/ui-e2e.js` | `UI E2E correcta: 25 comprobaciones`: laboratorio interno, compra completa con número HX y roles |
+| `tools/store_smoke.py` / `tools/platform_smoke.py` | `OK tienda: 38 comprobaciones` / `OK plataforma: 35 comprobaciones` |
+| `check_frontend.py` | Correcto, con comprobaciones nuevas: la marca anterior no aparece en ningún texto de la tienda, todo enlace `/….html` existe, y las 45 páginas cargan `intro-gate.js` y `polymer.css` con el título «· POLYMER» |
+| `generate_brand.py --check`, `generate_pages.py --check`, `generate_catalog.py --check`, `generate_delivery.py --check`, `validate_delivery.py`, `check_observability.py` | Correctos |
+
+### CI con Docker real (GitHub Actions, ejecución 42348398511)
+
+| Job | Resultado |
+| --- | --- |
+| `compose` (`verify -Mode full`: 13 contenedores y migración V8 sobre la base) | **Correcto**, también los pasos `ui-e2e.js`, `pages-e2e.js` y el nuevo **`intro-e2e.js`** contra el stack completo |
+| `compose-basic` (6 contenedores) | **Correcto** |
+| `windows` (PowerShell 5.1: `check` con `generate_brand.py --check` y pruebas unitarias) | **Correcto** |
+
+### Errores encontrados y corregidos durante la prueba
+
+- La API View Transitions dejaba un rechazo de promesa sin capturar («Transition was aborted… opt-in disabled») al navegar mediante código o hacia `laboratorio.html`, que no carga `polymer.css`. Ahora `intro-gate.js` lo captura en todas las páginas, también en el laboratorio, y omite la transición mientras se muestra la intro.
+- En móvil, el logotipo horizontal dejaba sin espacio al buscador. Por debajo de 640 px la cabecera muestra solo el isotipo.
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Docker Desktop en Windows | No disponible en este entorno. El job `windows` del CI ejecuta `check` y las pruebas unitarias en PowerShell 5.1, pero no Docker Desktop |
+| Sonido audible | En el navegador sin interfaz se comprueba que «Entrar con sonido» y el botón de la cabecera funcionen sin errores y guarden la preferencia; que el sonido se oiga solo puede confirmarlo una persona |
+| Transiciones entre páginas | Chromium las aplica. Firefox y Safari antiguos navegan sin ellas (mejora progresiva): no lo comprobé en esos navegadores |
+| Sitio de referencia del encargo | La URL de referencia devolvió 403 desde este entorno y no se adjuntó la imagen del pie, así que el diseño no la copia |
+
+## Versión 6 — tienda tecnológica (3 de noviembre de 2026)
+
+Entorno local: contenedor Linux **sin Docker ni Windows**, con Java 21, PostgreSQL 16, Python 3.13 (motor de riesgo), Node 22 y Chromium con Playwright. Integraciones desactivadas (`HEXAORDERS_INTEGRATIONS=off`) y sin Prometheus. El stack Docker completo lo ejecuta el CI (tabla final).
+
+### Actualización real de una base v5 con datos
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Base v5 con pedidos (`platform_smoke.py`: 35 OK sobre la v5) | Flyway en la versión 5, 18 productos y 3 pedidos en USD |
+| Arranque de la v6 sobre esa base | `Successfully applied 2 migrations … now at version v7 (00:00.475s)`; la aplicación arrancó en 6,5 s |
+| Estado tras migrar | 20 categorías principales visibles, 170 subcategorías y 6 categorías anteriores ocultas; 557 productos, de los cuales 556 activos (la botella térmica deja de venderse, sin borrarse); `TEC-LAPTOP-14` pasó a S/ 4806,90; los 3 pedidos conservan su moneda USD y recibieron los números HX-100001 a HX-100003 |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn verify` | **110 pruebas**, cero fallos (antes 97). Nuevas: `TechStoreDomainTest` (7), `TechStoreServicesTest` (5) y la prueba de que `/api/orders` sigue exigiendo USD. Se actualizaron, por cambios de requisito, `OrderDomainTest` (PEN ya es válida), `SecurityRulesTest` (laboratorio y arquitectura internos) e `IntegrationServicesTest` (texto del correo) |
+| `tools/store_smoke.py` contra PostgreSQL real | `OK tienda: 38 comprobaciones`: catálogo, búsqueda por marca, modelo y SKU, filtros técnicos con conteos exactos, ofertas, paginación, promociones aplicadas en el servidor, carrito persistente entre sesiones con validación de stock (409), checkout express con transferencia (pedido HX en PEN), idempotencia, inventario, cancelación, promociones del administrador y reportes |
+| `tools/platform_smoke.py` sobre la v6 | `OK plataforma: 35 comprobaciones` (sin regresiones) |
+| `tools/ui-e2e/ui-e2e.js` (`SKIP_PROMETHEUS=1`) | `UI E2E correcta: 25 comprobaciones`: laboratorio interno como observador, compra con envío express y número de pedido |
+| `tools/ui-e2e/pages-e2e.js` (`SKIP_PROMETHEUS=1`) | `Páginas E2E correctas: 266 comprobaciones`: todas las páginas con visitante y los 5 roles, filtros persistentes en la URL, filtro de marca, «Comprar ahora» y checkout, **ningún texto técnico visible** para visitante y cliente, y móvil de 390 px en seis páginas sin desbordamiento |
+| `check_frontend.py` | `OK … 18 páginas de la tienda sin contenido técnico` (también comprobé que falla si se añade un texto técnico) |
+| `generate_catalog.py --check`, `generate_pages.py --check`, `generate_delivery.py --check`, `validate_delivery.py`, `check_observability.py` | Correctos; la observabilidad previa se conserva (8 dashboards, 9 alertas) |
+| Revisión visual con capturas | Corregidos: filtro de categorías vacío por un error de anidación, precio tachado pegado al precio en la ficha, desbordamiento de 144 px de la ficha en móvil, panel del megamenú demasiado transparente y franja superior demasiado alta en móvil |
+
+### CI con Docker real (GitHub Actions, ejecución 41595395620)
+
+| Job | Resultado |
+| --- | --- |
+| `compose` (`verify -Mode full`: 13 contenedores) | **Correcto**: los 10 pasos con `store_smoke.py` (paso 6c), la persistencia de la tienda tras reiniciar `db` y `order-api` (`store_smoke.py --quick`), las integraciones y la degradación; después `ui-e2e.js` y `pages-e2e.js` contra el stack completo |
+| `compose-basic` (`verify -Mode basic`: 6 contenedores) | **Correcto** |
+| `windows` (PowerShell 5.1: `check` con `generate_catalog.py --check`, pruebas unitarias) | **Correcto** |
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Docker Desktop en Windows 10/11 | No hay Windows con Docker en este entorno |
+| Kubernetes | Solo validación de esquema |
+
+## Versión 5 — plataforma de 13 contenedores (2 de noviembre de 2026)
+
+Entorno local: contenedor Linux de desarrollo **sin motor Docker ni Windows**. Para probar las integraciones sin Docker se usaron los **binarios reales** de cada servicio:
+
+- PostgreSQL 16, `redis-server` y `rabbitmq-server` (paquetes del sistema);
+- Mailpit, Tempo, `otelcol-contrib` y Loki (binarios oficiales);
+- Nginx con `infra/frontend/nginx.conf`, el motor de riesgo con trazas y el JAR con `HEXAORDERS_INTEGRATIONS=on`.
+
+Prometheus, Grafana y Alloy no se ejecutaron en local: los cubre el job `compose` del CI, que levanta el stack Docker real.
+
+### Ejecución real local (binarios, sin Docker)
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| `platform_smoke.py` a través del gateway Nginx | 35 comprobaciones correctas, sin regresiones. |
+| Estáticos a través de Nginx | 28 archivos idénticos byte a byte a los del repositorio. |
+| Eventos y correos | 15 eventos publicados con confirmación, 15 consumidos y 15 correos en Mailpit. DLQ vacía. |
+| Redis | Aciertos registrados en `hexaorders_cache_requests_total{result="hit"}`. |
+| Tempo | Traza de un checkout con 15 spans de `order-api` y `risk-engine`: HTTP, caso de uso, repositorio, puerto de riesgo, `POST /score` y `ScoreRisk.execute`. |
+| Degradación | Con Redis y RabbitMQ detenidos: el catálogo respondió en 0,3 s, `platform_smoke.py` pasó (35 OK) y quedaron 15 eventos en el outbox. Al rearrancarlos: outbox en 0 y 15 correos más. |
+
+### Pruebas automáticas
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java: `mvn verify` | **97 pruebas**, cero fallos (antes 81). Nuevas: `BusinessEventTest`, `IntegrationServicesTest` e `InfrastructureAdaptersTest` (contrato, publicador con *ack* y *nack*, Redis real, degradación contra un Redis inalcanzable y modos de `IntegrationEnvironment`). |
+| Python: `pytest` | **62 pruebas** aprobadas (antes 60), incluida `test_tracing.py`. |
+| `check_observability.py` | `OK: observabilidad previa conservada (9 paneles, 2 alertas, 3 jobs) · 8 dashboards en total, 9 alertas en total`. |
+| `check_frontend.py` | `OK: frontend multipágina coherente (39 páginas generadas + laboratorio, 32 rutas, 13 transiciones, CSP sin estilos ni scripts en línea)`. |
+| `generate_delivery.py --check`, `validate_delivery.py` | `OK: Compose autosuficiente y 14 objetos Kubernetes`. Se valida `read_only`, perfiles, healthchecks, imágenes fijadas, puertos solo en `127.0.0.1` y servicios internos sin puertos. |
+
+### CI con Docker real (GitHub Actions)
+
+| Job | Resultado |
+| --- | --- |
+| `windows` (PowerShell 5.1, cuatro secretos, `check`, `test`) | Correcto. |
+| `compose-basic` (`verify -Mode basic`: 6 contenedores) | Correcto. |
+| `compose` (`verify -Mode full`: 13 contenedores, ejecución 41417234620) | **Correcto**, los 10 pasos (detalle abajo), además de `ui-e2e.js` (24 comprobaciones) y `pages-e2e.js` contra el stack completo. |
+
+Salida real del modo completo en el CI:
+
+| Paso | Resultado |
+| --- | --- |
+| `smoke.py` y `platform_smoke.py` a través del gateway | `OK: tres riesgos, persistencia…` y `OK plataforma: 36 comprobaciones`. |
+| `integration_smoke.py check` | **`OK integración (check): 45 comprobaciones`**, entre ellas: <ul><li>2 aciertos de Redis;</li><li>correos «recibido» y «aprobado» en Mailpit;</li><li>17 mensajes confirmados en RabbitMQ, la DLQ vacía y el outbox en 0;</li><li>una traza de **21 spans** de order-api y risk-engine en Tempo, con `ScoreRisk.execute`;</li><li>los 9 targets en UP, 1079 spans exportados por el collector y 166 peticiones de Nginx;</li><li>logs de order-api, risk-engine y frontend en Loki, y ninguno de los 4 secretos en los logs;</li><li>las 3 fuentes de Grafana con salud OK y los 8 dashboards.</li></ul> |
+| `degraded` (Redis y RabbitMQ detenidos) | 4 comprobaciones: el catálogo responde desde PostgreSQL en menos de 5 s, el pedido se crea y 2 eventos esperan en el outbox. |
+| `recovered` | 3 comprobaciones: el outbox se vacía, llegan los 2 correos retenidos y el catálogo vuelve a usar Redis. |
+| `persist-write` / `persist-read` | El pedido sigue en PostgreSQL tras reiniciar `db` y `order-api`. |
+| Caída del motor de riesgo | HTTP 503 a través del gateway y recuperación sana. |
+
+### Errores del CI encontrados y corregidos
+
+| Error | Causa | Corrección |
+| --- | --- | --- |
+| Alloy: `mkdir /var/lib/alloy/data: permission denied` | `COPY --chown` no cambia un directorio que ya existe en la imagen, y `cap_drop: ALL` impide escribir como otro usuario | El almacenamiento de Alloy pasa a `/var/lib/hexaorders-alloy`, creado con el usuario correcto |
+| `integration_smoke.py`: comprobación de la DLQ | RabbitMQ 4 añade `x-queue-type: classic` a los argumentos de toda cola | Solo se exige que la DLQ sea durable, esté vacía y no tenga a su vez otra DLX |
+
+### Pendiente de verificación
+
+| Comprobación | Motivo |
+| --- | --- |
+| Docker Desktop en Windows 10/11 | No hay Windows con Docker en este entorno. Lista manual: [`WINDOWS_DOCKER_GUIDE.md`](WINDOWS_DOCKER_GUIDE.md). |
+| Alloy leyendo `/var/run/docker.sock` en Docker Desktop | Solo probado en Linux (CI). Docker Desktop expone el socket a los contenedores Linux, pero no se ha comprobado aquí. |
+| Kubernetes | Solo el núcleo y solo validación de esquema; no incluye los servicios v5. |
+
 ## Versión 4 — sitio web multipágina (2 de noviembre de 2026)
 
 Entorno local: contenedor Linux de desarrollo **sin motor Docker ni Windows** (Java 21, Maven, Python 3.13, PostgreSQL 16, Node 22, Chromium con Playwright). Sin Prometheus ni Grafana en local: su parte la ejecuta el job `compose` de GitHub Actions.

@@ -6,32 +6,96 @@ import com.hexaorders.application.port.in.AuthenticatedUser;
 import com.hexaorders.application.port.in.CatalogUseCases;
 import com.hexaorders.application.port.out.AuditLog;
 import com.hexaorders.application.port.out.CatalogRepository;
+import com.hexaorders.application.port.out.CommerceOrderRepository;
+import com.hexaorders.domain.catalog.CatalogPage;
+import com.hexaorders.domain.catalog.CatalogQuery;
+import com.hexaorders.domain.catalog.CatalogSearch;
 import com.hexaorders.domain.catalog.Category;
+import com.hexaorders.domain.catalog.PricedProduct;
 import com.hexaorders.domain.catalog.Product;
 import com.hexaorders.domain.catalog.ProductDetails;
 import com.hexaorders.domain.identity.Role;
+import java.time.Clock;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class CatalogService implements CatalogUseCases {
     private final CatalogRepository catalog;
     private final AuditLog audit;
+    private final com.hexaorders.application.port.out.CatalogCache cache;
+    private final PricingService pricing;
+    private final CommerceOrderRepository sales;
 
     public CatalogService(CatalogRepository catalog, AuditLog audit) {
+        this(catalog, audit, com.hexaorders.application.port.out.CatalogCache.NONE);
+    }
+
+    /** v5: public catalog reads go through a read-through cache; PostgreSQL remains the source of truth. */
+    public CatalogService(CatalogRepository catalog, AuditLog audit, com.hexaorders.application.port.out.CatalogCache cache) {
+        this(catalog, audit, cache, PricingService.none(Clock.systemUTC()), null);
+    }
+
+    /** v6: prices with running promotions; sales (optional) orders the store by popularity. */
+    public CatalogService(CatalogRepository catalog, AuditLog audit, com.hexaorders.application.port.out.CatalogCache cache,
+                          PricingService pricing, CommerceOrderRepository sales) {
         this.catalog = catalog;
         this.audit = audit;
+        this.cache = cache;
+        this.pricing = pricing;
+        this.sales = sales;
+    }
+
+    /** Visible categories only: hidden (pre-v6) categories keep their data but are not shown in the store. */
+    @Override
+    public List<Category> categories() { return cache.categories(catalog::categories).stream().filter(Category::active).toList(); }
+
+    @Override
+    public List<Category> allCategories(AuthenticatedUser admin) {
+        Guards.require(admin, Role.ADMIN);
+        return catalog.categories();
     }
 
     @Override
-    public List<Category> categories() { return catalog.categories(); }
+    public CatalogPage search(CatalogQuery query) {
+        if (!CatalogSearch.knownAttributes(query.attributes().keySet())) throw new IllegalArgumentException("Filtro técnico desconocido");
+        Map<Long, Long> sold = query.sort() == CatalogQuery.Sort.POPULAR && sales != null ? sales.unitsSold() : Map.of();
+        return CatalogSearch.search(storeProducts(), query, sold);
+    }
+
+    @Override
+    public List<PricedProduct> pricedProducts(String query, Long categoryId) {
+        return pricing.price(products(query, categoryId));
+    }
+
+    @Override
+    public PricedProduct pricedProduct(long id) { return pricing.price(product(id)); }
+
+    @Override
+    public List<PricedProduct> related(long id, int limit) {
+        Product product = product(id);
+        return CatalogSearch.related(storeProducts(), product, Math.max(1, Math.min(limit, 12)));
+    }
+
+    /** Every active product of a visible category, priced now. The listing is cached; prices are not. */
+    private List<PricedProduct> storeProducts() {
+        Set<Long> visible = categories().stream().map(Category::id).collect(Collectors.toSet());
+        List<Product> active = cache.activeProducts(null, () -> catalog.products(null, null, true));
+        return pricing.price(active.stream().filter(p -> visible.contains(p.details().categoryId())).toList());
+    }
 
     @Override
     public List<Product> products(String query, Long categoryId) {
-        return catalog.products(Guards.text(query, 80, "q"), categoryId, true);
+        String clean = Guards.text(query, 80, "q");
+        // Free-text searches are not cached (unbounded keys); category listings are.
+        if (clean != null) return catalog.products(clean, categoryId, true);
+        return cache.activeProducts(categoryId, () -> catalog.products(null, categoryId, true));
     }
 
     @Override
     public Product product(long id) {
-        return catalog.product(id).filter(product -> product.details().active())
+        return cache.product(id, () -> catalog.product(id)).filter(product -> product.details().active())
                 .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
     }
 
@@ -43,12 +107,22 @@ public final class CatalogService implements CatalogUseCases {
 
     @Override
     public Category createCategory(AuthenticatedUser admin, String slug, String name) {
+        return createCategory(admin, slug, name, null);
+    }
+
+    @Override
+    public Category createCategory(AuthenticatedUser admin, String slug, String name, Long parentId) {
         Guards.require(admin, Role.ADMIN);
-        new Category(1, slug, name); // validates
-        if (catalog.categories().stream().anyMatch(category -> category.slug().equals(slug))) {
+        new Category(1, slug, name, parentId, 0, true); // validates
+        List<Category> existing = catalog.categories();
+        if (existing.stream().anyMatch(category -> category.slug().equals(slug))) {
             throw new BusinessConflictException("DUPLICATE_CATEGORY", "Ya existe una categoría con ese slug");
         }
-        Category created = catalog.createCategory(slug, name.strip());
+        if (parentId != null && existing.stream().noneMatch(category -> category.id() == parentId && category.isMain())) {
+            throw new IllegalArgumentException("parentId: debe ser una categoría principal existente");
+        }
+        Category created = catalog.createCategory(slug, name.strip(), parentId);
+        cache.invalidate();
         audit.record(admin.username(), "CATEGORY_CREATED", "category:" + created.id(), slug);
         return created;
     }
@@ -60,7 +134,8 @@ public final class CatalogService implements CatalogUseCases {
         requireCategory(details.categoryId());
         if (catalog.skuExists(details.sku(), null)) throw new BusinessConflictException("DUPLICATE_SKU", "Ya existe un producto con ese SKU");
         Product created = catalog.createProduct(details, initialStock);
-        audit.record(admin.username(), "PRODUCT_CREATED", "product:" + created.id(), details.sku() + " · " + details.price() + " USD");
+        cache.invalidate();
+        audit.record(admin.username(), "PRODUCT_CREATED", "product:" + created.id(), details.sku() + " · S/ " + details.price());
         return created;
     }
 
@@ -70,7 +145,8 @@ public final class CatalogService implements CatalogUseCases {
         requireCategory(details.categoryId());
         if (catalog.skuExists(details.sku(), id)) throw new BusinessConflictException("DUPLICATE_SKU", "Ya existe un producto con ese SKU");
         Product updated = catalog.updateProduct(id, details).orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
-        audit.record(admin.username(), "PRODUCT_UPDATED", "product:" + id, details.sku() + " · " + details.price() + " USD · active=" + details.active());
+        cache.invalidate();
+        audit.record(admin.username(), "PRODUCT_UPDATED", "product:" + id, details.sku() + " · S/ " + details.price() + " · active=" + details.active());
         return updated;
     }
 
@@ -83,6 +159,7 @@ public final class CatalogService implements CatalogUseCases {
         catalog.product(id).orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
         Product updated = catalog.adjustStock(id, delta)
                 .orElseThrow(() -> new BusinessConflictException("NEGATIVE_STOCK", "El ajuste dejaría el stock en negativo"));
+        cache.invalidate();
         audit.record(admin.username(), "STOCK_ADJUSTED", "product:" + id, (delta > 0 ? "+" : "") + delta + " · " + cleanReason);
         return updated;
     }

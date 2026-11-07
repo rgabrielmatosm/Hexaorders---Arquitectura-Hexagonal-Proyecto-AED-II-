@@ -1,14 +1,14 @@
-/* HexaOrders — tokens de diseño, base tipográfica y layout. */
+/* POLYMER — tokens de diseño, base tipográfica y layout (los nombres --violet* se conservan por compatibilidad: ahora son turquesa y periwinkle). */
 :root {
   color-scheme: dark;
-  --bg: #0B0F14;
-  --bg-2: #151B23;
-  --bg-3: #1C2430;
+  --bg: #101827;
+  --bg-2: #171D2B;
+  --bg-3: #1F2638;
   --line: rgba(148, 163, 184, 0.14);
   --line-strong: rgba(148, 163, 184, 0.28);
-  --violet: #8B5CF6;
-  --violet-2: #A78BFA;
-  --violet-soft: rgba(139, 92, 246, 0.14);
+  --violet: #3DE2D0;
+  --violet-2: #A6B8FF;
+  --violet-soft: rgba(61, 226, 208, 0.12);
   --green: #10B981;
   --green-soft: rgba(16, 185, 129, 0.14);
   --amber: #F59E0B;
@@ -56,7 +56,7 @@ kbd { border: 1px solid var(--line-strong); border-radius: 5px; padding: 0.05em 
 
 :focus-visible { outline: 2px solid var(--violet-2); outline-offset: 3px; border-radius: 6px; }
 
-::selection { background: rgba(139, 92, 246, 0.45); }
+::selection { background: rgba(61, 226, 208, 0.45); }
 
 .muted { color: var(--text-2); }
 .small { font-size: 0.82rem; line-height: 1.55; }
@@ -68,7 +68,7 @@ kbd { border: 1px solid var(--line-strong); border-radius: 5px; padding: 0.05em 
 
 .skip-link {
   position: absolute; left: 16px; top: -60px; z-index: 100;
-  background: var(--violet); color: #fff; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--violet); color: #101827; padding: 10px 14px; border-radius: var(--radius-sm);
 }
 .skip-link:focus { top: 12px; }
 
@@ -80,7 +80,7 @@ main { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; paddin
   height: var(--topbar-h);
   display: flex; align-items: center; gap: 24px;
   padding: 0 24px;
-  background: rgba(11, 15, 20, 0.72);
+  background: rgba(16, 24, 39, 0.72);
   backdrop-filter: saturate(140%) blur(14px);
   -webkit-backdrop-filter: saturate(140%) blur(14px);
   border-bottom: 1px solid var(--line);
@@ -117,7 +117,7 @@ main { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; paddin
 .hero__actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
 
 .gradient-text {
-  background: linear-gradient(100deg, var(--violet-2), var(--violet) 55%, #C4B5FD);
+  background: linear-gradient(100deg, var(--violet-2), var(--violet) 55%, #A6B8FF);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 

@@ -48,7 +48,8 @@ public final class AdministrationService implements AdministrationUseCases {
         Guards.require(admin, Role.ADMIN);
         return new AdminDashboard(orders.countAll(), orders.countByStatus(), orders.shopSales(), orders.countShopOrders(),
                 catalog.countProducts(), catalog.lowStock(LOW_STOCK_THRESHOLD), incidents.countOpen(),
-                orders.ordersPerDay(clock.instant().minus(Duration.ofDays(13))), orders.salesByCategory(), audit.recent(12));
+                orders.ordersPerDay(clock.instant().minus(Duration.ofDays(13))), orders.salesByCategory(), audit.recent(12),
+                orders.legacyUsdSales(), orders.topProducts(10));
     }
 
     @Override

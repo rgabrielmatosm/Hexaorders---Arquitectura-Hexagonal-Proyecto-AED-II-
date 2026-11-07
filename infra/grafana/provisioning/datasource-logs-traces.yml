@@ -1,0 +1,32 @@
+# v5: fuentes de logs (Loki) y trazas (Tempo). La fuente Prometheus (datasource.yml) no cambia.
+# En el modo básico estos servicios no existen y Grafana solo mostrará error al consultarlas.
+apiVersion: 1
+datasources:
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      # Del log de order-api a su traza en Tempo (el patrón de log incluye el trace id).
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '\b([0-9a-f]{32})\b'
+          datasourceUid: tempo
+          url: '$${__value.raw}'
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      nodeGraph:
+        enabled: true
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        filterByTraceID: true
+        customQuery: true
+        query: '{service=~"order-api|risk-engine"} |= "$${__trace.traceId}"'

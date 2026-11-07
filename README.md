@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="services/order-api/src/main/resources/static/img/logo.svg" alt="Logo de HexaOrders" width="112">
+<img src="services/order-api/src/main/resources/static/img/polymer-logo-light.svg" alt="POLYMER" width="320">
 
-# HEXAORDERS
+**Tecnología que conecta contigo.**
 
-**Order Management & Risk Assessment System**
+Tienda de tecnología **POLYMER**, construida sobre **HexaOrders** (nombre técnico del sistema): *Order Management & Risk Assessment System*
 
 Gestión de pedidos con evaluación determinista de riesgo, construida con **arquitectura hexagonal** (puertos y adaptadores) en **Java 21** y **Python**, persistida en **PostgreSQL**, orquestada con **Docker Compose** y observada con **Prometheus** y **Grafana**.
 
@@ -20,6 +20,9 @@ Gestión de pedidos con evaluación determinista de riesgo, construida con **arq
 <summary>Mostrar el índice completo</summary>
 
 1. [Descripción](#-descripción) · [Problema y objetivos](#-problema-que-resuelve-y-objetivos)
+1. [**Marca POLYMER**](#-marca-polymer): [manual de marca](docs/brand/BRAND_POLYMER.md) · [ADR 0016](docs/adr/0016-polymer-brand-in-the-presentation-layer.md) · [actualizar](docs/WINDOWS_DOCKER_GUIDE.md#11-actualizar-a-polymer)
+1. [**Tienda tecnológica v6**](#-tienda-tecnológica-v6): [documentación técnica](docs/TECH_STORE.md) · [ADR 0014](docs/adr/0014-commercial-store-and-internal-technical-docs.md) · [ADR 0015](docs/adr/0015-pricing-promotions-and-currency-in-the-domain.md) · [actualizar desde la v5](docs/WINDOWS_DOCKER_GUIDE.md#10-actualizar-desde-la-v5-a-la-v6-tienda-tecnológica)
+1. [**Plataforma Docker v5 (13 contenedores)**](#-plataforma-docker-v5-13-contenedores): [arquitectura](docs/DOCKER_ARCHITECTURE.md) · [servicios](docs/DOCKER_SERVICES.md) · [eventos](docs/ASYNCHRONOUS_EVENTS.md) · [Redis](docs/REDIS_INTEGRATION.md) · [observabilidad](docs/OBSERVABILITY_STACK.md) · [Windows](docs/WINDOWS_DOCKER_GUIDE.md)
 1. [**Sitio web multipágina v4**](#-sitio-web-multipágina-v4): [páginas](docs/FRONTEND_PAGES.md) · [arquitectura](docs/HEXAGONAL_ARCHITECTURE.md) · [Windows y Docker](docs/WINDOWS_DOCKER_GUIDE.md) · [capturas](#capturas-del-sitio-v4-datos-reales)
 1. [**Plataforma comercial v3**](#-plataforma-comercial-v3): [roles](#roles-y-permisos) · [funcionalidades](#funcionalidades) · [ciclo de vida](#ciclo-de-vida-del-pedido) · [modelo de datos](#modelo-de-datos) · [seguridad](#seguridad) · [capturas](#capturas-de-la-plataforma-datos-reales) · [ADR](docs/adr/)
 2. [Tecnologías](#-tecnologías)
@@ -55,6 +58,113 @@ El proyecto es una práctica universitaria cuyo objetivo es **demostrar de forma
 | Persistencia real | PostgreSQL 17 con migraciones Flyway y restricciones `CHECK`. |
 | Entregable en un único YAML | `docker-compose.yml` contiene Dockerfiles, código, tests y configuración de monitoreo. |
 | Observabilidad | Métricas técnicas y de negocio en Prometheus, dashboard aprovisionado en Grafana. |
+
+## ✨ Marca POLYMER
+
+La tienda v6 se presenta ahora como **POLYMER**: *Tecnología que conecta contigo.* Es un cambio de la **capa de presentación**. Se mantienen igual la arquitectura hexagonal, los 13 contenedores, la base de datos, la seguridad, la observabilidad y los números de pedido `HX-…`. HexaOrders sigue siendo el nombre técnico: paquetes, tablas, métricas y contenedores.
+
+- **Logotipo original:**
+  - isotipo «Enlace»: una P trazada como pista de circuito con tres nodos encadenados, como un polímero;
+  - versiones horizontal oscura y clara, monocromo, favicon y animada;
+  - todo se genera con `tools/generate_brand.py`;
+  - tres conceptos evaluados en [`docs/brand/`](docs/brand/BRAND_POLYMER.md).
+- **Intro cinematográfica** de unos 4 s, una vez por sesión:
+  - el isotipo se arma con líneas de luz y aparecen las letras P·O·L·Y·M·E·R;
+  - se abre el telón y la tienda entra de forma escalonada;
+  - se puede omitir (botón o `Esc`) y el sonido solo suena con «Entrar con sonido»;
+  - no aparece con movimiento reducido ni en los paneles internos.
+- **Movimiento:** transiciones entre páginas (View Transitions), indicador de navegación, aparición al desplazarse, tarjetas, vuelo al carrito y confirmación animada del pedido.
+- **Audio** sintetizado con Web Audio (bienvenida, confirmación, notificación y error), con silencio global en la cabecera. Está apagado por defecto.
+- **Pie comercial** de 5 columnas:
+  - contacto de demostración marcado como tal;
+  - métodos de pago reales frente a «próximamente»;
+  - redes sociales sin cuentas inventadas;
+  - Libro de reclamaciones funcional.
+  
+  Todos sus enlaces llevan a páginas reales: [`/empresa.html`](services/order-api/src/main/resources/static/empresa.html), [`/legal.html`](services/order-api/src/main/resources/static/legal.html) y [`/libro-reclamaciones.html`](services/order-api/src/main/resources/static/libro-reclamaciones.html).
+- **Paneles internos** con la identidad común y un color de acento por área, sin fondos que distraigan.
+
+Los datos de contacto, legales y de redes son **de demostración** y se configuran en `static/js/brand.js`. No se inventa un RUC ni se anuncian pagos con tarjeta o billeteras que no están integrados.
+
+## 🛒 Tienda tecnológica v6
+
+La v6 convierte http://localhost:8080 en una **tienda virtual de tecnología** sobre la misma arquitectura hexagonal y los mismos 13 contenedores:
+
+- **Catálogo:** **556 productos activos** en **20 categorías y 170 subcategorías**: computadoras, componentes, monitores, smartphones, gaming, periféricos, audio, redes, almacenamiento, smart home, seguridad, televisores, fotografía, empresarial, robótica, impresión 3D, wearables, realidad virtual, energía y productividad.
+- **Búsqueda y filtros:** por nombre, marca, modelo y SKU; filtros por categoría, marca, precio, disponibilidad, ofertas y **atributos técnicos reales** (RAM, almacenamiento, procesador, GPU, resolución, frecuencia, conectividad, batería…); orden y paginación del servidor.
+- **Ficha de producto:** especificaciones técnicas, precio en **soles**, precio anterior y descuento calculado, disponibilidad y productos relacionados.
+- **Promociones:** campañas con vigencia que gestiona el administrador.
+- **Compra:** **carrito guardado** en PostgreSQL y **checkout** con método de entrega y de pago (sin pagos en línea) y número de pedido `HX-…`.
+- **Portales por rol:** adaptados para cliente, administración, operaciones, logística y monitoreo.
+
+La tienda no muestra contenido técnico. La documentación técnica está en [`docs/TECH_STORE.md`](docs/TECH_STORE.md) y, para el personal autorizado, en **Monitoreo → Documentación técnica** (ADR 0014).
+
+```powershell
+.\hexaorders.cmd start          # modo completo (13 contenedores)
+.\hexaorders.cmd start -Mode basic
+```
+
+Las migraciones V6 y V7 se aplican solas y **no borran datos**: los pedidos y usuarios de la v5 se conservan.
+
+## 🐳 Plataforma Docker v5 (13 contenedores)
+
+La v5 convierte HexaOrders en una plataforma de **13 contenedores**, cada uno con una función real y comprobada por pruebas automáticas: 12 servicios más Alloy como agente de logs. Todo lo anterior se conserva: páginas, APIs, roles, dominio, 7 dashboards, métricas, alertas, scripts y pruebas.
+
+```mermaid
+flowchart LR
+    U((Navegador)) -->|127.0.0.1:8080| FE[frontend · Nginx]
+    FE --> OA[order-api · hexagonal]
+    OA --> DB[(PostgreSQL)]
+    OA --> RE[risk-engine · FastAPI]
+    OA -. caché .-> RD[(Redis)]
+    OA -. outbox → eventos .-> MQ[RabbitMQ]
+    MQ -. consumidor idempotente .-> OA
+    OA -. SMTP .-> MP[Mailpit]
+    OA & RE -. OTLP .-> OC[otel-collector] --> TP[(Tempo)]
+    AL[Alloy] -. logs .-> LK[(Loki)]
+    PR[Prometheus] --> GF[Grafana]
+    LK & TP --> GF
+```
+
+| Servicio | Función | Modo | Host |
+| --- | --- | --- | --- |
+| `frontend` | Gateway Nginx: estáticos y reenvío a Spring (ADR 0011) | básico | 127.0.0.1:8080 |
+| `order-api` | Núcleo hexagonal Java 21 / Spring Boot | básico | — |
+| `risk-engine` | Motor de riesgo FastAPI | básico | — |
+| `db` | PostgreSQL 17, fuente de verdad y outbox | básico | — |
+| `prometheus` | Métricas (9 jobs) y 9 alertas | básico | 127.0.0.1:9091 |
+| `grafana` | 8 dashboards; fuentes Prometheus, Loki y Tempo | básico | 127.0.0.1:3000 |
+| `redis` | Caché del catálogo (no es fuente de verdad) | full | — |
+| `rabbitmq` | Eventos de negocio versionados con DLQ | full | 127.0.0.1:15672 (consola) |
+| `mailpit` | Captura de correos de desarrollo (no envía a Internet) | full | 127.0.0.1:8025 |
+| `loki` | Logs centralizados (7 días) | full | — |
+| `tempo` | Trazas distribuidas (72 h) | full | — |
+| `otel-collector` | Recepción OTLP, filtrado, lotes y métricas de Nginx | full | — |
+| `alloy` | Recolector de logs de Docker hacia Loki | full | — |
+
+PostgreSQL, Redis y AMQP **nunca** se publican en el host. Las redes internas son `gateway`, `data`, `compute`, `cache`, `messaging` y `telemetry`.
+
+**Comandos (Windows, PowerShell):**
+
+```powershell
+.\hexaorders.cmd start               # modo completo (13 contenedores, ~4,5 GB de RAM)
+.\hexaorders.cmd start -Mode basic   # modo básico (6 contenedores, ~2,5 GB)
+.\hexaorders.cmd status
+.\hexaorders.cmd logs
+.\hexaorders.cmd smoke
+.\hexaorders.cmd check
+.\hexaorders.cmd stop                # conserva los datos
+```
+
+Documentación:
+
+- [`DOCKER_ARCHITECTURE.md`](docs/DOCKER_ARCHITECTURE.md): redes, modos y recursos;
+- [`DOCKER_SERVICES.md`](docs/DOCKER_SERVICES.md): cada servicio y su verificación;
+- [`ASYNCHRONOUS_EVENTS.md`](docs/ASYNCHRONOUS_EVENTS.md): outbox, eventos, DLQ y correos;
+- [`REDIS_INTEGRATION.md`](docs/REDIS_INTEGRATION.md);
+- [`OBSERVABILITY_STACK.md`](docs/OBSERVABILITY_STACK.md): métricas, logs y trazas;
+- [`WINDOWS_DOCKER_GUIDE.md`](docs/WINDOWS_DOCKER_GUIDE.md);
+- [`validacion.md`](docs/validacion.md): resultados reales.
 
 ## 🌐 Sitio web multipágina v4
 
@@ -550,13 +660,14 @@ En Linux o macOS, los mismos comandos con PowerShell 7: `pwsh ./tools/hexaorders
 
 ## 🐳 Ejecución con Docker Compose
 
-`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los tres secretos.
+`docker-compose.yml` es el **entregable principal** y es **autosuficiente**: contiene, mediante `build.dockerfile_inline` y heredocs de BuildKit, los Dockerfiles, el código fuente, los tests, la interfaz web y la configuración de Prometheus y Grafana. Basta con copiar ese archivo a otra máquina y crear allí los cuatro secretos (v5: se añade `rabbitmq_password.txt`).
 
 ```powershell
 New-Item -ItemType Directory secrets -Force | Out-Null
-# Crea secrets\db_password.txt, grafana_password.txt y demo_password.txt (aleatorios; no sobrescribe)
+# Crea secrets\db_password.txt, grafana_password.txt, demo_password.txt y rabbitmq_password.txt (aleatorios; no sobrescribe)
 .\tools\init-env.ps1
 docker compose config --quiet
+$env:COMPOSE_PROFILES = 'full'   # v5: omítelo para el modo básico
 docker compose build --pull
 docker compose up -d --wait --wait-timeout 240
 docker compose ps
@@ -567,7 +678,7 @@ docker compose ps
 <details>
 <summary>Qué incluye el YAML (healthchecks, límites, secretos, volúmenes)</summary>
 
-- **Healthchecks** en los cinco servicios; `order-api` espera a `db` y `risk-engine` sanos (`depends_on: condition: service_healthy`).
+- **Healthchecks** en los 13 servicios (v5; perfil `full` para los 7 opcionales); `order-api` espera a `db` y `risk-engine` sanos (`depends_on: condition: service_healthy`).
 - **Límites** de memoria y CPU (`mem_limit`, `cpus`) y rotación de logs.
 - **Secretos** de tipo archivo montados en `/run/secrets` (Compose solo admite este tipo en servicios `read_only`).
 - **Volúmenes** `postgres_data`, `prometheus_data` y `grafana_data`: `docker compose down` los conserva y `down -v` los elimina.

@@ -1,6 +1,11 @@
 # HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
+#
+# v5 · Modos de ejecución (docs/DOCKER_ARCHITECTURE.md):
+#   básico   (sin perfil)        db, risk-engine, order-api, prometheus, grafana y frontend (gateway).
+#   completo (perfil "full")     + redis, rabbitmq, mailpit, loki, tempo, otel-collector y alloy.
+#   PowerShell: .\hexaorders.cmd start  (completo)  ·  .\hexaorders.cmd start -Mode basic
 name: hexaorders
 
 x-runtime: &runtime
@@ -11,6 +16,9 @@ x-runtime: &runtime
     options:
       max-size: 10m
       max-file: '3'
+  # Alloy solo recoge los logs de contenedores con esta etiqueta (nunca los de otros proyectos).
+  labels:
+    com.hexaorders.logs: 'true'
 
 services:
   # 1. Adaptador de persistencia: solo order-api conoce esta base de datos.
@@ -44,6 +52,15 @@ services:
     build:
       context: .
       dockerfile_inline: __INLINE_RISK__
+    environment:
+      # v5: trazas OTLP solo si existe otel-collector (perfil "full"); si no, se ejecuta igual que antes.
+      HEXAORDERS_INTEGRATIONS: auto
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: risk-engine
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+        required: false
     networks: [compute, telemetry]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
@@ -77,15 +94,36 @@ services:
       # v4: el portal de monitoreo consulta Prometheus por la red interna telemetry (nunca localhost).
       PROMETHEUS_URL: http://prometheus:9090
       JAVA_TOOL_OPTIONS: '-XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError'
-    secrets: [db_password, demo_password]
+      # v5: cada integración se activa sola si su servicio existe (perfil "full"); ver IntegrationEnvironment.
+      HEXAORDERS_INTEGRATIONS: auto
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: hexaorders
+      RABBITMQ_PASSWORD_FILE: /run/secrets/rabbitmq_password
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    secrets: [db_password, demo_password, rabbitmq_password]
     depends_on:
       db:
         condition: service_healthy
       risk-engine:
         condition: service_healthy
-    ports:
-      - '127.0.0.1:8080:8080'
-    networks: [edge, data, compute, telemetry]
+      # Dependencias opcionales: en el modo básico no existen y order-api arranca sin ellas.
+      redis:
+        condition: service_healthy
+        required: false
+      rabbitmq:
+        condition: service_healthy
+        required: false
+      mailpit:
+        condition: service_healthy
+        required: false
+      otel-collector:
+        condition: service_healthy
+        required: false
+    # v5: ya no se publica en el host; el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
+    networks: [gateway, data, compute, telemetry, cache, messaging]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
     cap_drop: [ALL]
@@ -130,7 +168,7 @@ services:
       timeout: 3s
       retries: 6
 
-  # 5. Datasource y dashboard provisionados: cero configuración manual en la demo.
+  # 5. Datasources (Prometheus; v5: Loki y Tempo) y dashboards provisionados: cero configuración manual.
   grafana:
     <<: *runtime
     image: hexaorders/grafana:1.0.0
@@ -167,6 +205,213 @@ services:
       retries: 12
       start_period: 20s
 
+  # 6. Gateway web (v5, ADR 0011): sirve css/js/img y reenvía páginas y /api a order-api.
+  frontend:
+    <<: *runtime
+    image: hexaorders/frontend:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_FRONTEND__
+    depends_on:
+      order-api:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:8080:8080'
+    networks: [edge, gateway, telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/nginx-health]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  # ---------------------------------------------------------------- perfil "full"
+
+  # 7. Caché del catálogo público (no es fuente de verdad: PostgreSQL lo es). Red interna "cache".
+  redis:
+    <<: *runtime
+    profiles: [full]
+    image: redis:7.4.12-alpine
+    user: '999:999'
+    command: [redis-server, --protected-mode, 'no', --save, '300', '1', --appendonly, 'no',
+              --maxmemory, 48mb, --maxmemory-policy, allkeys-lru]
+    volumes:
+      - redis_data:/data
+    networks: [cache]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=8m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # 8. Mensajería asíncrona de eventos de negocio (outbox → exchange → cola de notificaciones → DLQ).
+  rabbitmq:
+    <<: *runtime
+    profiles: [full]
+    image: hexaorders/rabbitmq:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_RABBITMQ__
+    hostname: rabbitmq  # nombre de nodo estable: los mensajes persisten al recrear el contenedor
+    environment:
+      RABBITMQ_USER: hexaorders
+    secrets: [rabbitmq_password]
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - '127.0.0.1:15672:15672'  # consola de gestión (usuario hexaorders, secrets\rabbitmq_password.txt)
+    networks: [edge, messaging, telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,nosuid,size=32m', '/etc/rabbitmq/conf.d:rw,noexec,nosuid,size=1m']
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 0.75
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 40s
+
+  # 9. Servidor SMTP de DESARROLLO: captura los correos de notificación (no envía nada a Internet).
+  mailpit:
+    <<: *runtime
+    profiles: [full]
+    image: axllent/mailpit:v1.33.0
+    environment:
+      MP_MAX_MESSAGES: '500'
+      MP_SMTP_AUTH_ACCEPT_ANY: 'false'
+      MP_SMTP_AUTH_ALLOW_INSECURE: 'false'
+    ports:
+      - '127.0.0.1:8025:8025'  # interfaz web de Mailpit
+    networks: [edge, messaging]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 96m
+    cpus: 0.25
+    healthcheck:
+      test: [CMD, /mailpit, readyz]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  # 10. Logs centralizados (consulta desde Grafana → Explore → Loki).
+  loki:
+    <<: *runtime
+    profiles: [full]
+    image: hexaorders/loki:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_LOKI__
+    volumes:
+      - loki_data:/loki
+    networks: [telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, /usr/local/bin/busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3100/ready]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  # 11. Trazas distribuidas (Grafana → Explore → Tempo; X-Trace-Id en cada respuesta de la API).
+  tempo:
+    <<: *runtime
+    profiles: [full]
+    image: hexaorders/tempo:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_TEMPO__
+    volumes:
+      - tempo_data:/var/tempo
+    networks: [telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, /usr/local/bin/busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3200/ready]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  # 12. Recepción y procesamiento de telemetría OTLP (→ Tempo) y métricas de Nginx (→ Prometheus).
+  otel-collector:
+    <<: *runtime
+    profiles: [full]
+    image: hexaorders/otel-collector:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_OTEL_COLLECTOR__
+    depends_on:
+      tempo:
+        condition: service_healthy
+    networks: [telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:13133/]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  # 13. Agente de logs (necesario para Loki en Docker Desktop): lee los logs de los contenedores de
+  #     este proyecto por la API de Docker (socket en solo lectura) y los envía a Loki sin secretos.
+  alloy:
+    <<: *runtime
+    profiles: [full]
+    image: hexaorders/alloy:1.0.0
+    build:
+      context: .
+      dockerfile_inline: __INLINE_ALLOY__
+    user: '0:0'  # leer /var/run/docker.sock (sin capacidades: cap_drop ALL)
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - alloy_data:/var/lib/hexaorders-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [telemetry]
+    read_only: true
+    tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, /usr/local/bin/busybox, wget, -q, -O, /dev/null, http://127.0.0.1:12345/-/ready]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
 # IPs variables; descubrimiento por nombre de servicio, nunca localhost entre servicios.
 networks:
   edge: {}
@@ -176,12 +421,24 @@ networks:
     internal: true
   telemetry:
     internal: true
+  # v5: gateway ↔ order-api; caché; mensajería y SMTP. Todas internas (sin salida a Internet).
+  gateway:
+    internal: true
+  cache:
+    internal: true
+  messaging:
+    internal: true
 
 # `down` conserva estos volúmenes; `down -v` elimina los datos.
 volumes:
   postgres_data: {}
   prometheus_data: {}
   grafana_data: {}
+  redis_data: {}
+  rabbitmq_data: {}
+  loki_data: {}
+  tempo_data: {}
+  alloy_data: {}
 
 # Los valores se generan al desplegar en ./secrets/ (junto a este archivo), nunca se
 # incrustan en el entregable ni en Git. Se usan archivos y no `environment:` porque
@@ -194,3 +451,5 @@ secrets:
     file: ./secrets/grafana_password.txt
   demo_password:
     file: ./secrets/demo_password.txt
+  rabbitmq_password:
+    file: ./secrets/rabbitmq_password.txt

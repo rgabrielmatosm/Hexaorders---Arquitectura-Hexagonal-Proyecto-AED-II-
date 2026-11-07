@@ -24,9 +24,16 @@ final class LifecycleTransitions {
     private final BusinessTelemetry telemetry;
     private final AuditLog audit;
     private final Clock clock;
+    private final com.hexaorders.application.port.out.CatalogCache cache;
 
     LifecycleTransitions(CommerceOrderRepository orders, DeliveryRepository deliveries, BusinessTelemetry telemetry,
                          AuditLog audit, Clock clock) {
+        this(orders, deliveries, telemetry, audit, clock, com.hexaorders.application.port.out.CatalogCache.NONE);
+    }
+
+    LifecycleTransitions(CommerceOrderRepository orders, DeliveryRepository deliveries, BusinessTelemetry telemetry,
+                         AuditLog audit, Clock clock, com.hexaorders.application.port.out.CatalogCache cache) {
+        this.cache = cache;
         this.orders = orders;
         this.deliveries = deliveries;
         this.telemetry = telemetry;
@@ -51,6 +58,7 @@ final class LifecycleTransitions {
         if (!orders.transition(orderId, order.version(), order.status(), change, releaseStock)) {
             throw new BusinessConflictException("CONCURRENT_UPDATE", "El pedido fue modificado por otra persona; recarga y vuelve a intentarlo");
         }
+        if (releaseStock) cache.invalidate(); // units went back to stock: cached listings are stale
         telemetry.transition(order.status(), target);
         audit.record(user.username(), "ORDER_STATUS_CHANGED", orderId.toString(),
                 order.status() + " -> " + target + (cleanNote == null ? "" : " · " + cleanNote));

@@ -82,19 +82,49 @@ public class PlatformConfiguration {
         return new DependencyHealthAdapter(jdbc, builder.baseUrl(riskBaseUrl).requestFactory(requests).build());
     }
 
-    @Bean CatalogUseCases catalogUseCases(CatalogRepository catalog, AuditLog audit) { return new CatalogService(catalog, audit); }
+    // ---- v6: store (promotions, saved cart) --------------------------------------------------
+    @Bean com.hexaorders.application.port.out.PromotionRepository promotionRepository(JdbcTemplate jdbc, TransactionTemplate tx) {
+        return new com.hexaorders.adapter.out.persistence.JdbcPromotionRepository(jdbc, tx);
+    }
+
+    @Bean com.hexaorders.application.port.out.CartRepository cartRepository(JdbcTemplate jdbc) {
+        return new com.hexaorders.adapter.out.persistence.JdbcCartRepository(jdbc);
+    }
+
+    @Bean com.hexaorders.application.service.PricingService pricingService(com.hexaorders.application.port.out.PromotionRepository promotions, Clock clock) {
+        return new com.hexaorders.application.service.PricingService(promotions, clock);
+    }
+
+    @Bean CatalogUseCases catalogUseCases(CatalogRepository catalog, AuditLog audit, com.hexaorders.application.port.out.CatalogCache cache,
+                                          com.hexaorders.application.service.PricingService pricing, CommerceOrderRepository orders) {
+        return new CatalogService(catalog, audit, cache, pricing, orders);
+    }
+
+    @Bean com.hexaorders.application.port.in.PromotionUseCases promotionUseCases(com.hexaorders.application.port.out.PromotionRepository promotions,
+                                                                                CatalogRepository catalog, com.hexaorders.application.port.out.CatalogCache cache,
+                                                                                AuditLog audit, Clock clock) {
+        return new com.hexaorders.application.service.PromotionService(promotions, catalog, cache, audit, clock);
+    }
+
+    @Bean com.hexaorders.application.port.in.CartUseCases cartUseCases(com.hexaorders.application.port.out.CartRepository carts, CatalogRepository catalog,
+                                                                      com.hexaorders.application.service.PricingService pricing) {
+        return new com.hexaorders.application.service.CartService(carts, catalog, pricing);
+    }
 
     @Bean
     CommerceUseCases commerceUseCases(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
                                       RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
-                                      AuditLog audit, Clock clock) {
-        return new CommerceService(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock);
+                                      AuditLog audit, Clock clock, com.hexaorders.application.port.out.CatalogCache cache,
+                                      com.hexaorders.application.service.PricingService pricing,
+                                      com.hexaorders.application.port.out.CartRepository carts) {
+        return new CommerceService(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock, cache, pricing, carts);
     }
 
     @Bean
     OperationsUseCases operationsUseCases(CommerceOrderRepository orders, DeliveryRepository deliveries, IncidentRepository incidents,
-                                          BusinessTelemetry telemetry, AuditLog audit, Clock clock) {
-        return new OperationsService(orders, deliveries, incidents, telemetry, audit, clock);
+                                          BusinessTelemetry telemetry, AuditLog audit, Clock clock,
+                                          com.hexaorders.application.port.out.CatalogCache cache) {
+        return new OperationsService(orders, deliveries, incidents, telemetry, audit, clock, cache);
     }
 
     @Bean

@@ -18,7 +18,7 @@ import java.util.Set;
 public final class AccountService implements AccountUseCases {
     /** Demo accounts, one per role (plus a second logistics operator to demonstrate assignment). */
     static final List<DemoUser> DEMO_USERS = List.of(
-            new DemoUser("admin", "Administración HexaOrders", "admin@hexaorders.local", EnumSet.of(Role.ADMIN)),
+            new DemoUser("admin", "Administración Polymer", "admin@hexaorders.local", EnumSet.of(Role.ADMIN)),
             new DemoUser("operador", "Operador de pedidos", "operador@hexaorders.local", EnumSet.of(Role.ORDER_OPERATOR)),
             new DemoUser("logistica", "Ana Logística", "logistica@hexaorders.local", EnumSet.of(Role.LOGISTICS_OPERATOR)),
             new DemoUser("logistica2", "Bruno Logística", "logistica2@hexaorders.local", EnumSet.of(Role.LOGISTICS_OPERATOR)),

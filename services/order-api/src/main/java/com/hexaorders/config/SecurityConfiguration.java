@@ -78,7 +78,8 @@ public class SecurityConfiguration {
                     .requestMatchers("/api/orders", "/api/orders/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
                     .requestMatchers("/api/auth/**").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/shop/quote").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/shop/quote", "/api/shop/checkout-summary").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/shop/checkout-options").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()
                     .requestMatchers("/api/shop/**").hasRole("CUSTOMER")
                     .requestMatchers("/api/account/**").authenticated()
@@ -98,6 +99,8 @@ public class SecurityConfiguration {
                     .requestMatchers("/operaciones", "/operaciones/**").hasAnyRole("ORDER_OPERATOR", "ADMIN")
                     .requestMatchers("/logistica", "/logistica/**").hasAnyRole("LOGISTICS_OPERATOR", "ADMIN")
                     .requestMatchers("/monitoreo", "/monitoreo/**").hasAnyRole("OBSERVABILITY_VIEWER", "ADMIN")
+                    // v6: la documentación técnica y el laboratorio de la API son internos (no forman parte de la tienda).
+                    .requestMatchers("/arquitectura/**", "/laboratorio.html").hasAnyRole("OBSERVABILITY_VIEWER", "ADMIN")
                     .anyRequest().permitAll())
             .exceptionHandling(errors -> errors
                     .authenticationEntryPoint((request, response, failure) -> {

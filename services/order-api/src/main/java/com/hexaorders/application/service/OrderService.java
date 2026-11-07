@@ -31,6 +31,8 @@ public final class OrderService implements OrderUseCases {
 
     @Override
     public Order create(OrderDraft draft) {
+        // Contract of the original API (v1): only USD. The store (CommerceService) sells in PEN.
+        if (!"USD".equals(draft.currency())) throw new IllegalArgumentException("currency: la única moneda admitida es USD");
         int score;
         try {
             score = riskAssessment.assess(draft);

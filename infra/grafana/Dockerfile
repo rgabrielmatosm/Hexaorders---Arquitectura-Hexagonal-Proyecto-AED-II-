@@ -13,3 +13,6 @@ COPY dashboards/hexaorders-api.json /etc/grafana/dashboards/hexaorders-api.json
 COPY dashboards/hexaorders-infrastructure.json /etc/grafana/dashboards/hexaorders-infrastructure.json
 COPY dashboards/hexaorders-security.json /etc/grafana/dashboards/hexaorders-security.json
 COPY dashboards/hexaorders-logistics.json /etc/grafana/dashboards/hexaorders-logistics.json
+# v5: fuentes Loki y Tempo (archivo nuevo; datasource.yml no cambia) y dashboard de integraciones.
+COPY provisioning/datasource-logs-traces.yml /etc/grafana/provisioning/datasources/logs-traces.yml
+COPY dashboards/hexaorders-integrations.json /etc/grafana/dashboards/hexaorders-integrations.json

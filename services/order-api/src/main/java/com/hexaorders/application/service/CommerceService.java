@@ -22,7 +22,11 @@ import com.hexaorders.domain.OrderDraft;
 import com.hexaorders.domain.catalog.Product;
 import com.hexaorders.domain.fulfillment.Actor;
 import com.hexaorders.domain.fulfillment.CartItem;
+import com.hexaorders.domain.fulfillment.CheckoutSummary;
 import com.hexaorders.domain.fulfillment.CommerceOrder;
+import com.hexaorders.domain.fulfillment.DeliveryMethod;
+import com.hexaorders.domain.fulfillment.PaymentMethod;
+import com.hexaorders.domain.fulfillment.ShippingAddress;
 import com.hexaorders.domain.fulfillment.FulfillmentStatus;
 import com.hexaorders.domain.fulfillment.OrderLine;
 import com.hexaorders.domain.fulfillment.Quote;
@@ -41,9 +45,12 @@ import java.util.regex.Pattern;
 /**
  * Customer use cases. Placing an order reuses the ORIGINAL risk flow: the same RiskAssessmentPort
  * (Python engine) is called before persisting, and the same OrderTelemetry counter is updated.
+ * v6: the store sells in PEN, prices include running promotions (PricingService), the checkout adds
+ * the shipping cost of the chosen delivery method, and the saved cart is emptied after the order.
  */
 public final class CommerceService implements CommerceUseCases {
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9_-]{8,64}");
+    static final String CURRENCY = "PEN";
 
     private final CatalogRepository catalog;
     private final CommerceOrderRepository orders;
@@ -54,10 +61,31 @@ public final class CommerceService implements CommerceUseCases {
     private final AuditLog audit;
     private final Clock clock;
     private final LifecycleTransitions transitions;
+    private final com.hexaorders.application.port.out.CatalogCache cache;
+    private final PricingService pricing;
+    private final com.hexaorders.application.port.out.CartRepository carts;
 
     public CommerceService(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
                            RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
                            AuditLog audit, Clock clock) {
+        this(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock, com.hexaorders.application.port.out.CatalogCache.NONE);
+    }
+
+    public CommerceService(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
+                           RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
+                           AuditLog audit, Clock clock, com.hexaorders.application.port.out.CatalogCache cache) {
+        this(catalog, orders, deliveries, risk, orderTelemetry, telemetry, audit, clock, cache, PricingService.none(clock),
+                com.hexaorders.application.port.out.CartRepository.NONE);
+    }
+
+    /** v6: promotions (pricing) and the saved cart, emptied once the order is placed. */
+    public CommerceService(CatalogRepository catalog, CommerceOrderRepository orders, DeliveryRepository deliveries,
+                           RiskAssessmentPort risk, OrderTelemetry orderTelemetry, BusinessTelemetry telemetry,
+                           AuditLog audit, Clock clock, com.hexaorders.application.port.out.CatalogCache cache,
+                           PricingService pricing, com.hexaorders.application.port.out.CartRepository carts) {
+        this.pricing = pricing;
+        this.carts = carts;
+        this.cache = cache;
         this.catalog = catalog;
         this.orders = orders;
         this.deliveries = deliveries;
@@ -66,19 +94,39 @@ public final class CommerceService implements CommerceUseCases {
         this.telemetry = telemetry;
         this.audit = audit;
         this.clock = clock;
-        this.transitions = new LifecycleTransitions(orders, deliveries, telemetry, audit, clock);
+        this.transitions = new LifecycleTransitions(orders, deliveries, telemetry, audit, clock, cache);
     }
 
     @Override
     public Quote quote(List<CartItem> items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("El carrito está vacío");
         Map<Long, Product> products = catalog.productsByIds(items.stream().map(CartItem::productId).toList());
-        return Quote.price(items, products);
+        return Quote.price(items, products, pricing.pricer());
+    }
+
+    @Override
+    public CheckoutSummary checkout(List<CartItem> items, DeliveryMethod delivery, PaymentMethod payment) {
+        return CheckoutSummary.of(quote(items), delivery, payment);
     }
 
     @Override
     public PlacementResult placeOrder(AuthenticatedUser customer, List<CartItem> items, String idempotencyKey,
                                       com.hexaorders.domain.fulfillment.ShippingAddress shipping) {
+        // v3–v5 API clients: standard delivery; the address stays optional for them.
+        return place(customer, items, idempotencyKey, shipping, DeliveryMethod.STANDARD, null);
+    }
+
+    @Override
+    public PlacementResult placeOrder(AuthenticatedUser customer, List<CartItem> items, String idempotencyKey, ShippingAddress shipping,
+                                      DeliveryMethod delivery, PaymentMethod payment) {
+        DeliveryMethod method = delivery == null ? DeliveryMethod.STANDARD : delivery;
+        if (payment == null) throw new IllegalArgumentException("paymentMethod: elige un método de pago");
+        if (method.needsAddress() && shipping == null) throw new IllegalArgumentException("shipping: la dirección de entrega es obligatoria");
+        return place(customer, items, idempotencyKey, shipping, method, payment);
+    }
+
+    private PlacementResult place(AuthenticatedUser customer, List<CartItem> items, String idempotencyKey, ShippingAddress shipping,
+                                  DeliveryMethod delivery, PaymentMethod payment) {
         Guards.require(customer, Role.CUSTOMER);
         if (idempotencyKey == null || !IDEMPOTENCY_KEY.matcher(idempotencyKey).matches()) {
             throw new IllegalArgumentException("Idempotency-Key: obligatoria, 8 a 64 caracteres [A-Za-z0-9_-]");
@@ -87,8 +135,10 @@ public final class CommerceService implements CommerceUseCases {
         if (replay != null) return replay;
 
         Quote quote;
+        CheckoutSummary summary;
         try {
             quote = quote(items);
+            summary = CheckoutSummary.of(quote, delivery, payment);
         } catch (IllegalArgumentException invalid) {
             telemetry.checkoutFailed("invalid");
             throw invalid;
@@ -102,7 +152,7 @@ public final class CommerceService implements CommerceUseCases {
         }
 
         // 1) Risk first (Python), exactly like the original use case; no transaction is open yet.
-        OrderDraft draft = new OrderDraft(customer.username(), quote.total(), "USD");
+        OrderDraft draft = new OrderDraft(customer.username(), summary.total(), CURRENCY);
         int score;
         try {
             score = risk.assess(draft);
@@ -122,7 +172,7 @@ public final class CommerceService implements CommerceUseCases {
         // 2) One transaction: order + lines + history + conditional stock decrement.
         CommerceOrder placed;
         try {
-            placed = orders.placeOrder(new NewShopOrder(order, customer.userId(), status, quote.lines(), history, idempotencyKey, shipping));
+            placed = orders.placeOrder(new NewShopOrder(order, customer.userId(), status, quote.lines(), history, idempotencyKey, shipping, summary));
         } catch (OutOfStockException outOfStock) {
             telemetry.checkoutFailed("out_of_stock");
             throw outOfStock;
@@ -131,10 +181,13 @@ public final class CommerceService implements CommerceUseCases {
             if (again != null) return again;
             throw new BusinessConflictException("IDEMPOTENCY_KEY_REUSED", concurrent.getMessage());
         }
+        cache.invalidate(); // stock decreased in PostgreSQL: cached listings would show stale stock
+        carts.clear(customer.userId()); // the order now holds what was in the saved cart
         orderTelemetry.orderCreated(order.status());
         telemetry.shopOrderPlaced(order.status());
         audit.record(customer.username(), "ORDER_PLACED", order.id().toString(),
-                "total=" + quote.total() + " USD; lines=" + quote.lines().size() + "; riskScore=" + score + "; status=" + status);
+                "total=" + summary.total() + " " + CURRENCY + "; lines=" + quote.lines().size() + "; delivery=" + delivery
+                        + "; payment=" + payment + "; riskScore=" + score + "; status=" + status);
         return new PlacementResult(placed, true);
     }
 
@@ -160,7 +213,8 @@ public final class CommerceService implements CommerceUseCases {
         ensureOwner(customer, orderId);
         CommerceOrder order = orders.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Pedido no encontrado"));
         return new OrderDetails(order, orders.history(orderId), deliveries.findByOrder(orderId).orElse(null),
-                TransitionPolicy.nextFor(order.status(), EnumSet.of(Actor.CUSTOMER)), orders.shippingOf(orderId).orElse(null));
+                TransitionPolicy.nextFor(order.status(), EnumSet.of(Actor.CUSTOMER)), orders.shippingOf(orderId).orElse(null),
+                orders.checkoutOf(orderId).orElse(null));
     }
 
     @Override

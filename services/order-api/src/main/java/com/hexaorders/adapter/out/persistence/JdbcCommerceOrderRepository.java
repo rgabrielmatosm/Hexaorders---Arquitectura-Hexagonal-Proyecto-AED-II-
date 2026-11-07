@@ -33,12 +33,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 public final class JdbcCommerceOrderRepository implements CommerceOrderRepository {
     private static final String COLUMNS = "o.id, o.customer_id, o.amount, o.currency, o.risk_score, o.status, "
-            + "o.fulfillment_status, o.channel, o.version, o.created_at";
+            + "o.fulfillment_status, o.channel, o.version, o.created_at, o.order_number";
     private static final RowMapper<CommerceOrder> HEADER = (rs, n) -> new CommerceOrder(
             rs.getObject("id", UUID.class), rs.getString("customer_id"), rs.getBigDecimal("amount"), rs.getString("currency"),
             rs.getInt("risk_score"), OrderStatus.valueOf(rs.getString("status")),
             FulfillmentStatus.valueOf(rs.getString("fulfillment_status")), rs.getString("channel"), rs.getInt("version"),
-            rs.getTimestamp("created_at").toInstant(), List.of());
+            rs.getTimestamp("created_at").toInstant(), List.of(), rs.getObject("order_number", Long.class));
     private static final RowMapper<StatusChange> CHANGE = (rs, n) -> new StatusChange(
             rs.getString("from_status") == null ? null : FulfillmentStatus.valueOf(rs.getString("from_status")),
             FulfillmentStatus.valueOf(rs.getString("to_status")), rs.getString("actor"), rs.getString("note"),
@@ -70,15 +70,22 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
                     int updated = jdbc.update("UPDATE products SET stock = stock - ?, updated_at = now() "
                             + "WHERE id = ? AND active AND stock >= ?", line.quantity(), line.productId(), line.quantity());
                     if (updated == 0) throw new OutOfStockException(line.productName());
-                    jdbc.update("INSERT INTO order_lines (order_id, line_no, product_id, product_name, unit_price, quantity, line_total) "
-                                    + "VALUES (?, ?, ?, ?, ?, ?, ?)", order.id(), line.lineNo(), line.productId(), line.productName(),
-                            line.unitPrice(), line.quantity(), line.lineTotal());
+                    jdbc.update("INSERT INTO order_lines (order_id, line_no, product_id, product_name, unit_price, quantity, line_total, "
+                                    + "list_unit_price, promotion_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", order.id(), line.lineNo(), line.productId(),
+                            line.productName(), line.unitPrice(), line.quantity(), line.lineTotal(), line.listUnitPrice(), line.promotionId());
                 }
                 shopOrder.history().forEach(change -> insertChange(order.id(), change));
                 var shipping = shopOrder.shipping();
                 if (shipping != null) {
                     jdbc.update("INSERT INTO order_shipping (order_id, recipient, address, city, phone, instructions) VALUES (?, ?, ?, ?, ?, ?)",
                             order.id(), shipping.recipient(), shipping.address(), shipping.city(), shipping.phone(), shipping.instructions());
+                }
+                var checkout = shopOrder.checkout();
+                if (checkout != null) {
+                    jdbc.update("INSERT INTO order_checkout (order_id, delivery_method, payment_method, subtotal, savings, shipping_cost, total) "
+                                    + "VALUES (?, ?, ?, ?, ?, ?, ?)", order.id(), checkout.delivery().name(),
+                            checkout.payment() == null ? null : checkout.payment().name(), checkout.subtotal(), checkout.savings(),
+                            checkout.shippingCost(), checkout.total());
                 }
                 return findById(order.id()).orElseThrow();
             });
@@ -100,6 +107,16 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
         return Jdbc.run(() -> jdbc.query("SELECT recipient, address, city, phone, instructions FROM order_shipping WHERE order_id = ?",
                 (rs, n) -> new com.hexaorders.domain.fulfillment.ShippingAddress(rs.getString("recipient"), rs.getString("address"),
                         rs.getString("city"), rs.getString("phone"), rs.getString("instructions")), orderId).stream().findFirst());
+    }
+
+    @Override
+    public Optional<com.hexaorders.domain.fulfillment.OrderCheckout> checkoutOf(UUID orderId) {
+        return Jdbc.run(() -> jdbc.query("SELECT delivery_method, payment_method, subtotal, savings, shipping_cost, total FROM order_checkout "
+                + "WHERE order_id = ?", (rs, n) -> new com.hexaorders.domain.fulfillment.OrderCheckout(
+                com.hexaorders.domain.fulfillment.DeliveryMethod.valueOf(rs.getString("delivery_method")),
+                rs.getString("payment_method") == null ? null : com.hexaorders.domain.fulfillment.PaymentMethod.valueOf(rs.getString("payment_method")),
+                rs.getBigDecimal("subtotal"), rs.getBigDecimal("savings"), rs.getBigDecimal("shipping_cost"), rs.getBigDecimal("total")),
+                orderId).stream().findFirst());
     }
 
     @Override
@@ -140,14 +157,16 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
         if (headers.isEmpty()) return headers;
         String placeholders = String.join(",", headers.stream().map(h -> "?").toList());
         Map<UUID, List<OrderLine>> lines = new HashMap<>();
-        jdbc.query("SELECT order_id, line_no, product_id, product_name, unit_price, quantity, line_total FROM order_lines "
-                + "WHERE order_id IN (" + placeholders + ") ORDER BY order_id, line_no", rs -> {
+        jdbc.query("SELECT order_id, line_no, product_id, product_name, unit_price, quantity, line_total, list_unit_price, promotion_id "
+                + "FROM order_lines WHERE order_id IN (" + placeholders + ") ORDER BY order_id, line_no", rs -> {
                     lines.computeIfAbsent(rs.getObject("order_id", UUID.class), k -> new ArrayList<>()).add(new OrderLine(
                             rs.getInt("line_no"), rs.getLong("product_id"), rs.getString("product_name"),
-                            rs.getBigDecimal("unit_price"), rs.getInt("quantity"), rs.getBigDecimal("line_total")));
+                            rs.getBigDecimal("unit_price"), rs.getInt("quantity"), rs.getBigDecimal("line_total"),
+                            rs.getBigDecimal("list_unit_price"), rs.getObject("promotion_id", Long.class)));
                 }, headers.stream().map(CommerceOrder::id).toArray());
         return headers.stream().map(h -> new CommerceOrder(h.id(), h.customerId(), h.amount(), h.currency(), h.riskScore(),
-                h.riskDecision(), h.status(), h.channel(), h.version(), h.createdAt(), lines.getOrDefault(h.id(), List.of()))).toList();
+                h.riskDecision(), h.status(), h.channel(), h.version(), h.createdAt(), lines.getOrDefault(h.id(), List.of()),
+                h.orderNumber())).toList();
     }
 
     @Override
@@ -194,8 +213,35 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
 
     @Override
     public BigDecimal shopSales() {
-        return Jdbc.run(() -> jdbc.queryForObject("SELECT COALESCE(sum(amount), 0) FROM orders WHERE channel = 'SHOP' "
+        return Jdbc.run(() -> jdbc.queryForObject("SELECT COALESCE(sum(amount), 0) FROM orders WHERE channel = 'SHOP' AND currency = 'PEN' "
                 + "AND fulfillment_status NOT IN ('CANCELLED', 'REJECTED')", BigDecimal.class)).setScale(2);
+    }
+
+    @Override
+    public BigDecimal legacyUsdSales() {
+        return Jdbc.run(() -> jdbc.queryForObject("SELECT COALESCE(sum(amount), 0) FROM orders WHERE channel = 'SHOP' AND currency = 'USD' "
+                + "AND fulfillment_status NOT IN ('CANCELLED', 'REJECTED')", BigDecimal.class)).setScale(2);
+    }
+
+    @Override
+    public List<AdminDashboard.TopProduct> topProducts(int limit) {
+        return Jdbc.run(() -> jdbc.query("SELECT l.product_id, max(l.product_name) AS name, sum(l.quantity) AS units, sum(l.line_total) AS revenue, "
+                + "o.currency FROM order_lines l JOIN orders o ON o.id = l.order_id WHERE o.fulfillment_status NOT IN ('CANCELLED', 'REJECTED') "
+                + "GROUP BY l.product_id, o.currency ORDER BY units DESC, revenue DESC LIMIT ?",
+                (rs, n) -> new AdminDashboard.TopProduct(rs.getLong("product_id"), rs.getString("name"), rs.getLong("units"),
+                        rs.getBigDecimal("revenue").setScale(2), rs.getString("currency")), limit));
+    }
+
+    @Override
+    public Map<Long, Long> unitsSold() {
+        Map<Long, Long> units = new HashMap<>();
+        Jdbc.run(() -> {
+            jdbc.query("SELECT l.product_id, sum(l.quantity) FROM order_lines l JOIN orders o ON o.id = l.order_id "
+                    + "WHERE o.fulfillment_status NOT IN ('CANCELLED', 'REJECTED') GROUP BY l.product_id",
+                    rs -> { units.put(rs.getLong(1), rs.getLong(2)); });
+            return null;
+        });
+        return units;
     }
 
     @Override
@@ -218,9 +264,11 @@ public final class JdbcCommerceOrderRepository implements CommerceOrderRepositor
 
     @Override
     public List<AdminDashboard.SalesByCategory> salesByCategory() {
-        return Jdbc.run(() -> jdbc.query("SELECT c.name, sum(l.quantity) AS units, sum(l.line_total) AS revenue FROM order_lines l "
-                + "JOIN orders o ON o.id = l.order_id JOIN products p ON p.id = l.product_id JOIN categories c ON c.id = p.category_id "
-                + "WHERE o.fulfillment_status NOT IN ('CANCELLED', 'REJECTED') GROUP BY c.name ORDER BY revenue DESC",
-                (rs, n) -> new AdminDashboard.SalesByCategory(rs.getString(1), rs.getLong(2), rs.getBigDecimal(3).setScale(2))));
+        // v6: grouped by MAIN category and currency (orders before v6 were in USD).
+        return Jdbc.run(() -> jdbc.query("SELECT COALESCE(m.name, c.name) AS category, sum(l.quantity) AS units, sum(l.line_total) AS revenue, "
+                + "o.currency FROM order_lines l JOIN orders o ON o.id = l.order_id JOIN products p ON p.id = l.product_id "
+                + "JOIN categories c ON c.id = p.category_id LEFT JOIN categories m ON m.id = c.parent_id "
+                + "WHERE o.fulfillment_status NOT IN ('CANCELLED', 'REJECTED') GROUP BY 1, o.currency ORDER BY o.currency DESC, revenue DESC",
+                (rs, n) -> new AdminDashboard.SalesByCategory(rs.getString(1), rs.getLong(2), rs.getBigDecimal(3).setScale(2), rs.getString(4))));
     }
 }

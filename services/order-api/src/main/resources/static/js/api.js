@@ -170,6 +170,19 @@ export const catalogApi = {
   categories: () => get('/api/catalog/categories'),
   products: (q, category) => get(`/api/catalog/products${qs({ q, category })}`),
   product: (id) => get(`/api/catalog/products/${encodeURIComponent(id)}`),
+  related: (id, limit = 8) => get(`/api/catalog/products/${encodeURIComponent(id)}/related?limit=${limit}`),
+  promotions: () => get('/api/catalog/promotions'),
+  /** params: URLSearchParams o pares {clave: valor | [valores]}; los filtros técnicos van como attr.CLAVE. */
+  search: (params) => {
+    const search = params instanceof URLSearchParams ? params : new URLSearchParams();
+    if (!(params instanceof URLSearchParams)) {
+      Object.entries(params || {}).forEach(([key, value]) => {
+        (Array.isArray(value) ? value : [value]).filter((v) => v !== undefined && v !== null && v !== '').forEach((v) => search.append(key, v));
+      });
+    }
+    const text = search.toString();
+    return get(`/api/catalog/search${text ? `?${text}` : ''}`);
+  },
 };
 
 export const shopApi = {
@@ -177,6 +190,17 @@ export const shopApi = {
   /** La misma Idempotency-Key en un reintento devuelve el mismo pedido (nunca se duplica). */
   place: (items, idempotencyKey, shipping) => send('POST', '/api/shop/orders', shipping ? { items, shipping } : { items },
     { headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** v6: totales con promociones y envío según el método elegido (también para visitantes). */
+  summary: (items, deliveryMethod, paymentMethod) => post('/api/shop/checkout-summary', { items, deliveryMethod, paymentMethod }),
+  options: () => get('/api/shop/checkout-options'),
+  /** v6: entrega y pago elegidos en el checkout. */
+  checkout: (payload, idempotencyKey) => send('POST', '/api/shop/orders', payload, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  cart: () => get('/api/shop/cart'),
+  cartAdd: (productId, quantity) => post('/api/shop/cart/items', { productId, quantity }),
+  cartSet: (productId, quantity) => put(`/api/shop/cart/items/${productId}`, { quantity }),
+  cartRemove: (productId) => send('DELETE', `/api/shop/cart/items/${productId}`).then((r) => r.data),
+  cartClear: () => send('DELETE', '/api/shop/cart').then((r) => r.data),
+  cartMerge: (items) => post('/api/shop/cart/merge', { items }),
   orders: () => get('/api/shop/orders'),
   order: (id) => get(`/api/shop/orders/${encodeURIComponent(id)}`),
   cancel: (id) => post(`/api/shop/orders/${encodeURIComponent(id)}/cancel`),
@@ -198,7 +222,12 @@ export const adminApi = {
   createProduct: (product) => post('/api/admin/products', product),
   updateProduct: (id, product) => put(`/api/admin/products/${id}`, product),
   adjustStock: (id, delta, reason) => post(`/api/admin/products/${id}/stock`, { delta, reason }),
-  createCategory: (slug, name) => post('/api/admin/categories', { slug, name }),
+  createCategory: (slug, name, parentId) => post('/api/admin/categories', { slug, name, parentId: parentId || null }),
+  categories: () => get('/api/admin/categories'),
+  promotions: () => get('/api/admin/promotions'),
+  createPromotion: (promotion) => post('/api/admin/promotions', promotion),
+  updatePromotion: (id, promotion) => put(`/api/admin/promotions/${id}`, promotion),
+  setPromotionActive: (id, enabled) => put(`/api/admin/promotions/${id}/active`, { enabled }),
   contactMessages: (limit = 50) => get(`/api/admin/contact-messages?limit=${limit}`),
 };
 

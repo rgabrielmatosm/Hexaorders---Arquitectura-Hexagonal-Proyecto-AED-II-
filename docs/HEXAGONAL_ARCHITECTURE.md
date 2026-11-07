@@ -1,4 +1,4 @@
-# Arquitectura hexagonal de HexaOrders (v4)
+# Arquitectura hexagonal de HexaOrders (v4 y v5)
 
 Este documento describe cómo está organizado el código y por qué la arquitectura hexagonal es **verificable**, no decorativa. Las rutas son relativas a `services/order-api/src/main/java/com/hexaorders/` salvo que se indique otra cosa.
 
@@ -236,3 +236,134 @@ flowchart LR
 ```
 
 Los contenedores se comunican por **nombre de servicio** (`db`, `risk-engine`, `prometheus`), nunca por `localhost`. Solo se publican puertos en `127.0.0.1`. ADR 0009 explica por qué el frontend sigue servido por Spring Boot en lugar de un sexto contenedor Nginx.
+
+## 9. Versión 5: nuevos puertos y adaptadores (Redis, RabbitMQ, SMTP, OpenTelemetry)
+
+La v5 añade infraestructura **sin tocar el dominio ni las reglas existentes**: todo entra por puertos nuevos o por decoradores en `config`. Las cuatro reglas de ArchUnit y la prueba AST de Python siguen en verde.
+
+```mermaid
+flowchart LR
+    subgraph IN ["Adaptadores de entrada"]
+        REST["REST · Spring Security<br/>adapter/in/web"]
+        AMQP["BusinessEventListener<br/>adapter/in/messaging"]
+        TIMER["EventRelayScheduler<br/>adapter/in/scheduling"]
+    end
+    subgraph CORE ["Núcleo (sin frameworks)"]
+        PIN["Puertos de entrada<br/>CommerceUseCases, CatalogUseCases…<br/>EventRelayUseCases, NotificationUseCases"]
+        SVC["Casos de uso<br/>CommerceService, CatalogService…<br/>EventRelayService, NotificationService"]
+        DOM["Dominio<br/>… + domain/event (BusinessEvent, EventType)"]
+        POUT["Puertos de salida<br/>… + CatalogCache, EventOutbox, EventPublisher,<br/>ProcessedEvents, NotificationRecipients, MailSender"]
+    end
+    subgraph OUT ["Adaptadores de salida"]
+        JDBC["JDBC: repositorios, JdbcEventOutbox,<br/>JdbcProcessedEvents, JdbcNotificationRecipients"]
+        REDIS["RedisCatalogCache"]
+        RMQ["RabbitMqEventPublisher"]
+        SMTP["SmtpMailSender"]
+        HTTPR["HttpRiskAssessmentAdapter"]
+        MET["Micrometer: telemetría de negocio e integración"]
+    end
+    REST --> PIN
+    AMQP --> PIN
+    TIMER --> PIN
+    PIN --> SVC --> DOM
+    SVC --> POUT
+    JDBC -.implementa.-> POUT
+    REDIS -.implementa.-> POUT
+    RMQ -.implementa.-> POUT
+    SMTP -.implementa.-> POUT
+    HTTPR -.implementa.-> POUT
+    MET -.implementa.-> POUT
+    JDBC --> PG[(PostgreSQL)]
+    REDIS --> RD[(Redis)]
+    RMQ --> MQ[RabbitMQ]
+    AMQP --- MQ
+    SMTP --> MP[Mailpit]
+    HTTPR --> PY[FastAPI]
+```
+
+| Pieza nueva | Capa | Notas |
+| --- | --- | --- |
+| `BusinessEvent`, `EventType` | dominio | Regla de negocio: qué cambio es «creado», «aprobado», «rechazado»… Sin datos personales. |
+| `CatalogCache` | puerto de salida | `NONE` para el modo básico y las pruebas |
+| `EventOutbox`, `EventPublisher`, `ProcessedEvents`, `NotificationRecipients`, `MailSender`, `IntegrationTelemetry` | puertos de salida | — |
+| `EventRelayUseCases`, `NotificationUseCases` | puertos de entrada | — |
+| `EventRelayService`, `NotificationService`, `NotificationComposer` | aplicación | Publicación *at-least-once*; consumidor idempotente |
+| `CatalogService`, `CommerceService`, `LifecycleTransitions`, `OperationsService` | aplicación | Constructores **adicionales** con `CatalogCache`; los anteriores siguen existiendo y usan `CatalogCache.NONE` |
+| `RedisCatalogCache` | `adapter/out/cache` | Lectura con caché, invalidación por versión y degradación |
+| `RabbitMqEventPublisher` | `adapter/out/messaging` | Confirmaciones del broker y `mandatory` |
+| `SmtpMailSender` | `adapter/out/mail` | JavaMailSender → Mailpit |
+| `JdbcEventOutbox`, `JdbcProcessedEvents`, `JdbcNotificationRecipients` | `adapter/out/persistence` | Outbox sobre las tablas de historial (ADR 0012) |
+| `MicrometerIntegrationTelemetry` | `adapter/out/metrics` | — |
+| `BusinessEventListener` | `adapter/in/messaging` | AMQP → `NotificationUseCases`; DLQ |
+| `EventRelayScheduler` | `adapter/in/scheduling` | Temporizador → `EventRelayUseCases` |
+| `TraceIdResponseFilter` | `adapter/in/web` | Cabecera `X-Trace-Id` |
+| `EventContract` | `adapter/messaging` | Contrato JSON compartido por los adaptadores de entrada y salida (no depende de ninguno) |
+| `IntegrationEnvironment`, `IntegrationConfiguration`, `ObservedPortsConfiguration`, `TracingConfiguration` | `config` | Raíz de composición: activación por despliegue, cableado y observación de puertos |
+
+### Observación de los puertos sin tocar el núcleo
+
+`ObservedPortsConfiguration` registra un `BeanPostProcessor`. Cada bean que implementa un puerto de `application.port.in` o `application.port.out` se envuelve en un proxy JDK, que abre una *Observation* por llamada. Así se obtiene:
+
+- un span por caso de uso y por puerto en Tempo, por ejemplo `commerce-use-cases.place-order`, `commerce-order-repository.place-order` y `risk-assessment-port.assess`;
+- un temporizador `hexaorders_port_calls_seconds{kind,port,method}` en Prometheus.
+
+Los servicios y el dominio no conocen Micrometer.
+
+### Secuencia de un pedido con la infraestructura v5
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant FE as frontend (Nginx)
+    participant OA as order-api
+    participant RC as Redis
+    participant PY as risk-engine
+    participant DB as PostgreSQL
+    participant MQ as RabbitMQ
+    participant MP as Mailpit
+    FE->>OA: GET /api/catalog/products
+    OA->>RC: caché (acierto → sin consultar PostgreSQL)
+    FE->>OA: POST /api/shop/orders
+    OA->>PY: POST /score (traceparent)
+    OA->>DB: transacción: pedido + stock + historial (= outbox)
+    OA->>RC: invalidar catálogo (el stock cambió)
+    OA-->>FE: 201 + X-Trace-Id
+    OA->>DB: relay: eventos pendientes
+    OA->>MQ: publicar con confirmación
+    MQ->>OA: entrega al consumidor
+    OA->>MP: correo de notificación
+```
+
+Más detalle: [`ASYNCHRONOUS_EVENTS.md`](ASYNCHRONOUS_EVENTS.md), [`REDIS_INTEGRATION.md`](REDIS_INTEGRATION.md), [`OBSERVABILITY_STACK.md`](OBSERVABILITY_STACK.md) y [`DOCKER_ARCHITECTURE.md`](DOCKER_ARCHITECTURE.md).
+
+## 10. Versión 6: tienda tecnológica
+
+La v6 añade casos de uso comerciales **sin romper la separación hexagonal**. Detalle completo en [`TECH_STORE.md`](TECH_STORE.md).
+
+| Capa | Piezas nuevas |
+| --- | --- |
+| Dominio | `CatalogSearch`, `CatalogQuery`, `CatalogPage`, `PriceTag`, `Promotion`, `Spec`, `CommercialStatus`, `Availability`, `CheckoutSummary`, `DeliveryMethod`, `PaymentMethod`, `OrderCheckout` |
+| Puertos de entrada | `PromotionUseCases`, `CartUseCases`; amplía `CatalogUseCases` (búsqueda, precios, relacionados) y `CommerceUseCases` (resumen y checkout con entrega y pago) |
+| Aplicación | `PricingService`, `PromotionService`, `CartService`; amplía `CatalogService` y `CommerceService` |
+| Puertos de salida | `PromotionRepository`, `CartRepository`; amplía `CatalogRepository` y `CommerceOrderRepository` |
+| Adaptadores de salida | `JdbcPromotionRepository`, `JdbcCartRepository`; `JdbcCatalogRepository` (JSONB) y `JdbcCommerceOrderRepository` (checkout, número de pedido) |
+| Adaptadores de entrada | `CatalogController` (`/search`, `/promotions`, `/related`), `ShopController` (carrito, resumen), `AdminController` (promociones, categorías) |
+
+```mermaid
+sequenceDiagram
+    actor C as Cliente
+    participant W as ShopController
+    participant S as CommerceService
+    participant P as PricingService
+    participant D as Dominio (PriceTag · CheckoutSummary)
+    participant R as RiskAssessmentPort
+    participant DB as CommerceOrderRepository
+    C->>W: POST /api/shop/orders (entrega, pago, Idempotency-Key)
+    W->>S: placeOrder(...)
+    S->>P: promociones vigentes
+    S->>D: precio de cada línea + envío + reglas de pago
+    S->>R: evaluar riesgo (total en PEN)
+    S->>DB: una transacción: pedido, líneas, stock, historial, entrega, pago
+    S->>S: vaciar carrito guardado
+    W-->>C: 201 · HX-100123
+```

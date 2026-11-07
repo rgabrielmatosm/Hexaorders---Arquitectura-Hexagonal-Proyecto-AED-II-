@@ -1,0 +1,59 @@
+// Solo contenedores con la etiqueta com.hexaorders.logs=true (los de este proyecto): nunca se
+// recogen logs de otros contenedores de tu Docker Desktop.
+discovery.docker "hexaorders" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "10s"
+  filter {
+    name   = "label"
+    values = ["com.hexaorders.logs=true"]
+  }
+}
+
+discovery.relabel "hexaorders" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
+loki.source.docker "hexaorders" {
+  host             = "unix:///var/run/docker.sock"
+  targets          = discovery.docker.hexaorders.targets
+  relabel_rules    = discovery.relabel.hexaorders.rules
+  refresh_interval = "10s"
+  forward_to       = [loki.process.redact.receiver]
+}
+
+// Defensa en profundidad: aunque las aplicaciones no registran secretos, cualquier valor que siga a
+// password, secret, token, authorization, cookie o jsessionid se sustituye antes de llegar a Loki.
+loki.process "redact" {
+  stage.replace {
+    expression = "(?i)(?:password|passwd|secret|token|authorization|set-cookie|cookie|jsessionid)[\"']?\\s*[:=]\\s*[\"']?(?:bearer\\s+)?([^\\s\"',;&]+)"
+    replace    = "<redacted>"
+  }
+  stage.static_labels {
+    values = { source = "docker" }
+  }
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

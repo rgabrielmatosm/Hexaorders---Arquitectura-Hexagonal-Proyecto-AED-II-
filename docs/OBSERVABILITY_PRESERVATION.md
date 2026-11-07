@@ -115,6 +115,24 @@ Fuente: `infra/prometheus/alerts.yml`.
 - **Páginas `/monitoreo/*`** para OBSERVABILITY_VIEWER y ADMIN: servicios (targets), métricas (14 indicadores con PromQL fijo) y alertas (reglas y estado). order-api las obtiene de Prometheus por la red interna `telemetry` (`PROMETHEUS_URL=http://prometheus:9090`) mediante `MonitoringPort` → `PrometheusMonitoringAdapter` ([ADR 0010](adr/0010-monitoring-portal-through-a-port.md)). **No sustituyen a Grafana**: enlazan a sus 7 dashboards. Si Prometheus no responde, lo dicen sin romper la página.
 - La única configuración tocada es la necesaria para servir el dashboard nuevo: un `COPY` en `infra/grafana/Dockerfile`, una entrada en el ConfigMap generado y un montaje `subPath` en `k8s/40-observability.yaml`, más la variable `PROMETHEUS_URL` de order-api. `prometheus.yml`, `alerts.yml`, el datasource y los 6 dashboards anteriores no cambian.
 
+### Versión 5: Loki, Tempo, OpenTelemetry e integraciones
+
+- **`prometheus.yml`.** Se **añaden al final** 6 jobs: `rabbitmq`, `otel-collector`, `nginx`, `loki`, `tempo` y `alloy`. Usan `dns_sd_configs`, así que en el modo básico no tienen targets en lugar de aparecer caídos. `global`, `rule_files` y los 3 jobs originales no cambian, y `check_observability.py` lo comprueba.
+- **Grafana.** Las fuentes Loki (`uid: loki`) y Tempo (`uid: tempo`) se aprovisionan en un **archivo nuevo**, `provisioning/datasource-logs-traces.yml`. `datasource.yml` (Prometheus, `uid: prometheus`) no se toca.
+- **Dashboard nuevo `hexaorders-integrations`** (14 paneles):
+  - caché Redis, outbox, DLQ, correos, eventos publicados y consumidos, y colas de RabbitMQ;
+  - Nginx;
+  - latencia por puerto hexagonal;
+  - spans del collector;
+  - ingesta de Loki y Tempo;
+  - logs de errores (fuente Loki) y una guía.
+- **Los 7 dashboards anteriores no cambian.** `hexaorders.json` sigue idéntico al de la línea base.
+- **Métricas nuevas.** `hexaorders_cache_*`, `hexaorders_outbox_pending`, `hexaorders_events_*`, `hexaorders_notifications_sent_total`, `hexaorders_port_calls_seconds_*`, `nginx_*` (vía collector), `rabbitmq_*`, `otelcol_*`, `loki_*` y `tempo_*`. Ninguna métrica anterior se renombra.
+- **Alertas.** Sin cambios: siguen las 9 reglas y la regla de registro.
+- **`check_observability.py` ampliado.**
+  - Los dashboards **nuevos** pueden usar las fuentes `loki` y `tempo`; los de la línea base siguen obligados a usar `prometheus`.
+  - Exige que el archivo de fuentes nuevo contenga Loki y Tempo, que se copie en la imagen y que no repita uids de `datasource.yml`.
+
 ## 9. Pruebas de compatibilidad
 
 | Prueba | Dónde se ejecuta | Qué garantiza |
@@ -124,6 +142,8 @@ Fuente: `infra/prometheus/alerts.yml`.
 | `tools/smoke.py` | `verify` | Targets `up`, métricas originales en Prometheus, dashboard `hexaorders` **y los 6 nuevos** (incluido `hexaorders-logistics`) aprovisionados en Grafana. |
 | `tools/ui-e2e/pages-e2e.js` (v4) | job `compose` | El rol observador ve los 3 targets en UP y las 9 reglas de alerta leídas de Prometheus a través del backend. |
 | `PrometheusMonitoringAdapterTest` (v4) | `mvn verify` | El adaptador interpreta targets, reglas e indicadores de la API de Prometheus y convierte un fallo en «no disponible». |
+| `integration_smoke.py check` (v5) | `verify` (modo full) | Los 9 jobs en UP, fuentes `prometheus`, `loki` y `tempo` con salud OK, los 8 dashboards aprovisionados, métricas de Nginx y RabbitMQ, spans exportados, logs en Loki y trazas en Tempo. |
+| Job `compose-basic` (v5) | CI | En el modo básico Prometheus y los 8 dashboards siguen funcionando sin los servicios del perfil full. |
 | `tools/platform_smoke.py` con `PROMETHEUS_URL` | `verify` | Las métricas nuevas y `orders_created_total` existen en Prometheus, junto con métricas de JVM y HikariCP. |
 | `tools/ui-e2e/ui-e2e.js` | job `compose` | La sección Observabilidad del laboratorio sigue mostrando los 3 targets y las métricas reales. |
 | `generate_delivery.py --check`, `validate_delivery.py` | `check` | El Compose y el ConfigMap de Kubernetes incluyen la configuración de monitoreo al día. |
@@ -143,18 +163,18 @@ Durante el trabajo no se encontró ningún otro panel ni alerta roto.
 
 ## 11. Antes y después
 
-| Aspecto | Antes (v2) | Después (v3) | Después (v4) |
-| --- | --- | --- | --- |
-| Dashboards | 1 | 6 (el original intacto) | 7 (+ Logistics Operations) |
-| Paneles | 9 | 70 (9 originales + 61 nuevos) | 82 (+ 12 de logística) |
-| Alertas | 2 | 9 (2 originales intactas + 7) | 9 |
-| Reglas de registro | 0 | 1 (compatibilidad) | 1 |
-| Jobs de Prometheus | 3 | 3 (sin cambios) | 3 (sin cambios) |
-| Datasources | 1 | 1 (sin cambios) | 1 (sin cambios) |
-| Métricas de negocio | pedidos y fallos de riesgo | + tienda, ciclo de vida, logística, incidencias, stock, seguridad | sin cambios |
-| Paneles originales con datos | 7 de 9 (2 sin datos reales por el defecto de la sección 10) | 9 de 9 | 9 de 9 |
-| Verificación automática de preservación | no | sí (`check_observability.py`) | sí |
-| Portal web de monitoreo | no | salud de dependencias | + targets, alertas e indicadores de Prometheus |
+| Aspecto | Antes (v2) | Después (v3) | Después (v4) | Después (v5) |
+| --- | --- | --- | --- | --- |
+| Dashboards | 1 | 6 (el original intacto) | 7 (+ Logistics Operations) | 8 (+ Platform Integrations) |
+| Paneles | 9 | 70 (9 originales + 61 nuevos) | 82 (+ 12 de logística) | 96 (+ 14 de integraciones) |
+| Alertas | 2 | 9 (2 originales intactas + 7) | 9 | 9 |
+| Reglas de registro | 0 | 1 (compatibilidad) | 1 | 1 |
+| Jobs de Prometheus | 3 | 3 (sin cambios) | 3 (sin cambios) | 9 (3 originales intactos + 6 por DNS) |
+| Datasources | 1 | 1 (sin cambios) | 1 (sin cambios) | 3 (Prometheus intacto + Loki + Tempo) |
+| Métricas de negocio | pedidos y fallos de riesgo | + tienda, ciclo de vida, logística, incidencias, stock, seguridad | sin cambios | + caché, eventos, notificaciones, puertos |
+| Paneles originales con datos | 7 de 9 (2 sin datos reales por el defecto de la sección 10) | 9 de 9 | 9 de 9 | 9 de 9 |
+| Verificación automática de preservación | no | sí (`check_observability.py`) | sí | sí (ampliada) |
+| Portal web de monitoreo | no | salud de dependencias | + targets, alertas e indicadores de Prometheus | sin cambios |
 
 ## 12. Cómo añadir observabilidad sin romper nada
 
@@ -166,3 +186,5 @@ Durante el trabajo no se encontró ningún otro panel ni alerta roto.
 6. Si un cambio **intencionado** debe alterar la línea base (por ejemplo, retirar una métrica con acuerdo del equipo), actualiza `infra/observability-baseline.json` en un commit separado que lo explique. Nunca para hacer pasar el check.
 
 No uses `docker compose down -v` para «arreglar» Grafana o Prometheus: borra los volúmenes con el historial de métricas y los datos de PostgreSQL. Para recargar dashboards basta con `docker compose up -d --build grafana`.
+
+**v5: logs y trazas.** Además de las métricas, el modo completo centraliza los logs en Loki y las trazas en Tempo. Ver [`OBSERVABILITY_STACK.md`](OBSERVABILITY_STACK.md).

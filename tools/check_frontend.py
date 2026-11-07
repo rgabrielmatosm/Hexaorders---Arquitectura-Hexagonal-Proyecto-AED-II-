@@ -7,6 +7,9 @@
 5. Ninguna página tiene estilos o scripts en línea (la Content-Security-Policy los bloquearía).
 6. Las páginas protegidas tienen una regla en SecurityConfiguration con los mismos roles.
 7. La tabla de transiciones de la documentación (JS) coincide con TransitionPolicy.java.
+8. v6: la tienda (páginas públicas y del cliente, y los textos de sus vistas) no contiene explicaciones
+   técnicas ni académicas (arquitectura, Docker, bases de datos, mensajería, observabilidad...) ni
+   enlaza la documentación técnica interna, que solo ve el personal autorizado.
 """
 from __future__ import annotations
 
@@ -88,8 +91,57 @@ if not java_rules or java_rules != js_rules:
     errors.append(f'Transiciones distintas entre TransitionPolicy.java y architecture-pages.js: '
                   f'solo Java {sorted(java_rules - js_rules)}, solo JS {sorted(js_rules - java_rules)}')
 
+# 8. Tienda sin contenido técnico ni académico
+BANNED = ['hexagonal', 'puertos y adaptadores', 'adaptador de salida', 'adaptador de entrada', 'docker', 'contenedor', 'microservicio',
+          'postgres', 'redis', 'rabbitmq', 'grafana', 'prometheus', 'idempoten', 'laboratorio', 'arquitectura', 'backend', 'spring',
+          'flyway', 'motor de riesgo', 'jdbc', 'kubernetes', 'patrón de diseño', 'caso de uso', 'casos de uso', 'bcrypt', 'endpoint',
+          'académic', 'microservicios', 'base de datos', 'servidor lo comprueba', 'api ']
+store_pages = [page for page in PAGES if not page.get('section') or page.get('section') == 'cliente']
+for page in store_pages:
+    text = f"{page['title']} {page['description']}".lower()
+    for word in BANNED:
+        if word in text:
+            errors.append(f'{page["path"]}: texto técnico en la tienda («{word}» en título o descripción)')
+STORE_MODULES = ['js/views/home.js', 'js/views/shop.js', 'js/views/customer.js', 'js/views/info.js', 'js/store-ui.js', 'js/cart.js',
+                 'js/layout.js', 'js/brand.js', 'js/intro.js', 'js/motion.js', 'js/audio.js']
+string_literal = re.compile(r"'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\"|`(?:[^`\\]|\\.)*`")
+for module in STORE_MODULES:
+    source = (STATIC / module).read_text(encoding='utf-8')
+    if module.endswith('layout.js'):
+        # Las barras laterales de los portales del personal (SECTIONS) no forman parte de la tienda.
+        start = source.index('export const SECTIONS = {')
+        source = source[:start] + source[source.index('\n};', start):]
+    for literal in string_literal.findall(source):
+        value = literal[1:-1]
+        if value.endswith('.js') or value.startswith(('.', '/api/')):
+            continue
+        lowered = value.lower() + ' '
+        for word in BANNED:
+            if word in lowered:
+                errors.append(f'{module}: texto técnico en la tienda («{word}»): {value[:70]}')
+        if re.search(r'/(arquitectura|laboratorio)', value):
+            errors.append(f'{module}: la tienda enlaza la documentación técnica interna: {value[:70]}')
+        # 9a. POLYMER: la marca anterior no aparece en ningún texto visible de la tienda.
+        if 'HexaOrders' in value or 'HEXA' in value:
+            errors.append(f'{module}: marca anterior visible en la tienda: {value[:70]}')
+        # 9b. Los enlaces internos de la tienda (pie incluido) llevan a páginas que existen.
+        target = re.match(r'^(/[A-Za-z0-9/_-]+\.html)', value)
+        if target and not (STATIC / target.group(1).lstrip('/')).exists():
+            errors.append(f'{module}: enlace a una página inexistente: {target.group(1)}')
+
+# 9c. POLYMER: todas las páginas cargan la marca, la intro y el sistema de movimiento.
+for page in PAGES:
+    html_text = (STATIC / page['path']).read_text(encoding='utf-8')
+    for needle in ('· POLYMER</title>', '<script src="/js/intro-gate.js"></script>', '/css/polymer.css'):
+        if needle not in html_text:
+            errors.append(f'{page["path"]}: falta «{needle}»')
+    if 'HexaOrders' in f"{page['title']} {page['description']}":
+        errors.append(f'{page["path"]}: marca anterior en título o descripción')
+if 'js/intro-gate.js' not in (STATIC / 'laboratorio.html').read_text(encoding='utf-8'):
+    errors.append('laboratorio.html: falta js/intro-gate.js (controla las transiciones entre páginas)')
+
 if errors:
     print('Frontend con problemas:\n  ' + '\n  '.join(errors), file=sys.stderr)
     sys.exit(1)
 print(f'OK: frontend multipágina coherente ({len(PAGES)} páginas generadas + laboratorio, {len(registered)} rutas, '
-      f'{len(java_rules)} transiciones, CSP sin estilos ni scripts en línea)')
+      f'{len(java_rules)} transiciones, CSP sin estilos ni scripts en línea, {len(store_pages)} páginas de la tienda sin contenido técnico)')
