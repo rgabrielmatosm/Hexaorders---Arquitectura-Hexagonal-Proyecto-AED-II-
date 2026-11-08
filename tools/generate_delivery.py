@@ -65,6 +65,37 @@ def packed(content: str) -> str:
     return '\n'.join(encoded[i:i + 76] for i in range(0, len(encoded), 76))
 
 
+def canonical(text: str) -> str:
+    """Sustituye cada bloque gzip + base64 por el SHA-256 de su contenido descomprimido.
+
+    gzip no produce los mismos bytes con todas las versiones de zlib (Python de Windows, de Linux, del CI):
+    la comprobación --check y el SHA de la cabecera se calculan sobre este texto canónico, así que dos
+    entregables con el mismo contenido son iguales aunque se hayan generado en equipos distintos.
+    """
+    lines, out, i = text.split('\n'), [], 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        stripped = line.lstrip(' ')
+        if not stripped.startswith('COPY <<'):
+            continue
+        indent = line[:len(line) - len(stripped)]
+        for name in [part.split("'")[1] for part in stripped.split() if part.startswith("<<'")]:
+            body = []
+            while i < len(lines) and lines[i] != indent + name:
+                body.append(lines[i][len(indent):])
+                i += 1
+            if name.endswith('.gz.b64'):
+                data = gzip.decompress(base64.b64decode(''.join(body)))
+                body = [f'sha256:{hashlib.sha256(data).hexdigest()}']
+            out.extend(indent + b for b in body)
+            if i < len(lines):
+                out.append(lines[i])
+                i += 1
+    return '\n'.join(out)
+
+
 def inline_dockerfile(service: str) -> str:
     context = ROOT / BUILD_CONTEXTS[service]
     result: list[str] = []
@@ -135,7 +166,7 @@ def compose() -> str:
         if base.count(marker) != 1:
             raise ValueError(f'Marcador {marker} ausente o duplicado en compose.base.yml')
         base = base.replace(marker, '|\n' + block(inline_dockerfile(service), 8))
-    digest = hashlib.sha256(base.encode()).hexdigest()
+    digest = hashlib.sha256(canonical(base).encode()).hexdigest()
     return f'# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo {digest}\n' + base
 
 
@@ -168,7 +199,7 @@ def main() -> None:
     for name, expected in outputs.items():
         target = ROOT / name
         if args.check:
-            if not target.exists() or read_text(target) != expected:
+            if not target.exists() or canonical(read_text(target)) != canonical(expected):
                 raise SystemExit(f'Entregable desactualizado: {name}; ejecutar python tools/generate_delivery.py')
         else:
             target.write_text(expected, encoding='utf-8', newline='\n')

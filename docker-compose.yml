@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo d6fc7977fd4d0817a95cfe03280b569c34aba716c88a1f8a0afe282dcdb8c3d9
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo d37343070ea0436513944b90554203784ec431934f6a3eb82339c54f9b4fd5b4
 # POLYMER — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
