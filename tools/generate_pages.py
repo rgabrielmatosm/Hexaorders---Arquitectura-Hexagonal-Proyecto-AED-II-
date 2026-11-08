@@ -85,6 +85,91 @@ PAGES: list[dict] = [
     dict(path='arquitectura/flujo-pedidos.html', route='/arquitectura/flujo-pedidos', title='Flujo de pedidos', description='Documentación técnica interna para el personal autorizado.', section='arquitectura', roles=['ADMIN', 'OBSERVABILITY_VIEWER']),
 ]
 
+# ---- Idiomas y rutas localizadas ---------------------------------------------------------------
+# Rutas reales /<idioma>/<ruta> (ver LocalizedPagesController y static/js/i18n.js). Una sola página
+# HTML sirve a los seis idiomas: el servidor ajusta lang, título, descripción, canonical y hreflang.
+# Agregar un idioma: añadir su código aquí (y en i18n.js y LocalizedPagesController), una columna en
+# SLUGS y su catálogo static/i18n/<idioma>.json; tools/check_i18n.py comprueba que esté completo.
+LANGUAGES = ['es', 'en', 'fr', 'it', 'pt', 'de']
+_ADMIN = ('admin',) * 6
+_OPS = ('operaciones', 'operations', 'operations', 'operazioni', 'operacoes', 'betrieb')
+_LOG = ('logistica', 'logistics', 'logistique', 'logistica', 'logistica', 'logistik')
+_MON = ('monitoreo', 'monitoring', 'supervision', 'monitoraggio', 'monitoramento', 'monitoring')
+_ARQ = ('arquitectura', 'architecture', 'architecture', 'architettura', 'arquitetura', 'architektur')
+
+
+def _join(base, tail):
+    return tuple(f'{b}/{t}' for b, t in zip(base, tail))
+
+
+SLUGS: dict[str, tuple] = {
+    'index.html': ('',) * 6,
+    'catalogo.html': ('productos', 'products', 'produits', 'prodotti', 'produtos', 'produkte'),
+    'producto.html': ('producto', 'product', 'produit', 'prodotto', 'produto', 'produkt'),
+    'ofertas.html': ('ofertas', 'offers', 'offres', 'offerte', 'ofertas', 'angebote'),
+    'carrito.html': ('carrito', 'cart', 'panier', 'carrello', 'carrinho', 'warenkorb'),
+    'checkout.html': ('checkout', 'checkout', 'paiement', 'cassa', 'finalizar-compra', 'kasse'),
+    'login.html': ('iniciar-sesion', 'login', 'connexion', 'accedi', 'entrar', 'anmelden'),
+    'registro.html': ('registro', 'register', 'inscription', 'registrazione', 'cadastro', 'registrieren'),
+    'ayuda.html': ('ayuda', 'help', 'aide', 'aiuto', 'ajuda', 'hilfe'),
+    'nosotros.html': ('nosotros', 'about', 'a-propos', 'chi-siamo', 'sobre-nos', 'ueber-uns'),
+    'contacto.html': ('contacto', 'contact', 'contact', 'contatti', 'contato', 'kontakt'),
+    'empresa.html': ('empresa', 'company', 'entreprise', 'azienda', 'empresa', 'unternehmen'),
+    'legal.html': ('legal', 'legal', 'mentions-legales', 'note-legali', 'legal', 'rechtliches'),
+    'libro-reclamaciones.html': ('libro-de-reclamaciones', 'complaints-book', 'registre-des-reclamations', 'libro-reclami',
+                                 'livro-de-reclamacoes', 'beschwerdebuch'),
+    '403.html': ('error/403',) * 6,
+    '404.html': ('error/404',) * 6,
+    'cliente/dashboard.html': ('mi-cuenta', 'my-account', 'mon-compte', 'il-mio-account', 'minha-conta', 'mein-konto'),
+    'cliente/pedidos.html': ('mis-pedidos', 'my-orders', 'mes-commandes', 'i-miei-ordini', 'meus-pedidos', 'meine-bestellungen'),
+    'cliente/pedido-detalle.html': ('mis-pedidos/detalle', 'my-orders/detail', 'mes-commandes/detail', 'i-miei-ordini/dettaglio',
+                                    'meus-pedidos/detalhe', 'meine-bestellungen/detail'),
+    'cliente/seguimiento.html': ('seguimiento', 'tracking', 'suivi', 'tracciamento', 'rastreamento', 'sendungsverfolgung'),
+    'cliente/perfil.html': ('perfil', 'profile', 'profil', 'profilo', 'perfil', 'profil'),
+    'admin/dashboard.html': _ADMIN,
+    'admin/productos.html': _join(_ADMIN, ('productos', 'products', 'produits', 'prodotti', 'produtos', 'produkte')),
+    'admin/categorias.html': _join(_ADMIN, ('categorias', 'categories', 'categories', 'categorie', 'categorias', 'kategorien')),
+    'admin/inventario.html': _join(_ADMIN, ('inventario', 'inventory', 'inventaire', 'inventario', 'estoque', 'bestand')),
+    'admin/promociones.html': _join(_ADMIN, ('promociones', 'promotions', 'promotions', 'promozioni', 'promocoes', 'aktionen')),
+    'admin/pedidos.html': _join(_ADMIN, ('pedidos', 'orders', 'commandes', 'ordini', 'pedidos', 'bestellungen')),
+    'admin/usuarios.html': _join(_ADMIN, ('usuarios', 'users', 'utilisateurs', 'utenti', 'usuarios', 'benutzer')),
+    'admin/incidencias.html': _join(_ADMIN, ('incidencias', 'incidents', 'incidents', 'incidenti', 'incidentes', 'vorfaelle')),
+    'admin/reportes.html': _join(_ADMIN, ('reportes', 'reports', 'rapports', 'report', 'relatorios', 'berichte')),
+    'admin/auditoria.html': _join(_ADMIN, ('auditoria', 'audit', 'audit', 'audit', 'auditoria', 'audit')),
+    'operaciones/dashboard.html': _OPS,
+    'operaciones/pedidos.html': _join(_OPS, ('pedidos', 'orders', 'commandes', 'ordini', 'pedidos', 'bestellungen')),
+    'operaciones/revisiones.html': _join(_OPS, ('revisiones', 'reviews', 'revisions', 'revisioni', 'revisoes', 'pruefungen')),
+    'operaciones/incidencias.html': _join(_OPS, ('incidencias', 'incidents', 'incidents', 'incidenti', 'incidentes', 'vorfaelle')),
+    'logistica/dashboard.html': _LOG,
+    'logistica/calendario.html': _join(_LOG, ('calendario', 'calendar', 'calendrier', 'calendario', 'calendario', 'kalender')),
+    'logistica/entregas.html': _join(_LOG, ('entregas', 'deliveries', 'livraisons', 'consegne', 'entregas', 'lieferungen')),
+    'logistica/asignaciones.html': _join(_LOG, ('asignaciones', 'assignments', 'affectations', 'assegnazioni', 'atribuicoes', 'zuweisungen')),
+    'monitoreo/dashboard.html': _MON,
+    'monitoreo/servicios.html': _join(_MON, ('servicios', 'services', 'services', 'servizi', 'servicos', 'dienste')),
+    'monitoreo/metricas.html': _join(_MON, ('metricas', 'metrics', 'metriques', 'metriche', 'metricas', 'metriken')),
+    'monitoreo/alertas.html': _join(_MON, ('alertas', 'alerts', 'alertes', 'avvisi', 'alertas', 'warnungen')),
+    'arquitectura/overview.html': _ARQ,
+    'arquitectura/flujo-pedidos.html': _join(_ARQ, ('flujo-pedidos', 'order-flow', 'flux-commandes', 'flusso-ordini', 'fluxo-pedidos', 'bestellablauf')),
+}
+
+
+# Textos fijos de la plantilla HTML: el servidor (LocalizedPagesController) los traduce en /<idioma>/….
+SHELL_TEXTS = ['Saltar al contenido', 'Ruta de navegación', 'Secciones del portal',
+               'Activa JavaScript en tu navegador para comprar en POLYMER.']
+
+
+def routes_manifest() -> str:
+    """static/i18n/routes.json: rutas localizadas y metadatos (título y descripción en español = clave de traducción)."""
+    pages, meta = {}, {}
+    for page in PAGES:
+        slugs = SLUGS[page['path']]
+        pages['/' + page['path']] = dict(zip(LANGUAGES, slugs))
+        meta['/' + page['path']] = {'title': page['title'], 'description': page['description'], 'roles': page.get('roles') or [],
+                                    'indexable': not page.get('roles') and page['path'] not in ('403.html', '404.html', 'producto.html')}
+    return json.dumps({'languages': LANGUAGES, 'default': 'es', 'pages': pages, 'meta': meta, 'shell': SHELL_TEXTS},
+                      ensure_ascii=False, indent=1) + '\n'
+
+
 TEMPLATE = """<!doctype html>
 <html lang="es">
 <head>
@@ -173,6 +258,26 @@ def main() -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content.encode('utf-8'))
             print(f'escrito {page["path"]}')
+    # Rutas por idioma: cada página tiene su ruta en los seis idiomas y no se repite dentro de un idioma.
+    missing = [page['path'] for page in PAGES if page['path'] not in SLUGS]
+    if missing:
+        print('Páginas sin ruta localizada en SLUGS: ' + ', '.join(missing), file=sys.stderr)
+        return 1
+    for index, code in enumerate(LANGUAGES):
+        seen = [SLUGS[page['path']][index] for page in PAGES]
+        duplicates = sorted({slug for slug in seen if seen.count(slug) > 1})
+        if duplicates:
+            print(f'Rutas repetidas en {code}: {duplicates}', file=sys.stderr)
+            return 1
+    routes_file = STATIC / 'i18n/routes.json'
+    current_routes = routes_file.read_text(encoding='utf-8').replace('\r\n', '\n') if routes_file.exists() else None
+    if current_routes != routes_manifest():
+        if args.check:
+            stale.append('static/i18n/routes.json')
+        else:
+            routes_file.parent.mkdir(parents=True, exist_ok=True)
+            routes_file.write_bytes(routes_manifest().encode('utf-8'))
+            print('escrito static/i18n/routes.json')
     manifest = json.dumps([{'path': '/' + page['path'], 'route': page['route'], 'title': page['title'], 'roles': page.get('roles') or [],
                             'needsId': ':id' in page['route']} for page in PAGES], ensure_ascii=False, indent=2) + '\n'
     manifest_file = ROOT / 'tools/ui-e2e/pages.json'

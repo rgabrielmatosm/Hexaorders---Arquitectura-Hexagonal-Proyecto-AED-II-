@@ -1,0 +1,725 @@
+{
+ "languages": [
+  "es",
+  "en",
+  "fr",
+  "it",
+  "pt",
+  "de"
+ ],
+ "default": "es",
+ "pages": {
+  "/index.html": {
+   "es": "",
+   "en": "",
+   "fr": "",
+   "it": "",
+   "pt": "",
+   "de": ""
+  },
+  "/catalogo.html": {
+   "es": "productos",
+   "en": "products",
+   "fr": "produits",
+   "it": "prodotti",
+   "pt": "produtos",
+   "de": "produkte"
+  },
+  "/producto.html": {
+   "es": "producto",
+   "en": "product",
+   "fr": "produit",
+   "it": "prodotto",
+   "pt": "produto",
+   "de": "produkt"
+  },
+  "/ofertas.html": {
+   "es": "ofertas",
+   "en": "offers",
+   "fr": "offres",
+   "it": "offerte",
+   "pt": "ofertas",
+   "de": "angebote"
+  },
+  "/carrito.html": {
+   "es": "carrito",
+   "en": "cart",
+   "fr": "panier",
+   "it": "carrello",
+   "pt": "carrinho",
+   "de": "warenkorb"
+  },
+  "/checkout.html": {
+   "es": "checkout",
+   "en": "checkout",
+   "fr": "paiement",
+   "it": "cassa",
+   "pt": "finalizar-compra",
+   "de": "kasse"
+  },
+  "/login.html": {
+   "es": "iniciar-sesion",
+   "en": "login",
+   "fr": "connexion",
+   "it": "accedi",
+   "pt": "entrar",
+   "de": "anmelden"
+  },
+  "/registro.html": {
+   "es": "registro",
+   "en": "register",
+   "fr": "inscription",
+   "it": "registrazione",
+   "pt": "cadastro",
+   "de": "registrieren"
+  },
+  "/ayuda.html": {
+   "es": "ayuda",
+   "en": "help",
+   "fr": "aide",
+   "it": "aiuto",
+   "pt": "ajuda",
+   "de": "hilfe"
+  },
+  "/nosotros.html": {
+   "es": "nosotros",
+   "en": "about",
+   "fr": "a-propos",
+   "it": "chi-siamo",
+   "pt": "sobre-nos",
+   "de": "ueber-uns"
+  },
+  "/contacto.html": {
+   "es": "contacto",
+   "en": "contact",
+   "fr": "contact",
+   "it": "contatti",
+   "pt": "contato",
+   "de": "kontakt"
+  },
+  "/empresa.html": {
+   "es": "empresa",
+   "en": "company",
+   "fr": "entreprise",
+   "it": "azienda",
+   "pt": "empresa",
+   "de": "unternehmen"
+  },
+  "/legal.html": {
+   "es": "legal",
+   "en": "legal",
+   "fr": "mentions-legales",
+   "it": "note-legali",
+   "pt": "legal",
+   "de": "rechtliches"
+  },
+  "/libro-reclamaciones.html": {
+   "es": "libro-de-reclamaciones",
+   "en": "complaints-book",
+   "fr": "registre-des-reclamations",
+   "it": "libro-reclami",
+   "pt": "livro-de-reclamacoes",
+   "de": "beschwerdebuch"
+  },
+  "/403.html": {
+   "es": "error/403",
+   "en": "error/403",
+   "fr": "error/403",
+   "it": "error/403",
+   "pt": "error/403",
+   "de": "error/403"
+  },
+  "/404.html": {
+   "es": "error/404",
+   "en": "error/404",
+   "fr": "error/404",
+   "it": "error/404",
+   "pt": "error/404",
+   "de": "error/404"
+  },
+  "/cliente/dashboard.html": {
+   "es": "mi-cuenta",
+   "en": "my-account",
+   "fr": "mon-compte",
+   "it": "il-mio-account",
+   "pt": "minha-conta",
+   "de": "mein-konto"
+  },
+  "/cliente/pedidos.html": {
+   "es": "mis-pedidos",
+   "en": "my-orders",
+   "fr": "mes-commandes",
+   "it": "i-miei-ordini",
+   "pt": "meus-pedidos",
+   "de": "meine-bestellungen"
+  },
+  "/cliente/pedido-detalle.html": {
+   "es": "mis-pedidos/detalle",
+   "en": "my-orders/detail",
+   "fr": "mes-commandes/detail",
+   "it": "i-miei-ordini/dettaglio",
+   "pt": "meus-pedidos/detalhe",
+   "de": "meine-bestellungen/detail"
+  },
+  "/cliente/seguimiento.html": {
+   "es": "seguimiento",
+   "en": "tracking",
+   "fr": "suivi",
+   "it": "tracciamento",
+   "pt": "rastreamento",
+   "de": "sendungsverfolgung"
+  },
+  "/cliente/perfil.html": {
+   "es": "perfil",
+   "en": "profile",
+   "fr": "profil",
+   "it": "profilo",
+   "pt": "perfil",
+   "de": "profil"
+  },
+  "/admin/dashboard.html": {
+   "es": "admin",
+   "en": "admin",
+   "fr": "admin",
+   "it": "admin",
+   "pt": "admin",
+   "de": "admin"
+  },
+  "/admin/productos.html": {
+   "es": "admin/productos",
+   "en": "admin/products",
+   "fr": "admin/produits",
+   "it": "admin/prodotti",
+   "pt": "admin/produtos",
+   "de": "admin/produkte"
+  },
+  "/admin/categorias.html": {
+   "es": "admin/categorias",
+   "en": "admin/categories",
+   "fr": "admin/categories",
+   "it": "admin/categorie",
+   "pt": "admin/categorias",
+   "de": "admin/kategorien"
+  },
+  "/admin/inventario.html": {
+   "es": "admin/inventario",
+   "en": "admin/inventory",
+   "fr": "admin/inventaire",
+   "it": "admin/inventario",
+   "pt": "admin/estoque",
+   "de": "admin/bestand"
+  },
+  "/admin/promociones.html": {
+   "es": "admin/promociones",
+   "en": "admin/promotions",
+   "fr": "admin/promotions",
+   "it": "admin/promozioni",
+   "pt": "admin/promocoes",
+   "de": "admin/aktionen"
+  },
+  "/admin/pedidos.html": {
+   "es": "admin/pedidos",
+   "en": "admin/orders",
+   "fr": "admin/commandes",
+   "it": "admin/ordini",
+   "pt": "admin/pedidos",
+   "de": "admin/bestellungen"
+  },
+  "/admin/usuarios.html": {
+   "es": "admin/usuarios",
+   "en": "admin/users",
+   "fr": "admin/utilisateurs",
+   "it": "admin/utenti",
+   "pt": "admin/usuarios",
+   "de": "admin/benutzer"
+  },
+  "/admin/incidencias.html": {
+   "es": "admin/incidencias",
+   "en": "admin/incidents",
+   "fr": "admin/incidents",
+   "it": "admin/incidenti",
+   "pt": "admin/incidentes",
+   "de": "admin/vorfaelle"
+  },
+  "/admin/reportes.html": {
+   "es": "admin/reportes",
+   "en": "admin/reports",
+   "fr": "admin/rapports",
+   "it": "admin/report",
+   "pt": "admin/relatorios",
+   "de": "admin/berichte"
+  },
+  "/admin/auditoria.html": {
+   "es": "admin/auditoria",
+   "en": "admin/audit",
+   "fr": "admin/audit",
+   "it": "admin/audit",
+   "pt": "admin/auditoria",
+   "de": "admin/audit"
+  },
+  "/operaciones/dashboard.html": {
+   "es": "operaciones",
+   "en": "operations",
+   "fr": "operations",
+   "it": "operazioni",
+   "pt": "operacoes",
+   "de": "betrieb"
+  },
+  "/operaciones/pedidos.html": {
+   "es": "operaciones/pedidos",
+   "en": "operations/orders",
+   "fr": "operations/commandes",
+   "it": "operazioni/ordini",
+   "pt": "operacoes/pedidos",
+   "de": "betrieb/bestellungen"
+  },
+  "/operaciones/revisiones.html": {
+   "es": "operaciones/revisiones",
+   "en": "operations/reviews",
+   "fr": "operations/revisions",
+   "it": "operazioni/revisioni",
+   "pt": "operacoes/revisoes",
+   "de": "betrieb/pruefungen"
+  },
+  "/operaciones/incidencias.html": {
+   "es": "operaciones/incidencias",
+   "en": "operations/incidents",
+   "fr": "operations/incidents",
+   "it": "operazioni/incidenti",
+   "pt": "operacoes/incidentes",
+   "de": "betrieb/vorfaelle"
+  },
+  "/logistica/dashboard.html": {
+   "es": "logistica",
+   "en": "logistics",
+   "fr": "logistique",
+   "it": "logistica",
+   "pt": "logistica",
+   "de": "logistik"
+  },
+  "/logistica/calendario.html": {
+   "es": "logistica/calendario",
+   "en": "logistics/calendar",
+   "fr": "logistique/calendrier",
+   "it": "logistica/calendario",
+   "pt": "logistica/calendario",
+   "de": "logistik/kalender"
+  },
+  "/logistica/entregas.html": {
+   "es": "logistica/entregas",
+   "en": "logistics/deliveries",
+   "fr": "logistique/livraisons",
+   "it": "logistica/consegne",
+   "pt": "logistica/entregas",
+   "de": "logistik/lieferungen"
+  },
+  "/logistica/asignaciones.html": {
+   "es": "logistica/asignaciones",
+   "en": "logistics/assignments",
+   "fr": "logistique/affectations",
+   "it": "logistica/assegnazioni",
+   "pt": "logistica/atribuicoes",
+   "de": "logistik/zuweisungen"
+  },
+  "/monitoreo/dashboard.html": {
+   "es": "monitoreo",
+   "en": "monitoring",
+   "fr": "supervision",
+   "it": "monitoraggio",
+   "pt": "monitoramento",
+   "de": "monitoring"
+  },
+  "/monitoreo/servicios.html": {
+   "es": "monitoreo/servicios",
+   "en": "monitoring/services",
+   "fr": "supervision/services",
+   "it": "monitoraggio/servizi",
+   "pt": "monitoramento/servicos",
+   "de": "monitoring/dienste"
+  },
+  "/monitoreo/metricas.html": {
+   "es": "monitoreo/metricas",
+   "en": "monitoring/metrics",
+   "fr": "supervision/metriques",
+   "it": "monitoraggio/metriche",
+   "pt": "monitoramento/metricas",
+   "de": "monitoring/metriken"
+  },
+  "/monitoreo/alertas.html": {
+   "es": "monitoreo/alertas",
+   "en": "monitoring/alerts",
+   "fr": "supervision/alertes",
+   "it": "monitoraggio/avvisi",
+   "pt": "monitoramento/alertas",
+   "de": "monitoring/warnungen"
+  },
+  "/arquitectura/overview.html": {
+   "es": "arquitectura",
+   "en": "architecture",
+   "fr": "architecture",
+   "it": "architettura",
+   "pt": "arquitetura",
+   "de": "architektur"
+  },
+  "/arquitectura/flujo-pedidos.html": {
+   "es": "arquitectura/flujo-pedidos",
+   "en": "architecture/order-flow",
+   "fr": "architecture/flux-commandes",
+   "it": "architettura/flusso-ordini",
+   "pt": "arquitetura/fluxo-pedidos",
+   "de": "architektur/bestellablauf"
+  }
+ },
+ "meta": {
+  "/index.html": {
+   "title": "Tienda de tecnología",
+   "description": "POLYMER, tecnología que conecta contigo: laptops, componentes, monitores, smartphones, gaming y smart home con envío a todo el Perú.",
+   "roles": [],
+   "indexable": true
+  },
+  "/catalogo.html": {
+   "title": "Catálogo",
+   "description": "Catálogo de tecnología con búsqueda, filtros por marca, precio y características técnicas.",
+   "roles": [],
+   "indexable": true
+  },
+  "/producto.html": {
+   "title": "Producto",
+   "description": "Ficha del producto con especificaciones técnicas, precio, disponibilidad y productos relacionados.",
+   "roles": [],
+   "indexable": false
+  },
+  "/ofertas.html": {
+   "title": "Ofertas",
+   "description": "Ofertas y promociones vigentes en tecnología.",
+   "roles": [],
+   "indexable": true
+  },
+  "/carrito.html": {
+   "title": "Carrito",
+   "description": "Tu carrito de compras.",
+   "roles": [],
+   "indexable": true
+  },
+  "/checkout.html": {
+   "title": "Checkout",
+   "description": "Finaliza tu compra: entrega, pago y confirmación.",
+   "roles": [
+    "CUSTOMER"
+   ],
+   "indexable": false
+  },
+  "/login.html": {
+   "title": "Iniciar sesión",
+   "description": "Inicia sesión en tu cuenta POLYMER.",
+   "roles": [],
+   "indexable": true
+  },
+  "/registro.html": {
+   "title": "Crear cuenta",
+   "description": "Crea tu cuenta POLYMER para comprar y seguir tus pedidos.",
+   "roles": [],
+   "indexable": true
+  },
+  "/ayuda.html": {
+   "title": "Centro de ayuda",
+   "description": "Envíos, métodos de pago, garantías, devoluciones y tu cuenta.",
+   "roles": [],
+   "indexable": true
+  },
+  "/nosotros.html": {
+   "title": "Nosotros",
+   "description": "Conoce POLYMER, tu tienda de tecnología: quiénes somos y nuestra historia.",
+   "roles": [],
+   "indexable": true
+  },
+  "/contacto.html": {
+   "title": "Contacto",
+   "description": "Escríbenos: pedidos, soporte técnico, garantías y ventas corporativas.",
+   "roles": [],
+   "indexable": true
+  },
+  "/empresa.html": {
+   "title": "Empresa",
+   "description": "Canales de atención, compra segura, métodos de pago, tiendas, cobertura de delivery y disponibilidad.",
+   "roles": [],
+   "indexable": true
+  },
+  "/legal.html": {
+   "title": "Información legal",
+   "description": "Términos y condiciones, privacidad, cookies, cambios y devoluciones, garantías y facturación.",
+   "roles": [],
+   "indexable": true
+  },
+  "/libro-reclamaciones.html": {
+   "title": "Libro de reclamaciones",
+   "description": "Registra un reclamo o una queja sobre tu compra.",
+   "roles": [],
+   "indexable": true
+  },
+  "/403.html": {
+   "title": "Acceso restringido",
+   "description": "Tu cuenta no tiene permiso para esta página.",
+   "roles": [],
+   "indexable": false
+  },
+  "/404.html": {
+   "title": "Página no encontrada",
+   "description": "La página solicitada no existe.",
+   "roles": [],
+   "indexable": false
+  },
+  "/cliente/dashboard.html": {
+   "title": "Mi cuenta",
+   "description": "Resumen de tus compras y pedidos.",
+   "roles": [
+    "CUSTOMER"
+   ],
+   "indexable": false
+  },
+  "/cliente/pedidos.html": {
+   "title": "Mis pedidos",
+   "description": "Historial de tus pedidos.",
+   "roles": [
+    "CUSTOMER"
+   ],
+   "indexable": false
+  },
+  "/cliente/pedido-detalle.html": {
+   "title": "Detalle del pedido",
+   "description": "Productos, totales, entrega, pago y cancelación.",
+   "roles": [
+    "CUSTOMER"
+   ],
+   "indexable": false
+  },
+  "/cliente/seguimiento.html": {
+   "title": "Seguimiento",
+   "description": "Estado de tu pedido paso a paso.",
+   "roles": [
+    "CUSTOMER"
+   ],
+   "indexable": false
+  },
+  "/cliente/perfil.html": {
+   "title": "Perfil y seguridad",
+   "description": "Datos personales y cambio de contraseña.",
+   "roles": [
+    "auth"
+   ],
+   "indexable": false
+  },
+  "/admin/dashboard.html": {
+   "title": "Panel de administración",
+   "description": "Indicadores reales, alertas operativas, actividad y mensajes de contacto.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/productos.html": {
+   "title": "Productos",
+   "description": "Alta y edición de productos con búsqueda y paginación.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/categorias.html": {
+   "title": "Categorías",
+   "description": "Categorías del catálogo y su contenido.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/inventario.html": {
+   "title": "Inventario",
+   "description": "Existencias, stock bajo y ajustes auditados.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/promociones.html": {
+   "title": "Promociones",
+   "description": "Campañas comerciales con vigencia y descuento.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/pedidos.html": {
+   "title": "Pedidos",
+   "description": "Todos los pedidos con su ciclo de vida.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/usuarios.html": {
+   "title": "Usuarios y roles",
+   "description": "Gestión de usuarios, roles y activación.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/incidencias.html": {
+   "title": "Incidencias",
+   "description": "Incidencias operativas.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/reportes.html": {
+   "title": "Reportes",
+   "description": "Ventas por categoría y productos más vendidos.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/admin/auditoria.html": {
+   "title": "Auditoría",
+   "description": "Registro de auditoría con filtros.",
+   "roles": [
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/operaciones/dashboard.html": {
+   "title": "Operaciones",
+   "description": "Resumen de la cola de pedidos.",
+   "roles": [
+    "ORDER_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/operaciones/pedidos.html": {
+   "title": "Bandeja de pedidos",
+   "description": "Procesamiento y cambios de estado.",
+   "roles": [
+    "ORDER_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/operaciones/revisiones.html": {
+   "title": "Revisiones de riesgo",
+   "description": "Pedidos en revisión de riesgo.",
+   "roles": [
+    "ORDER_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/operaciones/incidencias.html": {
+   "title": "Incidencias",
+   "description": "Registro y resolución de incidencias.",
+   "roles": [
+    "ORDER_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/logistica/dashboard.html": {
+   "title": "Logística",
+   "description": "Resumen logístico.",
+   "roles": [
+    "LOGISTICS_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/logistica/calendario.html": {
+   "title": "Calendario logístico",
+   "description": "Calendario mensual, semanal y diario de entregas.",
+   "roles": [
+    "LOGISTICS_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/logistica/entregas.html": {
+   "title": "Entregas",
+   "description": "Entregas programadas y estados de despacho.",
+   "roles": [
+    "LOGISTICS_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/logistica/asignaciones.html": {
+   "title": "Asignaciones",
+   "description": "Carga semanal por responsable.",
+   "roles": [
+    "LOGISTICS_OPERATOR",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/monitoreo/dashboard.html": {
+   "title": "Monitoreo",
+   "description": "Salud técnica y estado de Prometheus.",
+   "roles": [
+    "OBSERVABILITY_VIEWER",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/monitoreo/servicios.html": {
+   "title": "Servicios",
+   "description": "Targets de Prometheus y dependencias.",
+   "roles": [
+    "OBSERVABILITY_VIEWER",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/monitoreo/metricas.html": {
+   "title": "Métricas",
+   "description": "Indicadores operativos calculados por Prometheus.",
+   "roles": [
+    "OBSERVABILITY_VIEWER",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/monitoreo/alertas.html": {
+   "title": "Alertas",
+   "description": "Reglas de alerta y su estado.",
+   "roles": [
+    "OBSERVABILITY_VIEWER",
+    "ADMIN"
+   ],
+   "indexable": false
+  },
+  "/arquitectura/overview.html": {
+   "title": "Documentación técnica",
+   "description": "Documentación técnica interna para el personal autorizado.",
+   "roles": [
+    "ADMIN",
+    "OBSERVABILITY_VIEWER"
+   ],
+   "indexable": false
+  },
+  "/arquitectura/flujo-pedidos.html": {
+   "title": "Flujo de pedidos",
+   "description": "Documentación técnica interna para el personal autorizado.",
+   "roles": [
+    "ADMIN",
+    "OBSERVABILITY_VIEWER"
+   ],
+   "indexable": false
+  }
+ },
+ "shell": [
+  "Saltar al contenido",
+  "Ruta de navegación",
+  "Secciones del portal",
+  "Activa JavaScript en tu navegador para comprar en POLYMER."
+ ]
+}

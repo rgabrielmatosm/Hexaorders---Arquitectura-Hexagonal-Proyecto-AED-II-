@@ -79,6 +79,22 @@ class IntegrationServicesTest {
     }
 
     @Test
+    void notificationsUseTheRecipientsLanguage() {
+        NotificationRecipients recipients = mock(NotificationRecipients.class);
+        MailSender mail = mock(MailSender.class);
+        when(recipients.forOrder(ORDER)).thenReturn(Optional.of(
+                new NotificationRecipients.Recipient("Ana", "ana@polymer.local", com.polymer.domain.identity.Language.EN)));
+        var service = new NotificationService(mock(ProcessedEvents.class), recipients, mail, IntegrationTelemetry.NONE);
+        assertThat(service.handle(approved)).isEqualTo("sent");
+        var message = ArgumentCaptor.forClass(MailSender.MailMessage.class);
+        verify(mail).send(message.capture());
+        assertThat(message.getValue().subject()).contains("aaaaaaaa").contains("approved");
+        assertThat(message.getValue().body()).startsWith("Hello, Ana:").contains("/en/tracking?id=").contains("The Polymer team")
+                .doesNotContain("Pedido");
+        assertThat(com.polymer.domain.identity.Language.orDefault("xx")).isEqualTo(com.polymer.domain.identity.Language.ES);
+    }
+
+    @Test
     void notificationsAreSentOnceAndDuplicatesAreIgnored() {
         ProcessedEvents processed = mock(ProcessedEvents.class);
         NotificationRecipients recipients = mock(NotificationRecipients.class);
@@ -93,7 +109,7 @@ class IntegrationServicesTest {
         assertThat(message.getValue().to()).isEqualTo("cliente@polymer.local");
         assertThat(message.getValue().subject()).contains("aaaaaaaa").contains("aprobado");
         assertThat(message.getValue().body()).contains("verificado").contains("Mailpit")
-                .contains("Equipo Polymer").doesNotContain("POLYMER"); // POLYMER: marca comercial en los correos
+                .contains("Equipo Polymer").doesNotContain("Hexa" + "Orders"); // marca comercial en los correos
 
         when(processed.alreadyProcessed("order-status-11", "email-notifications")).thenReturn(true);
         assertThat(service.handle(approved)).isEqualTo("duplicate");

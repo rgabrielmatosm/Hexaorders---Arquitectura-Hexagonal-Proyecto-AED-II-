@@ -8,55 +8,55 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
-/** Text of the customer notifications (Spanish). Pure function of the event: easy to test. */
+/** Text of the customer notifications, in the recipient's language. Pure function of the event: easy to test. */
 final class NotificationComposer {
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm 'UTC'").withZone(ZoneOffset.UTC);
-    private static final Map<String, String> STATUS = Map.ofEntries(
-            Map.entry("CREATED", "Pedido recibido"), Map.entry("RISK_APPROVED", "Pedido verificado"), Map.entry("RISK_REVIEW", "En verificación"),
-            Map.entry("CONFIRMED", "Confirmado"), Map.entry("PREPARING", "En preparación"), Map.entry("READY_FOR_DISPATCH", "Listo para envío"),
-            Map.entry("IN_TRANSIT", "En camino"), Map.entry("DELIVERED", "Entregado"), Map.entry("REJECTED", "No aprobado"),
-            Map.entry("CANCELLED", "Cancelado"));
 
     private NotificationComposer() {}
 
     static MailMessage compose(BusinessEvent event, Recipient recipient) {
+        Map<String, String> text = NotificationTexts.of(recipient.language());
         String order = event.orderId().toString().substring(0, 8);
         String to = event.attributes().getOrDefault("to", "");
+        String status = text.getOrDefault(to, to);
         String subject;
         String detail;
         switch (event.type()) {
             case ORDER_CREATED -> {
-                subject = "Pedido " + order + " recibido";
-                detail = "¡Gracias por tu compra! Recibimos tu pedido y lo estamos verificando.";
+                subject = fill(text.get("created.subject"), order, status, "");
+                detail = text.get("created.detail");
             }
             case ORDER_APPROVED -> {
-                subject = "Pedido " + order + " aprobado";
-                detail = "risk-engine".equals(event.attributes().get("approvedBy"))
-                        ? "Tu pedido fue verificado y pronto pasará a preparación."
-                        : "Nuestro equipo confirmó tu pedido y lo está preparando.";
+                subject = fill(text.get("approved.subject"), order, status, "");
+                detail = "risk-engine".equals(event.attributes().get("approvedBy")) ? text.get("approved.byRisk") : text.get("approved.byStaff");
             }
             case ORDER_REJECTED -> {
-                subject = "Pedido " + order + " rechazado";
-                detail = "No pudimos aprobar tu pedido tras la verificación. No se realizó ningún cobro; escríbenos si necesitas ayuda.";
+                subject = fill(text.get("rejected.subject"), order, status, "");
+                detail = text.get("rejected.detail");
             }
             case DELIVERY_SCHEDULED -> {
-                subject = "Entrega " + ("RESCHEDULED".equals(event.attributes().get("action")) ? "reprogramada" : "programada")
-                        + " para el pedido " + order;
-                detail = "Ventana de entrega: " + WHEN.format(Instant.parse(event.attributes().get("windowStart")))
-                        + " – " + WHEN.format(Instant.parse(event.attributes().get("windowEnd"))) + ".";
+                subject = fill(text.get("RESCHEDULED".equals(event.attributes().get("action")) ? "delivery.rescheduled" : "delivery.scheduled"),
+                        order, status, "");
+                String window = WHEN.format(Instant.parse(event.attributes().get("windowStart")))
+                        + " – " + WHEN.format(Instant.parse(event.attributes().get("windowEnd")));
+                detail = fill(text.get("delivery.detail"), order, status, window);
             }
             default -> {
-                subject = "Pedido " + order + ": " + STATUS.getOrDefault(to, to);
-                detail = "El estado de tu pedido cambió a «" + STATUS.getOrDefault(to, to) + "».";
+                subject = fill(text.get("status.subject"), order, status, "");
+                detail = fill(text.get("status.detail"), order, status, "");
             }
         }
-        String body = "Hola, " + recipient.displayName() + ":\n\n" + detail + "\n\n"
-                + "Pedido: " + event.orderId() + "\n"
-                + "Fecha del evento: " + WHEN.format(event.occurredAt()) + "\n\n"
-                + "Puedes seguirlo en tu cuenta Polymer: /cliente/seguimiento.html?id=" + event.orderId() + "\n\n"
-                + "— Equipo Polymer · Tecnología que conecta contigo.\n\n"
-                + "(Entorno de pruebas: este correo lo captura Mailpit y no se envía a Internet.)\n"
-                + "Referencia del evento: " + event.eventId() + "\n";
+        String body = text.get("greeting").replace("{name}", recipient.displayName()) + "\n\n" + detail + "\n\n"
+                + text.get("order") + ": " + event.orderId() + "\n"
+                + text.get("eventDate") + ": " + WHEN.format(event.occurredAt()) + "\n\n"
+                + text.get("follow").replace("{path}", text.get("trackingPath") + event.orderId()) + "\n\n"
+                + text.get("signature") + "\n\n"
+                + text.get("sandbox") + "\n"
+                + text.get("reference") + ": " + event.eventId() + "\n";
         return new MailMessage(recipient.email(), subject, body);
+    }
+
+    private static String fill(String template, String order, String status, String window) {
+        return template.replace("{order}", order).replace("{status}", status).replace("{window}", window);
     }
 }

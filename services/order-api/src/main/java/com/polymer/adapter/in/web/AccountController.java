@@ -25,6 +25,12 @@ public final class AccountController {
         return accounts.updateProfile(CurrentUser.require(), request.displayName(), request.email());
     }
 
+    @PutMapping("/locale")
+    public ResponseEntity<Void> locale(@RequestBody LanguageRequest request) {
+        accounts.setLanguage(CurrentUser.require(), request.language());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/password")
     public ResponseEntity<Void> password(@RequestBody PasswordRequest request) {
         accounts.changePassword(CurrentUser.require(), request.currentPassword(), request.newPassword());
@@ -33,4 +39,5 @@ public final class AccountController {
 
     public record ProfileRequest(String displayName, String email) {}
     public record PasswordRequest(String currentPassword, String newPassword) {}
+    public record LanguageRequest(String language) {}
 }

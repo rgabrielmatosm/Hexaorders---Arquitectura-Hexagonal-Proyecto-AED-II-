@@ -3,6 +3,7 @@ package com.polymer.config;
 import com.polymer.adapter.out.health.DependencyHealthAdapter;
 import com.polymer.adapter.out.metrics.MicrometerBusinessTelemetry;
 import com.polymer.adapter.out.persistence.JdbcAuditLog;
+import com.polymer.adapter.out.persistence.JdbcUserPreferences;
 import com.polymer.adapter.out.persistence.JdbcCatalogRepository;
 import com.polymer.adapter.out.persistence.JdbcCommerceOrderRepository;
 import com.polymer.adapter.out.persistence.JdbcDeliveryRepository;
@@ -24,6 +25,7 @@ import com.polymer.application.port.out.DeliveryRepository;
 import com.polymer.application.port.out.IncidentRepository;
 import com.polymer.application.port.out.OrderTelemetry;
 import com.polymer.application.port.out.PasswordBlocklist;
+import com.polymer.application.port.out.UserPreferences;
 import com.polymer.application.port.out.PasswordHasher;
 import com.polymer.application.port.out.RiskAssessmentPort;
 import com.polymer.application.port.out.SystemHealthPort;
@@ -165,8 +167,10 @@ public class PlatformConfiguration {
     }
 
     @Bean PasswordBlocklist passwordBlocklist() { return new ClasspathPasswordBlocklist(); }
-    @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist) {
-        return new AccountService(users, hasher, audit, blocklist);
+    @Bean UserPreferences userPreferences(JdbcTemplate jdbc) { return new JdbcUserPreferences(jdbc); }
+    @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist,
+                                          UserPreferences preferences) {
+        return new AccountService(users, hasher, audit, blocklist, preferences);
     }
 
     /** Creates the demo accounts once, from the demo_password secret; never modifies existing users. */

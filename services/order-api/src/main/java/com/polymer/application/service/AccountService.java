@@ -9,7 +9,9 @@ import com.polymer.application.port.out.AuditLog;
 import com.polymer.application.port.out.PasswordBlocklist;
 import com.polymer.application.port.out.PasswordHasher;
 import com.polymer.application.port.out.StoredCredentials;
+import com.polymer.application.port.out.UserPreferences;
 import com.polymer.application.port.out.UserRepository;
+import com.polymer.domain.identity.Language;
 import com.polymer.domain.identity.PasswordPolicy;
 import com.polymer.domain.identity.Role;
 import com.polymer.domain.identity.UserAccount;
@@ -34,12 +36,20 @@ public final class AccountService implements AccountUseCases {
     private final AuditLog audit;
 
     private final PasswordBlocklist blocklist;
+    private final UserPreferences preferences;
 
-    public AccountService(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist) {
+    public AccountService(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist, UserPreferences preferences) {
         this.users = users;
         this.hasher = hasher;
         this.audit = audit;
         this.blocklist = blocklist;
+        this.preferences = preferences;
+    }
+
+    @Override
+    public void setLanguage(AuthenticatedUser user, String language) {
+        me(user);
+        preferences.setLanguage(user.userId(), Language.fromCode(language));
     }
 
     @Override
