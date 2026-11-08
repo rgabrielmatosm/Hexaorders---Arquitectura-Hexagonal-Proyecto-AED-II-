@@ -18,7 +18,25 @@ Contenedor Linux **sin Docker**: PostgreSQL 16 con la base que ya tenía datos d
 | `generate_pages.py --check`, `check_frontend.py`, `generate_brand.py --check`, `generate_catalog.py --check`, `generate_delivery.py`, `validate_delivery.py`, `check_observability.py` | Correctos |
 | Contraseñas existentes | Ninguna se cambió. Las cuentas de demostración siguen entrando con su contraseña y su hash anterior |
 
-**No verificado aquí:** Docker Desktop en Windows, los 13 contenedores y `change-password` contra servicios reales. Se ejecutan en el CI (sección siguiente cuando termine).
+### CI con Docker real
+
+Ejecución **42535872750** de GitHub Actions (commit `5ee7f0e`): los **4 jobs en verde**.
+
+| Job | Resultado observado |
+| --- | --- |
+| `compose`: `polymer.ps1 verify -Mode full` con **13 contenedores** | Los 10 pasos de `verify` correctos (build con pruebas de Java y Python, 13 servicios sanos, `smoke`, plataforma, tienda, integraciones reales, degradación y persistencia). Después, `ui-e2e.js`, `pages-e2e.js`, `intro-e2e.js` y **`i18n-e2e.js` (`OK i18n e2e: 77 comprobaciones`)** contra el stack completo, a través del gateway Nginx |
+| `compose-basic` (6 contenedores) | Correcto |
+| `windows` (Windows PowerShell 5.1) | Análisis de los scripts, `polymer.cmd help`, secretos aleatorios y **memorables** (nunca impresos), `check` (incluido `check_i18n.py`) y pruebas unitarias |
+| **`migrate-from-v6`** | HexaOrders v6 con datos → POLYMER en otra carpeta sin `secrets\`: contraseñas importadas, volúmenes migrados, 13 contenedores sanos, datos intactos, Flyway hasta **V10** (`user_preferences` creada sin tocar usuarios), `platform_smoke` y `store_smoke`. Después, **`change-password` para PostgreSQL, Grafana y RabbitMQ** (copia de seguridad, verificación y servicios sanos) y segunda `migrate` idempotente |
+
+**Problemas encontrados por el CI y corregidos** antes de este resultado:
+
+1. Con los catálogos de idioma, el Dockerfile en línea de order-api (2,7 MB) superaba el mensaje máximo de BuildKit («received message larger than max»). Los archivos de más de 64 KB se incrustan ahora comprimidos y se restauran byte a byte (1,6 MB).
+2. Los bytes de gzip dependen de la versión de zlib. `generate_delivery.py --check` y `validate_delivery.py` comparan ahora el contenido descomprimido.
+3. `smoke.py` no conocía los tipos `.json` y `.txt` de los estáticos nuevos.
+4. El job de migración esperaba V9 como última migración.
+
+**No verificado:** Docker Desktop en Windows en un equipo real (el CI usa Linux con Docker y Windows sin Docker), y el envío real de correos por idioma a Internet (los correos van a Mailpit; la prueba Java comprueba que se redactan en el idioma del destinatario).
 
 ## Identidad técnica POLYMER y migración segura (8 de noviembre de 2026)
 
