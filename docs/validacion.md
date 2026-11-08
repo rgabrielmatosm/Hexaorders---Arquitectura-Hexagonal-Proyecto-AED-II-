@@ -14,6 +14,17 @@ Se compararon, archivo por archivo, los dos ZIP entregados: `HexaOrders-v6.zip` 
 | Rutas del frontend (`route(…)`), funciones y constantes exportadas, endpoints Java (`@…Mapping`), métodos Java, `@Bean`, servicios de Compose, funciones de Python y de PowerShell, títulos y uid de dashboards, alertas | **Nada se perdió**: todo lo de la v6 sigue presente |
 | Causa real del fallo de `start` | El ZIP no incluye `secrets\` (las contraseñas no se distribuyen). Al descomprimirlo en otra carpeta, el script encontraba los volúmenes `hexaorders_postgres_data` y `hexaorders_grafana_data` sin sus contraseñas y se detenía **a propósito**, para no dejar inaccesibles los datos |
 
+### Segunda comparación: POLYMER anterior → POLYMER actual (después del renombrado técnico)
+
+Se compararon `POLYMER-HexaOrders.zip` (449 archivos) y `POLYMER.zip` (461 archivos), normalizando con las mismas reglas de `tools/migration/rename_to_polymer.py`.
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Archivos de la v6 o del POLYMER anterior ausentes | **Ninguno** |
+| Líneas sin equivalente | 57, todas intencionadas: textos de documentación actualizados, comprobaciones de la marca anterior y funciones de `polymer.ps1` ampliadas |
+| Única pérdida real | Las instrucciones de actualización desde versiones anteriores a la v6, que estaban en la guía de Windows. **Restauradas** en `MIGRACION_POLYMER.md`; la guía original se conserva en `historial/` |
+| Mejoras visuales presentes en el código actual | Intro con telón y letras, «Entrar con sonido» y «Omitir intro»; sonidos de bienvenida, confirmación, notificación y error; View Transitions, indicador de navegación, aparición al desplazarse, vuelo al carrito, check animado y movimiento reducido; pie con redes, pagos y Libro de reclamaciones; botón de sonido; 7 SVG del logotipo |
+
 ### Pruebas locales
 
 Contenedor Linux **sin Docker**, con PostgreSQL 16 y una base que ya tenía datos de la v6 y de POLYMER.

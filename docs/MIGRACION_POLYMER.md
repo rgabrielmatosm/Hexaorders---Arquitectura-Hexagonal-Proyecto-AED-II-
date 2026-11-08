@@ -56,6 +56,20 @@ decisión técnica está en la [ADR 0017](adr/0017-polymer-technical-identity-an
 
 **Si ya no tienes ninguna copia de `db_password.txt`**, `.\polymer.cmd repair-db-password` cambia la contraseña de PostgreSQL al valor del archivo nuevo **sin borrar datos**, previa confirmación. Para Grafana, la contraseña del usuario `admin` puede cambiarse desde su propia interfaz.
 
+### Desde versiones anteriores a la v6 (v4 o v5)
+
+El procedimiento es el mismo: los volúmenes también se llaman `hexaorders_*`. Al arrancar, Flyway aplica **una sola vez** las migraciones pendientes (V6 y V7: catálogo tecnológico, promociones, carrito y checkout; V8 y V9: identidad POLYMER) y conserva usuarios, contraseñas y pedidos.
+
+### Comprobación completa después de migrar (opcional)
+
+```powershell
+.\polymer.cmd smoke
+```
+
+Ejecuta las pruebas HTTP contra tu entorno en marcha: pedidos, roles, tienda y, en modo completo, Redis, RabbitMQ, Mailpit, Loki, Tempo y Grafana. Requiere Python.
+
+Para el personal: la documentación técnica y el laboratorio están en **Monitoreo → Documentación técnica**, con las cuentas `observador` o `admin`.
+
 ## 3. Volver a HexaOrders v6 (si lo necesitas)
 
 Los volúmenes `hexaorders_*` siguen intactos, en el estado en que estaban antes de copiarlos.
@@ -99,6 +113,8 @@ docker volume rm hexaorders_postgres_data hexaorders_prometheus_data hexaorders_
 | `hexaorders.cmd` | raíz | Alias que redirige a `polymer.cmd` |
 | Métricas `hexaorders_*` anteriores a la migración | Prometheus (volumen) | Es historia guardada; las métricas nuevas se llaman `polymer_*` |
 | Nombre del repositorio de GitHub | GitHub | Se cambia desde la configuración del repositorio, no desde el código |
+
+La guía de Windows de la versión anterior se conserva en [`historial/WINDOWS_DOCKER_GUIDE-hexaorders-v6.md`](historial/WINDOWS_DOCKER_GUIDE-hexaorders-v6.md).
 
 Todo lo demás usa POLYMER: paquete `com.polymer`, proyecto de Compose `polymer`, imágenes `polymer/*`,
 métricas, dashboards, alertas, etiquetas de logs, configuración, caché, claves del navegador, scripts,
