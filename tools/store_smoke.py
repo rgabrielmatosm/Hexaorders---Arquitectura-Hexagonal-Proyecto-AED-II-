@@ -112,8 +112,8 @@ def main():
     customer = Session()
     customer.refresh_csrf()
     customer.call('POST', '/api/auth/register', {'username': f'tienda{suffix}', 'displayName': 'Cliente Tienda',
-                                                 'email': f'tienda{suffix}@example.test', 'password': 'Tienda-2026-segura'}, expect=201)
-    customer.login(f'tienda{suffix}', 'Tienda-2026-segura')
+                                                 'email': f'tienda{suffix}@example.test', 'password': 'cobre lluvia faro norte 2026'}, expect=201)
+    customer.login(f'tienda{suffix}', 'cobre lluvia faro norte 2026')
     in_stock = next(p for p in search(anon, available='true', sort='price_asc', size=60)['items'] if 3 <= p['stock'] <= 60)
     _, cart, _ = customer.call('POST', '/api/shop/cart/items', {'productId': in_stock['id'], 'quantity': 2}, expect=200)
     ok(cart['units'] == 2 and D(cart['subtotal']) == D(in_stock['price']) * 2, 'Agregar al carrito: subtotal calculado por el servidor')
@@ -123,7 +123,7 @@ def main():
     _, cart, _ = customer.call('POST', '/api/shop/cart/merge', {'items': [{'productId': other['id'], 'quantity': 1}]}, expect=200)
     ok(len(cart['lines']) == 2, 'El carrito del visitante se fusiona con el carrito guardado al iniciar sesión')
     _, cart, _ = customer.call('DELETE', f'/api/shop/cart/items/{other["id"]}', expect=200)
-    relogin = Session().login(f'tienda{suffix}', 'Tienda-2026-segura')
+    relogin = Session().login(f'tienda{suffix}', 'cobre lluvia faro norte 2026')
     _, saved, _ = relogin.call('GET', '/api/shop/cart', expect=200)
     ok(len(saved['lines']) == 1 and saved['lines'][0]['quantity'] == 2, 'El carrito persiste en PostgreSQL entre sesiones')
 

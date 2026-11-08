@@ -824,6 +824,8 @@ function Invoke-Check {
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_catalog.py'), '--check')
     Write-Step 'Marca POLYMER: los SVG del logotipo coinciden con tools/generate_brand.py'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_brand.py'), '--check')
+    Write-Step 'Idiomas: catálogos en, fr, it, pt y de completos y con marcadores coherentes'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_i18n.py'))
 }
 
 function Invoke-Test {

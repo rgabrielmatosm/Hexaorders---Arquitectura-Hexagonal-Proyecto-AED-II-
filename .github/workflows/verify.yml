@@ -49,6 +49,7 @@ jobs:
           python tools/generate_pages.py --check
           python tools/check_frontend.py
           python tools/generate_brand.py --check
+          python tools/check_i18n.py
       - name: UI end to end against the real stack (Playwright)
         shell: bash
         working-directory: tools/ui-e2e
@@ -75,6 +76,15 @@ jobs:
         env:
           SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
         run: node intro-e2e.js
+      # Multilingüe: /es /en /fr /it /pt /de con recarga, SEO (lang, hreflang, canonical, sitemap), selector
+      # que conserva página, filtros, carrito y sesión, permisos por idioma, checkout en inglés,
+      # contraseñas (indicador y rechazo en el servidor) y vista móvil.
+      - name: Multilingual site and password security end to end
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: node i18n-e2e.js
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
