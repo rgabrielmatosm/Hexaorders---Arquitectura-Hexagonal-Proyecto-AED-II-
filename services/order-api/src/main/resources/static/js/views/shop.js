@@ -11,6 +11,7 @@ import { categoryTree, setBreadcrumbs, storeCategories } from '../layout.js';
 import { link, rerender, route } from '../router.js';
 import { ROLE_LABELS, homeFor, session } from '../session.js';
 import { $$, el, formatDateTime, formatRelative, toast } from '../ui.js';
+import { newPasswordFields, revealToggle } from '../password-strength.js';
 import { addToCart, availabilityNote, badges, priceBlock, productCard, productRail, skeletonCards } from '../store-ui.js';
 
 const view = (...children) => el('section', { class: 'view view--store' }, ...children);
@@ -598,20 +599,24 @@ route('/perfil', async (root) => {
   const profileError = formError();
   const saveProfile = el('button', { type: 'submit', class: 'btn btn--primary', text: 'Guardar perfil' });
   const current = el('input', { type: 'password', autocomplete: 'current-password' });
-  const next = el('input', { type: 'password', autocomplete: 'new-password', minlength: '8', maxlength: '72' });
+  const next = newPasswordFields({ label: 'Nueva contraseña', personal: () => [me.username, name.value, email.value] });
   const passError = formError();
   const savePass = el('button', { type: 'submit', class: 'btn btn--ghost', text: 'Cambiar contraseña' });
   const profileForm = el('form', { class: 'card form', novalidate: true }, el('h3', { class: 'card__title', text: 'Datos personales' }),
     field('Nombre', name), field('Correo electrónico', email), saveProfile, profileError);
   const passForm = el('form', { class: 'card form', novalidate: true }, el('h3', { class: 'card__title', text: 'Seguridad' }),
-    field('Contraseña actual', current), field('Nueva contraseña', next, 'Entre 8 y 72 caracteres, con letras y dígitos.'), savePass, passError);
+    (() => { const f = field('Contraseña actual', current); f.querySelector('input').replaceWith(el('div', { class: 'pw-input' }, current, revealToggle(current))); return f; })(),
+    next.element, savePass, passError);
   profileForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     await submitting(saveProfile, profileError, () => accountApi.profile(name.value, email.value), 'Perfil actualizado').catch(() => {});
   });
   passForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    await submitting(savePass, passError, () => accountApi.password(current.value, next.value), 'Contraseña actualizada').then(() => { current.value = ''; next.value = ''; }).catch(() => {});
+    const problem = next.check();
+    if (problem) { showFormError(passError, new Error(problem)); next.input.focus(); return; }
+    await submitting(savePass, passError, () => accountApi.password(current.value, next.input.value), 'Contraseña actualizada')
+      .then(() => { current.value = ''; next.reset(); }).catch(() => {});
   });
   root.append(view(head('Mi cuenta', 'Perfil y seguridad', `@${me.username} · ${me.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}`),
     el('div', { class: 'grid-2-even' }, profileForm, passForm)));
@@ -660,19 +665,21 @@ route('/registro', async (root) => {
   const username = el('input', { autocomplete: 'username', maxlength: '32' });
   const displayName = el('input', { autocomplete: 'name', maxlength: '80' });
   const email = el('input', { type: 'email', autocomplete: 'email', maxlength: '254' });
-  const password = el('input', { type: 'password', autocomplete: 'new-password', maxlength: '72' });
+  const password = newPasswordFields({ personal: () => [username.value, displayName.value, email.value] });
   const errorNode = formError();
   const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: 'Crear cuenta' });
   const form = el('form', { class: 'card form', novalidate: true }, el('h2', { class: 'card__title', text: 'Crea tu cuenta' }),
     field('Usuario', username, '3 a 32 letras, dígitos, guion o guion bajo.'), field('Nombre', displayName),
-    field('Correo electrónico', email), field('Contraseña', password, 'Entre 8 y 72 caracteres, con letras y dígitos.'), submit, errorNode,
+    field('Correo electrónico', email), password.element, submit, errorNode,
     el('p', { class: 'muted small' }, '¿Ya tienes cuenta? ', el('a', { href: '/login.html', text: 'Inicia sesión' })));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const problem = password.check();
+    if (problem) { showFormError(errorNode, new Error(problem)); password.input.focus(); return; }
     try {
       await submitting(submit, errorNode, async () => {
-        await authApi.register({ username: username.value.trim(), displayName: displayName.value.trim(), email: email.value.trim(), password: password.value });
-        return session.login(username.value.trim(), password.value);
+        await authApi.register({ username: username.value.trim(), displayName: displayName.value.trim(), email: email.value.trim(), password: password.input.value });
+        return session.login(username.value.trim(), password.input.value);
       }, 'Cuenta creada');
       await cart.sync();
       window.location.assign(cart.count() ? '/carrito.html' : '/cliente/dashboard.html');

@@ -91,7 +91,13 @@ def main():
     print('Registro, inicio de sesión y checkout idempotente')
     customer = Session()
     customer.refresh_csrf()
-    password = f'Cliente{suffix}9'
+    # Política de contraseñas (PasswordPolicy): el servidor rechaza las comunes y las que contienen el usuario.
+    for weak, reason in [('Password2026!', 'COMMON'), (f'Clave{suffix}9', 'CONTAINS_PERSONAL_DATA'), ('corta2026', 'TOO_SHORT')]:
+        status, body, _ = customer.call('POST', '/api/auth/register', {'username': f'c_{suffix}', 'displayName': 'Cliente E2E',
+                                                                       'email': f'c_{suffix}@example.com', 'password': weak})
+        ok(status == 400 and body.get('code') == 'WEAK_PASSWORD' and reason in body.get('problems', []),
+           f'El servidor rechaza una contraseña débil ({reason})')
+    password = 'nube cobre faro tigre 2026'
     customer.call('POST', '/api/auth/register', {'username': f'c_{suffix}', 'displayName': 'Cliente E2E',
                                                  'email': f'c_{suffix}@example.com', 'password': password}, expect=201)
     customer.login(f'c_{suffix}', password)

@@ -9,6 +9,7 @@ import com.polymer.application.exception.RiskUnavailableException;
 import com.polymer.domain.fulfillment.TransitionNotAllowedException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import com.polymer.domain.identity.PasswordPolicy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,7 +21,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public final class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail invalidInput(IllegalArgumentException error) {
-        return problem(HttpStatus.BAD_REQUEST, "Solicitud inválida", error.getMessage());
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "Solicitud inválida", error.getMessage());
+        if (error instanceof PasswordPolicy.WeakPasswordException weak) {
+            problem.setProperty("code", "WEAK_PASSWORD");
+            problem.setProperty("problems", weak.problems().stream().map(Enum::name).toList());
+        }
+        return problem;
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})

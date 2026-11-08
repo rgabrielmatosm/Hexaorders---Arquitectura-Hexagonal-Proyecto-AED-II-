@@ -6,9 +6,11 @@ import com.polymer.application.exception.ResourceNotFoundException;
 import com.polymer.application.port.in.AccountUseCases;
 import com.polymer.application.port.in.AuthenticatedUser;
 import com.polymer.application.port.out.AuditLog;
+import com.polymer.application.port.out.PasswordBlocklist;
 import com.polymer.application.port.out.PasswordHasher;
 import com.polymer.application.port.out.StoredCredentials;
 import com.polymer.application.port.out.UserRepository;
+import com.polymer.domain.identity.PasswordPolicy;
 import com.polymer.domain.identity.Role;
 import com.polymer.domain.identity.UserAccount;
 import java.util.EnumSet;
@@ -31,10 +33,13 @@ public final class AccountService implements AccountUseCases {
     private final PasswordHasher hasher;
     private final AuditLog audit;
 
-    public AccountService(UserRepository users, PasswordHasher hasher, AuditLog audit) {
+    private final PasswordBlocklist blocklist;
+
+    public AccountService(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist) {
         this.users = users;
         this.hasher = hasher;
         this.audit = audit;
+        this.blocklist = blocklist;
     }
 
     @Override
@@ -42,7 +47,7 @@ public final class AccountService implements AccountUseCases {
         UserAccount.validateUsername(username);
         UserAccount.validateDisplayName(displayName == null ? null : displayName.strip());
         UserAccount.validateEmail(email == null ? null : email.strip());
-        UserAccount.validatePassword(password);
+        PasswordPolicy.require(password, List.of(username, displayName, email), blocklist::contains);
         if (users.usernameExists(username)) throw new BusinessConflictException("DUPLICATE_USERNAME", "Ese nombre de usuario ya existe");
         if (users.emailExists(email.strip().toLowerCase(), null)) throw new BusinessConflictException("DUPLICATE_EMAIL", "Ese correo ya está registrado");
         UserAccount created = users.create(username, displayName.strip(), email.strip().toLowerCase(), hasher.hash(password), EnumSet.of(Role.CUSTOMER));
@@ -74,7 +79,8 @@ public final class AccountService implements AccountUseCases {
         if (currentPassword == null || !hasher.matches(currentPassword, credentials.passwordHash())) {
             throw new IllegalArgumentException("currentPassword: la contraseña actual no es correcta");
         }
-        UserAccount.validatePassword(newPassword);
+        UserAccount account = me(user);
+        PasswordPolicy.require(newPassword, List.of(account.username(), account.displayName(), account.email()), blocklist::contains);
         users.updatePasswordHash(user.userId(), hasher.hash(newPassword));
         audit.record(user.username(), "PASSWORD_CHANGED", "user:" + user.username(), "");
     }

@@ -231,3 +231,26 @@ html:not(.reduced-motion) .reveal.is-in.product-card:hover { transform: translat
 @media (max-width: 420px) {
   .pm-footer .site-footer__grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- Contraseñas: mostrar/ocultar, indicador de seguridad y coincidencia ------------------------- */
+.pw-group { display: grid; gap: 12px; }
+.pw-input { display: flex; gap: 6px; align-items: stretch; }
+.pw-input input { flex: 1; min-width: 0; }
+.pw-reveal { flex: none; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.pw-reveal:hover, .pw-reveal[aria-pressed="true"] { color: var(--pm-teal); border-color: var(--pm-teal); }
+.pw-meter { display: flex; align-items: center; gap: 10px; margin-top: 8px; min-height: 18px; }
+.pw-meter__track { flex: 1; height: 6px; border-radius: 999px; background: rgba(148, 163, 184, 0.18); overflow: hidden; }
+.pw-meter__bar { display: block; height: 100%; width: 0; border-radius: inherit; transform-origin: left; transition: width 0.25s var(--pm-ease), background 0.25s; }
+.pw-meter[data-level="WEAK"] .pw-meter__bar { width: 33%; background: #F43F5E; }
+.pw-meter[data-level="FAIR"] .pw-meter__bar { width: 66%; background: #FBBF24; }
+.pw-meter[data-level="STRONG"] .pw-meter__bar { width: 100%; background: var(--pm-gradient); }
+.pw-meter__level { font-size: 0.8rem; min-width: 9em; text-align: right; }
+.pw-meter[data-level="WEAK"] .pw-meter__level { color: #FDA4AF; }
+.pw-meter[data-level="FAIR"] .pw-meter__level { color: #FCD34D; }
+.pw-meter[data-level="STRONG"] .pw-meter__level { color: var(--pm-teal); }
+.pw-tips { margin: 6px 0 0; padding-left: 18px; color: #FDA4AF; font-size: 0.8rem; }
+.pw-tips:empty { display: none; }
+.pw-match { display: block; margin-top: 6px; font-size: 0.8rem; color: var(--text-2); }
+.pw-match[data-ok="true"] { color: var(--pm-teal); }
+.pw-match[data-ok="false"] { color: #FDA4AF; }
+@media (prefers-reduced-motion: reduce) { .pw-meter__bar { transition: none; } }

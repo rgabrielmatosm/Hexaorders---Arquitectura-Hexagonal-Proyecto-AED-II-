@@ -109,8 +109,8 @@ def new_customer():
     anon = Session()
     anon.refresh_csrf()
     anon.call('POST', '/api/auth/register', {'username': f'v5_{suffix}', 'displayName': 'Cliente v5',
-                                            'email': email, 'password': f'Clave{suffix}9'}, expect=201)
-    return Session().login(f'v5_{suffix}', f'Clave{suffix}9'), email
+                                            'email': email, 'password': 'faro lento nube cobre 2026'}, expect=201)
+    return Session().login(f'v5_{suffix}', 'faro lento nube cobre 2026'), email
 
 
 def place_order(customer, products=None):

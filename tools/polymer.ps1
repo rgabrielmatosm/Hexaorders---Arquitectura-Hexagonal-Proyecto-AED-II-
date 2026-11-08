@@ -28,7 +28,13 @@
       status       Estado de los contenedores.
       logs         Últimas 100 líneas de log de cada servicio.
       stop         Detiene los servicios conservando los datos (-RemoveData los elimina).
-      secrets      Solo genera secrets\db_password.txt, grafana_password.txt, demo_password.txt y rabbitmq_password.txt.
+      secrets      Solo crea en secrets\ las contraseñas que falten (aleatorias). Nunca sobrescribe.
+                   Con -Memorable (instalación NUEVA): elige por servicio una frase memorable generada,
+                   escribirla tú (oculta, dos veces) o aleatoria. Distinta para cada servicio.
+      change-password -Service db|grafana|rabbitmq
+                   Cambia una contraseña existente: pide confirmación, guarda la anterior en
+                   secrets\backup\, la cambia en el servicio, actualiza el archivo y comprueba que
+                   todo sigue funcionando (si falla, restaura la anterior). Nunca la muestra.
       repair-db-password
                    Si secrets\db_password.txt ya no coincide con la contraseña con la que se creó el
                    volumen de PostgreSQL (order-api no arranca: "password authentication failed"),
@@ -63,7 +69,7 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet('help', 'start', 'status', 'logs', 'stop', 'secrets', 'k8s-secrets', 'repair-db-password',
-                 'import-secrets', 'migrate', 'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup')]
+                 'import-secrets', 'migrate', 'change-password', 'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup')]
     [string]$Command = 'help',
 
     # v5: full = 13 contenedores (perfil "full" de Compose); basic = 6 contenedores esenciales.
@@ -87,8 +93,19 @@ param(
     # de la que copiar las contraseñas originales. Sin este parámetro se buscan junto al proyecto.
     [string]$SecretsFrom,
 
-    # Responde «sí» a las confirmaciones de importar secretos (uso no interactivo, por ejemplo el CI).
-    [switch]$AssumeYes
+    # Responde «sí» a las confirmaciones (uso no interactivo, por ejemplo el CI).
+    [switch]$AssumeYes,
+
+    # secrets: en una instalación NUEVA, permite elegir frases memorables (generadas o escritas por ti)
+    # en lugar de cadenas aleatorias. Nunca se aplica a servicios que ya tienen datos.
+    [switch]$Memorable,
+
+    # change-password: servicio cuya contraseña cambiar (db, grafana, rabbitmq o demo).
+    [ValidateSet('db', 'grafana', 'rabbitmq', 'demo')]
+    [string]$Service,
+
+    # change-password: archivo con la nueva contraseña (automatización). Sin él se pide de forma oculta.
+    [string]$NewPasswordFile
 )
 
 $ErrorActionPreference = 'Stop'
@@ -258,10 +275,11 @@ function Test-DbVolumeExists {
     return ($LASTEXITCODE -eq 0)
 }
 
-function Test-DatabasePassword {
+function Test-DatabasePassword([string]$Value) {
     Write-Step 'Comprobar que secrets\db_password.txt coincide con la contraseña guardada en el volumen de PostgreSQL'
     [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout", 'db'))
-    $code = Invoke-ComposeWithInput ((Get-DbSecretValue) + "`nSELECT 1;`n") @('exec', '-T', 'db', 'sh', '-c', $DbCheckScript)
+    if (-not $Value) { $Value = Get-DbSecretValue }
+    $code = Invoke-ComposeWithInput ($Value + "`nSELECT 1;`n") @('exec', '-T', 'db', 'sh', '-c', $DbCheckScript)
     return ($code -eq 0)
 }
 
@@ -463,6 +481,224 @@ function Invoke-VolumeMigration([switch]$Explicit) {
     Write-Host "Migración completada. Los volúmenes $($LegacyProject)_* se conservan intactos como copia de seguridad (registro: $log)." -ForegroundColor Green
 }
 
+# ---------------------------------------------------------------- credenciales locales
+
+# Servicios que REALMENTE usan credenciales (auditoría en docs/SECRETOS.md). Redis, Loki, Tempo,
+# OpenTelemetry y Alloy no tienen inicio de sesión y no publican puertos; Prometheus y Mailpit solo
+# escuchan en 127.0.0.1. No se les añaden contraseñas: romperían healthchecks y exportadores sin
+# aportar seguridad real frente al aislamiento de red actual.
+$CredentialFiles = [ordered]@{
+    db       = @{ File = 'db_password.txt';       Volume = 'postgres_data'; Label = 'PostgreSQL (usuario orders)' }
+    grafana  = @{ File = 'grafana_password.txt';  Volume = 'grafana_data';  Label = 'Grafana (usuario admin)' }
+    rabbitmq = @{ File = 'rabbitmq_password.txt'; Volume = 'rabbitmq_data'; Label = 'RabbitMQ (usuario hexaorders, heredado)' }
+    demo     = @{ File = 'demo_password.txt';     Volume = 'postgres_data'; Label = 'Cuentas de demostración de la tienda' }
+}
+# Caracteres seguros para todos los consumidores (rabbitmq.conf, variables, archivos): sin espacios,
+# comillas, barras invertidas ni $.
+$SecretPattern = '^[A-Za-z0-9._~!@#%^*+=:,-]{16,64}$'
+$MemorableWords = @('acero','agua','aire','alba','ancla','arena','arpa','astro','atlas','balsa','barco','bosque','brisa','bronce',
+    'cable','cactus','calma','campo','canal','cobre','cometa','coral','cosmos','cumbre','delta','duna','eco','eje','faro','fibra',
+    'flecha','foco','fuego','gema','globo','grano','granito','halcon','helio','hierro','hoja','horno','iman','isla','jade','jaguar',
+    'kayak','lago','lanza','laser','lienzo','lima','lince','lirio','lluvia','lobo','lucero','luna','madera','magma','malla','mango',
+    'mapa','marea','metal','mirlo','molino','monte','motor','muelle','nexo','niebla','nieve','nodo','norte','nube','oasis','ocaso',
+    'olivo','onda','orbita','oro','oso','palma','panal','pixel','planeta','plata','pluma','polen','prisma','puente','pulso','puma',
+    'quasar','radar','rayo','red','reloj','rio','roble','roca','rubi','ruta','salto','satelite','selva','senda','sierra','silicio',
+    'sol','sonar','surco','taller','tango','tejo','tigre','titan','torre','trigo','trueno','tunel','turbo','valle','vapor','vector',
+    'vela','viento','volcan','yunque','zafiro','zenit','zorro')
+
+function Get-RandomIndex([int]$Max) {
+    $bytes = New-Object byte[] 4
+    $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $generator.GetBytes($bytes) } finally { $generator.Dispose() }
+    return [int]([System.BitConverter]::ToUInt32($bytes, 0) % [uint32]$Max)
+}
+
+function New-MemorablePassphrase {
+    # Cinco palabras al azar (criptográfico) + número + símbolo: fácil de recordar, ~45 bits.
+    $words = 1..5 | ForEach-Object {
+        $word = $MemorableWords[(Get-RandomIndex $MemorableWords.Count)]
+        $word.Substring(0, 1).ToUpperInvariant() + $word.Substring(1)
+    }
+    $symbols = @('!', '#', '%', '+', '=', '@')
+    return ($words -join '-') + '-' + (10 + (Get-RandomIndex 90)) + $symbols[(Get-RandomIndex $symbols.Count)]
+}
+
+function ConvertFrom-Secure([System.Security.SecureString]$Secure) {
+    $pointer = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secure)
+    try { return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+    finally { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+}
+
+function Read-NewSecret([string]$Label) {
+    # Pide la contraseña dos veces sin mostrarla (o la lee de -NewPasswordFile). Nunca la imprime.
+    if ($NewPasswordFile) { return ([System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $NewPasswordFile))).TrimEnd([char[]]@([char]13, [char]10)) }
+    $first = ConvertFrom-Secure (Read-Host "Nueva contraseña para $Label" -AsSecureString)
+    $second = ConvertFrom-Secure (Read-Host 'Repítela' -AsSecureString)
+    if ($first -cne $second) { throw 'Las contraseñas no coinciden. No se cambió nada.' }
+    return $first
+}
+
+function Assert-ServiceSecret([string]$Value, [string]$Key) {
+    if ($Value -cnotmatch $SecretPattern) {
+        throw ('La contraseña debe tener entre 16 y 64 caracteres, sin espacios ni comillas: letras, números y . _ ~ ! @ # % ^ * + = : , -. ' +
+               'Una frase con guiones es ideal (por ejemplo, cinco palabras unidas por guiones).')
+    }
+    $dir = Join-Path $WorkDir 'secrets'
+    foreach ($other in $CredentialFiles.Keys) {
+        if ($other -eq $Key) { continue }
+        $path = Join-Path $dir $CredentialFiles[$other].File
+        if ((Test-Path -LiteralPath $path -PathType Leaf) -and ([System.IO.File]::ReadAllText($path).Trim() -ceq $Value)) {
+            throw "No reutilices la contraseña de otro servicio ($($CredentialFiles[$other].Label)). Usa una distinta para cada uno."
+        }
+    }
+}
+
+function Write-SecretFile([string]$Key, [string]$Value) {
+    $dir = Join-Path $WorkDir 'secrets'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    $path = Join-Path $dir $CredentialFiles[$Key].File
+    [System.IO.File]::WriteAllText($path, $Value, $utf8NoBom)
+    if (-not $OnWindows) { & chmod 644 $path }
+}
+
+function Invoke-Secrets {
+    if (-not $Memorable) { Initialize-WorkDir -SecretsOnly; return }
+    # Solo para lo que es realmente nuevo: archivo ausente y SIN datos persistentes del servicio.
+    Write-Step 'Contraseñas memorables para una instalación nueva'
+    $dockerAvailable = [bool](Get-Command docker -ErrorAction SilentlyContinue)
+    foreach ($key in $CredentialFiles.Keys) {
+        $item = $CredentialFiles[$key]
+        $path = Join-Path (Join-Path $WorkDir 'secrets') $item.File
+        if (Test-Path -LiteralPath $path -PathType Leaf) { Write-Host "  $($item.Label): ya existe; se conserva."; continue }
+        $hasData = $false
+        if ($dockerAvailable) {
+            $hasData = (Test-VolumeExists "polymer_$($item.Volume)") -or (Test-VolumeExists "$($LegacyProject)_$($item.Volume)")
+        }
+        if ($hasData) {
+            Write-Host "  $($item.Label): HAY DATOS y falta su contraseña. No se genera una nueva; usa import-secrets (docs/SECRETOS.md)." -ForegroundColor Yellow
+            continue
+        }
+        $choice = '1'
+        if (-not $AssumeYes) {
+            Write-Host ''
+            Write-Host "  $($item.Label):"
+            $choice = Read-Host '    [1] frase memorable generada  [2] escribirla yo  [Enter] aleatoria de 48 caracteres'
+        }
+        if ($choice -eq '1') { $value = New-MemorablePassphrase }
+        elseif ($choice -eq '2') { $value = Read-NewSecret $item.Label }
+        else { continue }  # init-env.ps1 la generará aleatoria
+        Assert-ServiceSecret $value $key
+        Write-SecretFile $key $value
+        Write-Host "    Guardada en secrets\$($item.File) (ábrela en VS Code para verla; nunca se muestra aquí)." -ForegroundColor Green
+    }
+    Initialize-WorkDir -SecretsOnly  # completa con aleatorias las que hayas dejado en blanco
+}
+
+function Get-SecretValue([string]$Key) {
+    $path = Join-Path (Join-Path $WorkDir 'secrets') $CredentialFiles[$Key].File
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "No existe secrets\$($CredentialFiles[$Key].File)." }
+    return ([System.IO.File]::ReadAllText($path)).TrimEnd([char[]]@([char]13, [char]10))
+}
+
+function Get-BasicAuthHeader([string]$User, [string]$Password) {
+    return @{ Authorization = 'Basic ' + [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("${User}:$Password")) }
+}
+
+function Test-ServiceRunning([string]$Name) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $id = (& docker compose -f $ComposeFile ps -q --status running $Name 2>$null | Out-String).Trim() } finally { $ErrorActionPreference = $previous }
+    return [bool]$id
+}
+
+function Restart-OrderApi {
+    Write-Step 'Reiniciar order-api para que use la nueva credencial y esperar a que esté sano'
+    [void](Invoke-Compose @('restart', 'order-api'))
+    [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout", 'order-api', 'frontend'))
+}
+
+function Set-GrafanaAdminPassword([string]$Current, [string]$Value) {
+    # API de Grafana (127.0.0.1:3000) autenticada con la contraseña actual: nada pasa por la línea de comandos.
+    $body = @{ oldPassword = $Current; newPassword = $Value; confirmNew = $Value } | ConvertTo-Json -Compress
+    [void](Invoke-RestMethod -UseBasicParsing -Method Put -Uri 'http://127.0.0.1:3000/api/user/password' `
+        -Headers (Get-BasicAuthHeader 'admin' $Current) -ContentType 'application/json' -Body $body -TimeoutSec 15)
+}
+
+function Test-GrafanaPassword([string]$Value) {
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:3000/api/user' -Headers (Get-BasicAuthHeader 'admin' $Value) -TimeoutSec 15
+        return ($response.StatusCode -eq 200)
+    } catch { return $false }
+}
+
+function Set-RabbitPassword([string]$Current, [string]$Value) {
+    # API de gestión (127.0.0.1:15672): la contraseña viaja en el cuerpo, nunca en la línea de comandos.
+    $user = 'hexaorders'   # usuario heredado guardado en el volumen de RabbitMQ (docs/MIGRACION_POLYMER.md)
+    $uri = "http://127.0.0.1:15672/api/users/$user"
+    $info = Invoke-RestMethod -UseBasicParsing -Uri $uri -Headers (Get-BasicAuthHeader $user $Current) -TimeoutSec 15
+    $tags = @($info.tags) -join ','
+    $body = @{ password = $Value; tags = $tags } | ConvertTo-Json -Compress
+    [void](Invoke-RestMethod -UseBasicParsing -Method Put -Uri $uri -Headers (Get-BasicAuthHeader $user $Current) -ContentType 'application/json' -Body $body -TimeoutSec 15)
+}
+
+function Test-RabbitPassword([string]$Value) {
+    try {
+        $who = Invoke-RestMethod -UseBasicParsing -Uri 'http://127.0.0.1:15672/api/whoami' -Headers (Get-BasicAuthHeader 'hexaorders' $Value) -TimeoutSec 15
+        return [bool]$who.name
+    } catch { return $false }
+}
+
+function Invoke-ChangePassword {
+    if (-not $Service) { throw 'Indica el servicio: .\polymer.cmd change-password -Service db|grafana|rabbitmq|demo' }
+    $item = $CredentialFiles[$Service]
+    if ($Service -eq 'demo') {
+        Write-Host ('demo_password.txt solo se usa la PRIMERA vez para crear las seis cuentas de demostración; cambiarlo no ' +
+                    'cambia las cuentas existentes. Cada cuenta cambia su contraseña desde «Mi cuenta → Perfil y seguridad», ' +
+                    'con la política de contraseñas de la tienda.') -ForegroundColor Yellow
+        return
+    }
+    Assert-Docker
+    $required = @{ db = 'db'; grafana = 'grafana'; rabbitmq = 'rabbitmq' }[$Service]
+    if (-not (Test-ServiceRunning $required)) { throw "El servicio $required no está en marcha. Arranca primero con: .\polymer.cmd start" }
+    $current = Get-SecretValue $Service
+    $value = Read-NewSecret $item.Label
+    Assert-ServiceSecret $value $Service
+    if ($value -ceq $current) { throw 'La nueva contraseña es igual a la actual. No se cambió nada.' }
+    Write-Host ''
+    Write-Host "Vas a cambiar la contraseña de $($item.Label)." -ForegroundColor Yellow
+    Write-Host 'Se guardará una copia de la credencial actual en secrets\backup\ y los datos NO se tocan.'
+    if (-not (Confirm-Action '¿Continuar?')) { Write-Host 'Cancelado: no se cambió nada.'; return }
+
+    $backupDir = Join-Path (Join-Path $WorkDir 'secrets') 'backup'
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+    $backup = Join-Path $backupDir ("$($item.File).$(Get-Date -Format 'yyyyMMdd-HHmmss').bak")
+    Copy-Item -LiteralPath (Join-Path (Join-Path $WorkDir 'secrets') $item.File) -Destination $backup
+    Write-Host "Copia de la credencial actual: $backup"
+
+    Write-Step "Cambiar la contraseña de $($item.Label)"
+    switch ($Service) {
+        'db' {
+            Set-DatabasePassword $value
+            if (-not (Test-DatabasePassword $value)) { Set-DatabasePassword $current; throw 'PostgreSQL no aceptó la nueva contraseña; se restauró la anterior.' }
+            Write-SecretFile $Service $value
+            try { Restart-OrderApi } catch { Set-DatabasePassword $current; Write-SecretFile $Service $current; Restart-OrderApi; throw "order-api no arrancó con la nueva contraseña; se restauró la anterior. $($_.Exception.Message)" }
+        }
+        'grafana' {
+            Set-GrafanaAdminPassword $current $value
+            if (-not (Test-GrafanaPassword $value)) { throw 'Grafana no confirmó la nueva contraseña; la anterior sigue en secrets\backup\ por si la necesitas.' }
+            Write-SecretFile $Service $value
+        }
+        'rabbitmq' {
+            Set-RabbitPassword $current $value
+            if (-not (Test-RabbitPassword $value)) { Set-RabbitPassword $value $current; throw 'RabbitMQ no aceptó la nueva contraseña; se restauró la anterior.' }
+            Write-SecretFile $Service $value
+            try { Restart-OrderApi } catch { Set-RabbitPassword $value $current; Write-SecretFile $Service $current; Restart-OrderApi; throw "order-api no arrancó con la nueva contraseña; se restauró la anterior. $($_.Exception.Message)" }
+        }
+    }
+    Write-Host "Contraseña de $($item.Label) cambiada y comprobada. secrets\$($item.File) actualizado (no se muestra)." -ForegroundColor Green
+}
+
 # ---------------------------------------------------------------- comandos
 
 function Invoke-Help { Get-Help $PSCommandPath -Detailed }
@@ -549,7 +785,6 @@ function Invoke-Stop {
     }
 }
 
-function Invoke-Secrets { Initialize-WorkDir -SecretsOnly }
 
 function Invoke-K8sSecrets {
     if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) { throw 'No se encontró kubectl.' }
@@ -729,6 +964,7 @@ try {
         'secrets'     { Invoke-Secrets }
         'repair-db-password' { Invoke-RepairDbPassword }
         'import-secrets' { Assert-Docker; Import-LegacySecrets -Explicit }
+        'change-password' { Invoke-ChangePassword }
         'migrate'     { Assert-Docker; Import-LegacySecrets; Assert-DatabaseSecretMatchesVolume; Initialize-WorkDir; Invoke-VolumeMigration -Explicit }
         'k8s-secrets' { Invoke-K8sSecrets }
         'check'       { Invoke-Check; Write-Host 'Comprobaciones correctas.' -ForegroundColor Green }

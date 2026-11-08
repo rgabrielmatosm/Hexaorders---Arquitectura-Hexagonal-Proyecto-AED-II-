@@ -41,13 +41,5 @@ public record UserAccount(long id, String username, String displayName, String e
         }
     }
 
-    /** Password policy: 8..72 characters (72 bytes is the BCrypt input limit). */
-    public static void validatePassword(String password) {
-        if (password == null || password.length() < 8 || password.length() > 72) {
-            throw new IllegalArgumentException("password: entre 8 y 72 caracteres");
-        }
-        if (password.chars().noneMatch(Character::isLetter) || password.chars().noneMatch(Character::isDigit)) {
-            throw new IllegalArgumentException("password: debe contener letras y dígitos");
-        }
-    }
+    // La política de contraseñas está en PasswordPolicy (longitud, contraseñas comunes, datos personales).
 }

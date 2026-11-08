@@ -101,9 +101,7 @@ class LifecycleDomainTest {
 
     @Test
     void passwordPolicyAndUsernameRules() {
-        UserAccount.validatePassword("segura2026");
-        assertThatThrownBy(() -> UserAccount.validatePassword("corta1")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> UserAccount.validatePassword("soloLetrasLargas")).isInstanceOf(IllegalArgumentException.class);
+        // Política de contraseñas: PasswordPolicyTest.
         assertThatThrownBy(() -> UserAccount.validateUsername("a b")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> UserAccount.validateEmail("sin-arroba")).isInstanceOf(IllegalArgumentException.class);
     }

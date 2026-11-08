@@ -1,6 +1,7 @@
 // Componentes reutilizables de la plataforma (sin frameworks). Texto dinámico siempre con textContent.
 
 import { ApiError } from './api.js';
+import { PROBLEM_TEXT } from './password-strength.js';
 import { el, formatMoney, toast } from './ui.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -193,6 +194,10 @@ export const skeletons = (count, className) => Array.from({ length: count }, () 
 export function errorMessage(error) {
   if (error instanceof ApiError) {
     if (error.status === 0) return 'Sin conexión con el servidor.';
+    // Contraseña rechazada por la política del servidor: motivo en el idioma de la interfaz.
+    if (error.body && error.body.code === 'WEAK_PASSWORD' && Array.isArray(error.body.problems)) {
+      return error.body.problems.map((code) => (PROBLEM_TEXT[code] ? PROBLEM_TEXT[code]() : code)).join(' ');
+    }
     return `${error.title ? `${error.title}: ` : ''}${error.message}`;
   }
   return error && error.message ? error.message : String(error);

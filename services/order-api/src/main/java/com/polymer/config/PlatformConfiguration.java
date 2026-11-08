@@ -9,6 +9,7 @@ import com.polymer.adapter.out.persistence.JdbcDeliveryRepository;
 import com.polymer.adapter.out.persistence.JdbcIncidentRepository;
 import com.polymer.adapter.out.persistence.JdbcUserRepository;
 import com.polymer.adapter.out.security.BcryptPasswordHasher;
+import com.polymer.adapter.out.security.ClasspathPasswordBlocklist;
 import com.polymer.application.port.in.AccountUseCases;
 import com.polymer.application.port.in.AdministrationUseCases;
 import com.polymer.application.port.in.CatalogUseCases;
@@ -22,6 +23,7 @@ import com.polymer.application.port.out.CommerceOrderRepository;
 import com.polymer.application.port.out.DeliveryRepository;
 import com.polymer.application.port.out.IncidentRepository;
 import com.polymer.application.port.out.OrderTelemetry;
+import com.polymer.application.port.out.PasswordBlocklist;
 import com.polymer.application.port.out.PasswordHasher;
 import com.polymer.application.port.out.RiskAssessmentPort;
 import com.polymer.application.port.out.SystemHealthPort;
@@ -162,7 +164,10 @@ public class PlatformConfiguration {
         return new com.polymer.application.service.MonitoringService(monitoring, clock);
     }
 
-    @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit) { return new AccountService(users, hasher, audit); }
+    @Bean PasswordBlocklist passwordBlocklist() { return new ClasspathPasswordBlocklist(); }
+    @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist) {
+        return new AccountService(users, hasher, audit, blocklist);
+    }
 
     /** Creates the demo accounts once, from the demo_password secret; never modifies existing users. */
     @Bean
