@@ -2,6 +2,24 @@
 
 Este registro separa lo **ejecutado y observado** de lo **pendiente de verificación**. Un resultado esperado nunca se presenta como observado. Los registros de versiones anteriores están en [`historial/validacion-hexaorders-v1-v6.md`](historial/validacion-hexaorders-v1-v6.md).
 
+## Multilingüe y seguridad de contraseñas (8 de noviembre de 2026)
+
+### Pruebas locales
+
+Contenedor Linux **sin Docker**: PostgreSQL 16 con la base que ya tenía datos de la v6 y de POLYMER (la migración V10 solo crea la tabla `user_preferences`), motor de riesgo con uvicorn y `order-api.jar`.
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Java (`mvn package`) | **122 pruebas**, cero fallos: `PasswordPolicyTest` (5), `LocalizedPagesTest` (6: idioma pedido con canonical y hreflang, español por defecto, login localizado con `next`, 403 localizado, 404, sitemap), notificaciones por idioma y ArchUnit |
+| `check_i18n.py` | `OK i18n: 2471 textos traducidos en 5 idiomas (+ español), marcadores coherentes` |
+| `i18n-e2e.js` | `OK i18n e2e: 77 comprobaciones`: 6 idiomas con acceso directo y recarga, hreflang/canonical, sitemap, 404 localizado, selector del pie y de la cabecera (página, filtros y carrito conservados, sin repetir la intro), visitante en `/it/cassa` → `/it/accedi?next=…`, cliente en `/en/admin` → 403, **pedido real desde el checkout en inglés** y seguimiento tras recargar, idioma guardado en la cuenta, indicador de contraseña (débil, común, aceptable, fuerte), mostrar/ocultar, confirmación, **3 contraseñas débiles rechazadas por el servidor** (`COMMON`, `TOO_SHORT`, `REPETITIVE`), registro con frase fuerte y móvil sin desplazamiento horizontal |
+| `pages-e2e.js` / `ui-e2e.js` / `intro-e2e.js` | 284 / 25 / 41 comprobaciones correctas (`SKIP_PROMETHEUS=1`). `pages-e2e` detectó un fallo real del campo «Contraseña actual» del perfil (fase anterior), ya corregido |
+| `store_smoke.py` / `platform_smoke.py` | `OK tienda: 38 comprobaciones` / `OK plataforma: 38 comprobaciones`. `store_smoke` usaba una contraseña que contenía el usuario: la política nueva la rechaza, y se cambió la del test |
+| `generate_pages.py --check`, `check_frontend.py`, `generate_brand.py --check`, `generate_catalog.py --check`, `generate_delivery.py`, `validate_delivery.py`, `check_observability.py` | Correctos |
+| Contraseñas existentes | Ninguna se cambió. Las cuentas de demostración siguen entrando con su contraseña y su hash anterior |
+
+**No verificado aquí:** Docker Desktop en Windows, los 13 contenedores y `change-password` contra servicios reales. Se ejecutan en el CI (sección siguiente cuando termine).
+
 ## Identidad técnica POLYMER y migración segura (8 de noviembre de 2026)
 
 ### Comparación con la versión anterior (sin inventar resultados)

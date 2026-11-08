@@ -33,6 +33,8 @@ Tienda de tecnología y plataforma de gestión de pedidos con **arquitectura hex
 13. [Pruebas](#13-pruebas)
 14. [Observabilidad](#14-observabilidad)
 15. [Solución de errores frecuentes](#15-solución-de-errores-frecuentes)
+16. [Idiomas](#16-idiomas)
+17. [Seguridad de contraseñas](#17-seguridad-de-contraseñas)
 
 Anexos: [API](#anexo-a-api) · [Documentación técnica](#anexo-b-documentación-técnica) · [Historial y migración](#anexo-c-historial-y-migración)
 
@@ -84,6 +86,8 @@ El proyecto está construido para demostrar en una sustentación universitaria q
 | **Monitoreo** | Salud de dependencias; targets, alertas e indicadores leídos de Prometheus; enlaces a Grafana; documentación técnica interna |
 | **Integraciones** | Caché del catálogo en Redis, eventos de negocio en RabbitMQ (outbox, DLQ, consumidor idempotente), correos en Mailpit, trazas OTLP a Tempo y logs a Loki |
 | **Seguridad** | Sesión con CSRF, BCrypt, permisos por rol en las páginas y en la API, secretos como archivos de solo lectura, contenedores `read_only`, PostgreSQL, Redis y AMQP no publicados en el equipo |
+| **Idiomas** | Español (por defecto), inglés, francés, italiano, portugués y alemán, con rutas reales (`/es/productos`, `/en/products`, `/fr/produits`…), selector en el pie y en la cabecera, SEO multilingüe y correos en el idioma del cliente ([sección 16](#16-idiomas)) |
+| **Contraseñas** | Mínimo 12 caracteres, frases de contraseña admitidas, indicador débil/aceptable/fuerte, mostrar/ocultar, detección de contraseñas comunes y validación en el servidor ([sección 17](#17-seguridad-de-contraseñas)) |
 
 <p align="center"><img src="docs/assets/screenshots/polymer-confirmacion.png" alt="Confirmación de pedido" width="640"></p>
 
@@ -239,7 +243,25 @@ Las contraseñas son **archivos** en `secrets\`. Esa carpeta está excluida de G
 - **Primera instalación:** `start` genera valores aleatorios de 48 caracteres. Para crearlos sin arrancar: `.\polymer.cmd secrets`.
 - **Nunca se sobrescribe** un archivo existente, porque PostgreSQL, Grafana y RabbitMQ guardan la contraseña al inicializar sus volúmenes.
 - **Si hay datos pero falta la contraseña**, `start` se detiene antes de tocar nada y explica cómo recuperarla. Busca automáticamente la carpeta `secrets\` de una instalación anterior, o puedes indicarla con `.\polymer.cmd import-secrets -SecretsFrom "C:\ruta"`.
-- **Para ver una contraseña**, abre el archivo con el Bloc de notas. No la publiques ni la subas a Git.
+- **Para ver una contraseña**, abre el archivo con el Bloc de notas o con VS Code (`code .` y luego la carpeta `secrets\`). No la publiques ni la subas a Git.
+- **Instalación nueva con contraseñas que puedas recordar:** antes del primer `start`, ejecuta `.\polymer.cmd secrets -Memorable`. Para cada servicio ofrece una frase generada al azar (cinco palabras, un número y un símbolo), escribir la tuya o dejar la aleatoria. Exige una contraseña **distinta para cada servicio** y **nunca la muestra en pantalla**. Solo actúa sobre servicios sin datos.
+- **Plantillas sin credenciales reales:** [`secrets.example/`](secrets.example/).
+- **Qué servicios usan contraseña:** PostgreSQL, Grafana, RabbitMQ y las cuentas de la tienda. Redis, Prometheus, Mailpit, Loki, Tempo, el Collector y Alloy no tienen inicio de sesión y solo escuchan en `127.0.0.1` o en redes internas de Docker. Auditoría completa en [`docs/SECRETOS.md`](docs/SECRETOS.md#1-auditoría-qué-servicios-usan-credenciales).
+
+**Cambiar una contraseña de forma segura** (con POLYMER en marcha):
+
+```powershell
+.\polymer.cmd change-password -Service db
+```
+
+Usa `-Service grafana` o `-Service rabbitmq` para los otros servicios. El comando:
+
+1. pide la nueva contraseña dos veces, oculta, y pide confirmación;
+2. guarda una copia de la actual en `secrets\backup\`;
+3. la cambia en el servicio, comprueba que funciona y solo entonces actualiza el archivo;
+4. si algo falla, restaura la anterior.
+
+Editar el archivo a mano **no** cambia la contraseña del servicio. Detalle en [`docs/SECRETOS.md`](docs/SECRETOS.md#5-cambiar-una-contraseña-existente).
 
 ## 10. Ejecución
 
@@ -263,6 +285,14 @@ Arranca la **plataforma completa con los 13 contenedores**: genera o recupera lo
 | `.\polymer.cmd repair-db-password` | Alinea la contraseña de PostgreSQL con `db_password.txt`, sin borrar datos y con confirmación |
 | `.\polymer.cmd help` | Ayuda completa |
 
+**Verificar los 13 contenedores:**
+
+```powershell
+.\polymer.cmd status
+```
+
+Deben aparecer los 13 servicios (`db`, `risk-engine`, `order-api`, `frontend`, `prometheus`, `grafana`, `redis`, `rabbitmq`, `mailpit`, `otel-collector`, `tempo`, `loki` y `alloy`) con el estado **Up (healthy)**. `start` ya espera a que todos estén sanos y termina con error si alguno no lo consigue; en ese caso, `.\polymer.cmd logs` muestra la causa.
+
 `.\polymer.cmd stop -RemoveData` **borra** los datos de POLYMER. Úsalo solo si quieres empezar de cero; nunca toca los volúmenes `hexaorders_*`.
 
 En Linux o macOS: `pwsh ./tools/polymer.ps1 start`.
@@ -272,6 +302,7 @@ En Linux o macOS: `pwsh ./tools/polymer.ps1 start`.
 | URL | Qué hay |
 | --- | --- |
 | http://localhost:8080 | Tienda POLYMER (la intro aparece una vez por sesión; «Ver la intro» en el pie la repite) |
+| http://localhost:8080/en/ · `/fr/` · `/it/` · `/pt/` · `/de/` | La tienda en inglés, francés, italiano, portugués o alemán (`/es/` en español) |
 | http://localhost:8080/login.html | Inicio de sesión: cuentas de la sección 12, contraseña en `secrets\demo_password.txt` |
 | http://localhost:3000 | Grafana: usuario `admin`, contraseña en `secrets\grafana_password.txt` |
 | http://localhost:9091 | Prometheus: targets y alertas |
@@ -297,12 +328,12 @@ Los permisos se comprueban en el servidor, en Spring Security y en el dominio. O
 
 | Tipo | Herramienta | Qué comprueba |
 | --- | --- | --- |
-| Dominio y casos de uso | JUnit 5 + Mockito (110 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones, seguridad |
+| Dominio y casos de uso | JUnit 5 + Mockito (122 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
 | **Arquitectura** | ArchUnit (`HexagonalArchitectureTest`) y `test_architecture.py` | El núcleo no depende de frameworks; los adaptadores de entrada solo usan puertos de entrada |
 | Motor de riesgo | pytest (62 pruebas) | Reglas, decimales exactos, validación y métricas |
 | API real | `smoke.py`, `platform_smoke.py`, `store_smoke.py`, `integration_smoke.py` | Pedidos, roles, tienda, carrito, checkout, Redis, RabbitMQ, Mailpit, Loki, Tempo y Grafana |
-| Interfaz | Playwright: `ui-e2e.js`, `pages-e2e.js` (las 45 páginas con los 6 tipos de usuario) e `intro-e2e.js` (intro, animaciones, sonido opcional, movimiento reducido, móvil y pie) | Navegador real contra el stack real |
-| Entregable | `check` | YAML generado al día, Kubernetes, observabilidad conservada, páginas, marca y catálogo |
+| Interfaz | Playwright: `ui-e2e.js`, `pages-e2e.js` (las 45 páginas con los 6 tipos de usuario), `intro-e2e.js` (intro, animaciones, sonido opcional, movimiento reducido, móvil y pie) e `i18n-e2e.js` (seis idiomas, SEO, selector, carrito y checkout en inglés, contraseñas y móvil) | Navegador real contra el stack real |
+| Entregable | `check` | YAML generado al día, Kubernetes, observabilidad conservada, páginas, marca, catálogo y traducciones completas (`check_i18n.py`) |
 | Integral | `verify` | Los 13 contenedores sanos, todas las pruebas de humo, degradación sin Redis o RabbitMQ, persistencia tras reiniciar y HTTP 503 sin el motor de riesgo |
 | **Migración** | Job del CI `migrate-from-v6` | Parte de HexaOrders v6 con datos y pasa a POLYMER desde otra carpeta sin `secrets\`: contraseñas recuperadas, volúmenes verificados, 13 contenedores y datos intactos |
 
@@ -340,8 +371,82 @@ Más detalle en [`docs/OBSERVABILITY_STACK.md`](docs/OBSERVABILITY_STACK.md) y [
 | No se ve la intro | Ya se vio en esta sesión, o Windows tiene desactivados los *Efectos de animación* | Usa «Ver la intro» en el pie o http://localhost:8080/?intro=1. Con movimiento reducido se omite a propósito |
 | No se oye la bienvenida | El sonido es opcional y está apagado por defecto | Pulsa «Entrar con sonido» o el botón de altavoz de la cabecera |
 | Cambios que no se ven | Caché del navegador | `Ctrl + F5` |
+| «Página no encontrada» al escribir una dirección en otro idioma | Cada idioma tiene sus propias rutas (`/en/products`, no `/en/productos`) | Usa el selector de idioma del pie o de la cabecera: lleva a la página equivalente. Lista de rutas en `static/i18n/routes.json` |
+| Un texto aparece en español en otro idioma | Es un dato registrado que no se traduce (nombre o modelo de un producto, texto escrito por el administrador), o falta en el catálogo de traducciones | Los nombres propios se conservan a propósito. Para textos de la interfaz, `python tools/check_i18n.py --missing en` lista lo que falta |
+| «La contraseña no es segura» al registrarse | La política del servidor la rechaza: menos de 12 caracteres, contraseña conocida, contiene tu usuario, nombre o correo, o es repetitiva | Usa una frase larga, por ejemplo cuatro o cinco palabras sin relación entre sí. El indicador muestra el motivo exacto |
+| `change-password` termina con error | El servicio no estaba en marcha, o la contraseña no cumple las reglas | Arranca con `start` y repite. Si falló a mitad, el comando ya restauró la contraseña anterior; la copia está en `secrets\backup\` |
 
 Diagnóstico: `.\polymer.cmd status` y `.\polymer.cmd logs`. Más casos en [`docs/WINDOWS_DOCKER_GUIDE.md`](docs/WINDOWS_DOCKER_GUIDE.md#8-problemas-frecuentes).
+
+## 16. Idiomas
+
+| Idioma | Código | Ejemplo de ruta |
+| --- | --- | --- |
+| Español (por defecto) | `es` | http://localhost:8080/es/productos |
+| English | `en` | http://localhost:8080/en/products |
+| Français | `fr` | http://localhost:8080/fr/produits |
+| Italiano | `it` | http://localhost:8080/it/prodotti |
+| Português | `pt` | http://localhost:8080/pt/produtos |
+| Deutsch | `de` | http://localhost:8080/de/produkte |
+
+**Cambiar de idioma.** Usa el menú de idiomas del pie (con el nombre de cada idioma) o el selector compacto de la cabecera (`ES`, `EN`…). El cambio:
+
+- lleva a la **misma página** en el otro idioma y conserva los filtros y la búsqueda (`?marca=Lenovo`);
+- conserva el **carrito**, la **sesión** y los **permisos**;
+- **no repite la intro**;
+- con sesión iniciada, guarda el idioma en tu cuenta para que los **correos** de tus pedidos lleguen en ese idioma.
+
+**Estructura de rutas.** Cada página tiene una ruta real por idioma, que funciona al escribirla, al recargar y al navegar:
+
+| Página | es | en | fr | it | pt | de |
+| --- | --- | --- | --- | --- | --- | --- |
+| Inicio | `/es/` | `/en/` | `/fr/` | `/it/` | `/pt/` | `/de/` |
+| Catálogo | `/es/productos` | `/en/products` | `/fr/produits` | `/it/prodotti` | `/pt/produtos` | `/de/produkte` |
+| Carrito | `/es/carrito` | `/en/cart` | `/fr/panier` | `/it/carrello` | `/pt/carrinho` | `/de/warenkorb` |
+| Checkout | `/es/checkout` | `/en/checkout` | `/fr/paiement` | `/it/cassa` | `/pt/finalizar-compra` | `/de/kasse` |
+| Iniciar sesión | `/es/iniciar-sesion` | `/en/login` | `/fr/connexion` | `/it/accedi` | `/pt/entrar` | `/de/anmelden` |
+
+Las 45 páginas están en [`static/i18n/routes.json`](services/order-api/src/main/resources/static/i18n/routes.json). Las URL anteriores (`/catalogo.html`…) siguen funcionando en español.
+
+- **Permisos:** una página protegida lleva al inicio de sesión **en el mismo idioma**; la de otro rol responde 403 traducido.
+- **SEO:** `<html lang>`, título y descripción traducidos, `canonical`, `hreflang` de los seis idiomas más `x-default`, [`/sitemap.xml`](http://localhost:8080/sitemap.xml) multilingüe y `robots.txt`. Las páginas internas llevan `noindex`.
+- **Qué no se traduce:** marcas, modelos, SKU, nombres propios, identificadores técnicos y los textos que escribe el administrador. Importes, reglas de negocio y validaciones son los mismos en todos los idiomas. Traducir la tienda **no** significa que haya envíos internacionales: POLYMER envía solo dentro del Perú.
+
+**Gestión de traducciones.**
+
+- **Un archivo por idioma:** [`static/i18n/en.json`, `fr.json`, `it.json`, `pt.json` y `de.json`](services/order-api/src/main/resources/static/i18n/). La clave es el texto en español y el valor, su traducción. El español no necesita archivo.
+- **En el código:** los textos se escriben en español con `t('Texto con {0}', valor)`. Los datos del catálogo se traducen con `td()`; los valores con cifras usan plantillas (`"Hasta {0} h": "Up to {0} h"`).
+- **Sin traducción automática en tiempo real.** Si falta una traducción, se muestra el texto en español.
+- **Comprobación:**
+
+  ```powershell
+  python tools/check_i18n.py
+  ```
+
+  Reúne todos los textos (interfaz, páginas, catálogo y mensajes del servidor) y falla si a un idioma le falta alguno o si no coinciden los marcadores `{0}`. Para ver qué falta en un idioma: `python tools/check_i18n.py --missing fr`. Lo ejecutan `.\polymer.cmd check` y el CI.
+
+**Agregar un idioma** (por ejemplo, japonés `ja`):
+
+1. Añádelo a `LANGUAGES` en [`static/js/i18n.js`](services/order-api/src/main/resources/static/js/i18n.js) (código, nombre y locale), en `LANGUAGES` y en la tabla `SLUGS` de [`tools/generate_pages.py`](tools/generate_pages.py) (una ruta por página), en `LANGS` y `OG_LOCALES` de `LocalizedPagesController`, en el enum `Language` y en la restricción de `user_preferences` (con una migración Flyway nueva), y en `NotificationTexts` (correos).
+2. Ejecuta `python tools/generate_pages.py` para regenerar `routes.json`.
+3. Crea `static/i18n/ja.json` y complétalo hasta que `python tools/check_i18n.py` (con `ja` añadido a su lista `LANGUAGES`) termine en OK.
+
+## 17. Seguridad de contraseñas
+
+Al registrarse y al cambiar la contraseña:
+
+| Requisito | Detalle |
+| --- | --- |
+| Longitud | **Mínimo 12 caracteres** (máximo 64) |
+| Frases de contraseña | Permitidas, con espacios: «ancla verde cobre lluvia» es mejor que «P@ssw0rd!» |
+| Indicador | **Débil** (no se acepta), **aceptable** o **fuerte**, con el motivo, mientras escribes |
+| Mostrar u ocultar | Botón «Mostrar» en cada campo |
+| Contraseñas comunes | Se detectan con una lista local, incluidas variantes como «Password2026!» |
+| Datos personales | No puede contener tu usuario, nombre ni correo |
+| Confirmación | Hay que escribirla dos veces; se avisa si no coinciden |
+| Servidor | **Todas las reglas se validan en el servidor** (`PasswordPolicy`, en el dominio): saltarse la interfaz no sirve. Respuesta `400` con `code: WEAK_PASSWORD` y el motivo |
+
+**Las cuentas existentes no cambian:** conservan su contraseña y su hash BCrypt. La política solo se aplica a contraseñas nuevas. Detalle técnico en [`docs/SECRETOS.md`](docs/SECRETOS.md#6-contraseñas-de-los-clientes-de-la-tienda).
 
 ---
 
