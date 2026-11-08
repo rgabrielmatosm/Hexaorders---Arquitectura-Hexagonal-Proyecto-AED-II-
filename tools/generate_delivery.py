@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import gzip
 import hashlib
 import json
 import shlex
@@ -51,6 +53,18 @@ INLINE_MARKERS = {
 }
 
 
+# BuildKit recibe el Dockerfile en un solo mensaje gRPC (máximo 4 MiB, y el contenido viaja más de una
+# vez): los archivos de texto grandes (catálogos de traducción, catálogo SQL) se incrustan comprimidos
+# con gzip + base64 y una instrucción RUN los restaura byte a byte antes de compilar.
+LARGE_FILE = 64 * 1024
+
+
+def packed(content: str) -> str:
+    data = gzip.compress(content.encode('utf-8'), compresslevel=9, mtime=0)
+    encoded = base64.b64encode(data).decode('ascii')
+    return '\n'.join(encoded[i:i + 76] for i in range(0, len(encoded), 76))
+
+
 def inline_dockerfile(service: str) -> str:
     context = ROOT / BUILD_CONTEXTS[service]
     result: list[str] = []
@@ -87,17 +101,25 @@ def inline_dockerfile(service: str) -> str:
             directory = str(Path(destination) / relative.parent).replace('\\', '/')
             groups.setdefault(directory, []).append(file)
         for directory, members in groups.items():
-            heredocs, bodies = [], []
+            heredocs, bodies, unpack = [], [], []
             for file in members:
                 if not all(ch.isalnum() or ch in '._-' for ch in file.name):
                     raise ValueError(f'Nombre de archivo no soportado en heredoc: {file}')
                 content = read_text(file).rstrip('\n')
-                if file.name in content.split('\n'):
+                name = file.name
+                if len(content.encode('utf-8')) > LARGE_FILE:
+                    # El heredoc termina en salto de línea: se comprime el contenido con él para restaurarlo igual.
+                    content, name = packed(content + '\n'), f'{file.name}.gz.b64'
+                    unpack.append(f'base64 -d {name} | gunzip > {file.name} && rm {name}')
+                if name in content.split('\n'):
                     raise ValueError(f'Colisión de heredoc en {file}')
-                heredocs.append(f"<<'{file.name}'")
-                bodies.extend([content, file.name])
-            result.append(f"COPY {' '.join(heredocs)} {directory.rstrip('/')}/")
+                heredocs.append(f"<<'{name}'")
+                bodies.extend([content, name])
+            target_dir = directory.rstrip('/')
+            result.append(f"COPY {' '.join(heredocs)} {target_dir}/")
             result.extend(bodies)
+            if unpack:
+                result.append(f"RUN cd {target_dir} && " + ' && '.join(unpack))
             index += 1
     return '\n'.join(result) + '\n'
 
