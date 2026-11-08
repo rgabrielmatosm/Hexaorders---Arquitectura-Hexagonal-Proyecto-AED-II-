@@ -33,7 +33,38 @@ En local se usó `SKIP_PROMETHEUS=1` porque no hay Prometheus: Prometheus, Grafa
 
 ### CI con Docker real
 
-*(Se completa con la ejecución de GitHub Actions de este cambio.)*
+Ejecución **42506314312** de GitHub Actions (commit `3d55156`): los **4 jobs en verde**.
+
+| Job | Resultado observado |
+| --- | --- |
+| `compose`: `polymer.ps1 verify -Mode full` con **13 contenedores** | Los 10 pasos: build con pruebas de Java y Python, promtool y validación del collector, 13 servicios sanos, `smoke`, plataforma (36), tienda (38), integraciones reales (45: Redis, RabbitMQ, Mailpit, Tempo, OpenTelemetry, Loki y Grafana), degradación sin Redis o RabbitMQ y recuperación, persistencia tras reiniciar PostgreSQL y order-api, y HTTP 503 sin el motor de riesgo. Después, `ui-e2e.js` (28), `pages-e2e.js` (285) e `intro-e2e.js` (41) contra el stack completo |
+| `compose-basic` (6 contenedores) | Correcto |
+| `windows` (PowerShell 5.1: análisis de los scripts, `polymer.cmd help`, secretos, `check` y pruebas unitarias) | Correcto |
+| **`migrate-from-v6`** (tu caso real) | Ver la tabla siguiente |
+
+Detalle del job `migrate-from-v6`. Partió de HexaOrders v6 (commit `6cc87c0`) en marcha con **13 contenedores**, contraseñas aleatorias y un pedido y un mensaje creados. Después ejecutó POLYMER desde otra carpeta **sin `secrets\`**.
+
+| Comprobación | Resultado observado |
+| --- | --- |
+| Recuperación de las contraseñas | Encontró `Descargas/HexaOrders-v6/secrets`, pidió confirmación y copió los 4 archivos sin mostrarlos; son idénticos byte a byte a los originales |
+| Stack anterior | «Detener (sin borrar) los 13 contenedores del proyecto anterior» |
+| Migración de los 8 volúmenes, con SHA-256 archivo por archivo | `postgres_data` 1368 archivos (48M) · `grafana_data` 547 (50M) · `rabbitmq_data` 38 · `loki_data` 5 · `tempo_data` 4 · `prometheus_data` 2 · `alloy_data` 2 · `redis_data` 1. Todos verificados |
+| Volúmenes originales | Los 8 `hexaorders_*` siguen existiendo |
+| Contenedores POLYMER | **13 en marcha**, ninguno *unhealthy* |
+| Datos (pedidos/usuarios/productos/mensajes) | Antes `1/6/557/1` · después `1/6/557/1`. El pedido de la v6 se lee por la API con el mismo cliente e importe, y el mensaje de contacto sigue ahí |
+| Flyway | Versión 9 aplicada; `admin` pasa a «Administración Polymer»; hay productos de la marca `Polymer` |
+| Pruebas sobre los datos migrados | `platform_smoke` (35) y `store_smoke` (38) con la contraseña original de las cuentas |
+| Segunda ejecución de `migrate` | «No hay volúmenes pendientes de migrar» (idempotente) |
+
+### Prueba local de la mecánica de migración con Docker real
+
+Docker funciona en este entorno, pero las construcciones no tienen salida a Internet (Maven y pip), así que el stack completo se probó en el CI. En local se probó el mismo script de copia que usa `polymer.ps1`, con PostgreSQL 17 real y `--auth-host=scram-sha-256` como en el proyecto:
+
+- copia de 1275 archivos (46M) verificada;
+- 300 y 500 pedidos idénticos tras la copia;
+- la **contraseña original** abre la base migrada y **una contraseña nueva se rechaza** («password authentication failed»), el error que se veía al no recuperar `secrets\`;
+- si el destino no coincide con el origen, la verificación **falla con código 1**;
+- el volumen original queda intacto.
 
 ### Pendiente de verificación
 
