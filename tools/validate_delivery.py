@@ -6,7 +6,7 @@ from pathlib import Path
 import jsonschema
 import yaml
 
-from generate_delivery import BUILD_CONTEXTS, ROOT, compose, inline_dockerfile, monitoring_configmap
+from generate_delivery import BUILD_CONTEXTS, ROOT, canonical, compose, inline_dockerfile, monitoring_configmap
 
 
 def validate(schema, document, name, draft=None):
@@ -21,12 +21,13 @@ parser.add_argument('--compose-schema', type=Path)
 parser.add_argument('--kubernetes-schema', type=Path)
 args = parser.parse_args()
 raw = (ROOT / 'docker-compose.yml').read_text(encoding='utf-8')
-assert raw == compose(), 'Compose desactualizado'
+# Comparación canónica: los bloques gzip + base64 cambian de bytes según la versión de zlib.
+assert canonical(raw) == canonical(compose()), 'Compose desactualizado'
 document = yaml.safe_load(raw)
 assert (ROOT / 'k8s/10-monitoring-config.yaml').read_text(encoding='utf-8') == monitoring_configmap()
 for service in BUILD_CONTEXTS:
     actual = document['services'][service]['build']['dockerfile_inline'].replace('$$', '$')
-    assert actual == inline_dockerfile(service), f'Fuentes inline alterados: {service}'
+    assert canonical(actual) == canonical(inline_dockerfile(service)), f'Fuentes inline alterados: {service}'
     for line in actual.splitlines():
         assert not (line.startswith('COPY ') and not line.startswith(('COPY <<', 'COPY --from='))), line
 for definition in document.get('configs', {}).values():
