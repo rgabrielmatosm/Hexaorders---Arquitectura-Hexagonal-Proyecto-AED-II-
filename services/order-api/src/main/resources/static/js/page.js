@@ -19,6 +19,7 @@ import './views/operations.js';
 import './views/logistics.js';
 import './views/ops.js';
 import './views/architecture-pages.js';
+import { startLinkLocalization, t } from './i18n.js';
 
 const LAB_ANCHORS = ['#inicio', '#panel', '#pedidos', '#arquitectura', '#observabilidad'];
 
@@ -29,6 +30,8 @@ async function start() {
   if (redirectLegacyHash()) return;
   // POLYMER: la intro (si toca) se superpone mientras la página se prepara detrás; nunca la bloquea.
   startIntro();
+  // i18n: con prefijo de idioma (/en/…), los enlaces internos que creen las vistas se localizan solos.
+  startLinkLocalization();
 
   // El fondo animado solo se usa en las áreas del personal; la tienda tiene un diseño comercial limpio.
   const section = document.body.dataset.section || '';
@@ -38,7 +41,7 @@ async function start() {
   window.addEventListener('polymer:unauthenticated', () => {
     if (session.isAuthenticated()) {
       session.expire();
-      toast('Tu sesión ha caducado: vuelve a iniciar sesión', 'warn');
+      toast(t('Tu sesión ha caducado: vuelve a iniciar sesión'), 'warn');
     }
   });
   await session.load();

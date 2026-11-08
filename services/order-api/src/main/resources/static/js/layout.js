@@ -3,61 +3,62 @@
 // Cada página HTML solo declara su sección y su título; este módulo genera la navegación a partir de
 // esa información, de las categorías reales del catálogo y de la sesión.
 
-import { catalogApi } from './api.js';
+import { accountApi, catalogApi } from './api.js';
 import { onSoundChange, play, setSound, soundEnabled } from './audio.js';
 import { BRAND, CONTACT, LEGAL, PAYMENTS, SOCIAL, SOCIAL_FALLBACK } from './brand.js';
 import { cart } from './cart.js';
 import { MAIN_CATEGORY_ICONS, icon } from './components.js';
 import { ROLE_LABELS, session } from './session.js';
 import { $, $$, el, toast } from './ui.js';
+import { LANGUAGES, equivalentUrl, lang, localizeHref, switchLanguage, t } from './i18n.js';
 
 /** Accesos rápidos de la tienda (debajo del buscador). */
 export const MAIN_NAV = [
-  ['/ofertas.html', 'Ofertas'],
-  ['/catalogo.html?orden=newest', 'Novedades'],
-  ['/catalogo.html?categoria=computadoras', 'Laptops y PC'],
-  ['/catalogo.html?categoria=componentes', 'Componentes'],
-  ['/catalogo.html?categoria=gaming', 'Gaming'],
-  ['/catalogo.html?categoria=smartphones-tablets', 'Smartphones'],
-  ['/catalogo.html?categoria=smart-home', 'Smart Home'],
-  ['/ayuda.html', 'Ayuda'],
+  ['/ofertas.html', t('Ofertas')],
+  ['/catalogo.html?orden=newest', t('Novedades')],
+  ['/catalogo.html?categoria=computadoras', t('Laptops y PC')],
+  ['/catalogo.html?categoria=componentes', t('Componentes')],
+  ['/catalogo.html?categoria=gaming', t('Gaming')],
+  ['/catalogo.html?categoria=smartphones-tablets', t('Smartphones')],
+  ['/catalogo.html?categoria=smart-home', t('Smart Home')],
+  ['/ayuda.html', t('Ayuda')],
 ];
 
 /** Portal de cada rol (ADMIN entra en todos menos en el del cliente). */
 export const AREAS = [
-  ['CUSTOMER', '/cliente/dashboard.html', 'Mi cuenta', 'user'],
-  ['ADMIN', '/admin/dashboard.html', 'Administración', 'grid'],
-  ['ORDER_OPERATOR', '/operaciones/dashboard.html', 'Operaciones', 'list'],
-  ['LOGISTICS_OPERATOR', '/logistica/dashboard.html', 'Logística', 'truck'],
-  ['OBSERVABILITY_VIEWER', '/monitoreo/dashboard.html', 'Monitoreo', 'activity'],
+  ['CUSTOMER', '/cliente/dashboard.html', t('Mi cuenta'), 'user'],
+  ['ADMIN', '/admin/dashboard.html', t('Administración'), 'grid'],
+  ['ORDER_OPERATOR', '/operaciones/dashboard.html', t('Operaciones'), 'list'],
+  ['LOGISTICS_OPERATOR', '/logistica/dashboard.html', t('Logística'), 'truck'],
+  ['OBSERVABILITY_VIEWER', '/monitoreo/dashboard.html', t('Monitoreo'), 'activity'],
 ];
 
 /** Barra lateral de cada portal. La autorización real la aplica Spring Security. */
 export const SECTIONS = {
-  cliente: { label: 'Mi cuenta', home: '/cliente/dashboard.html', pages: [
-    ['/cliente/dashboard.html', 'Resumen', 'home'], ['/cliente/pedidos.html', 'Mis pedidos', 'box'],
-    ['/carrito.html', 'Mi carrito', 'cart'], ['/cliente/perfil.html', 'Perfil y seguridad', 'user'],
-    ['/ayuda.html', 'Centro de ayuda', 'help'], ['/catalogo.html', 'Seguir comprando', 'tag']] },
-  admin: { label: 'Administración', home: '/admin/dashboard.html', pages: [
-    ['/admin/dashboard.html', 'Panel', 'grid'], ['/admin/productos.html', 'Productos', 'box'],
-    ['/admin/categorias.html', 'Categorías', 'tag'], ['/admin/inventario.html', 'Inventario', 'layers'],
-    ['/admin/promociones.html', 'Promociones', 'percent'], ['/admin/pedidos.html', 'Pedidos', 'list'],
-    ['/admin/usuarios.html', 'Usuarios y roles', 'users'], ['/admin/incidencias.html', 'Incidencias', 'alert'],
-    ['/admin/reportes.html', 'Reportes', 'chart'], ['/admin/auditoria.html', 'Auditoría', 'file']] },
-  operaciones: { label: 'Operaciones', home: '/operaciones/dashboard.html', pages: [
-    ['/operaciones/dashboard.html', 'Resumen', 'grid'], ['/operaciones/pedidos.html', 'Bandeja de pedidos', 'list'],
-    ['/operaciones/revisiones.html', 'Revisiones de riesgo', 'shield'], ['/operaciones/incidencias.html', 'Incidencias', 'alert']] },
-  logistica: { label: 'Logística', home: '/logistica/dashboard.html', pages: [
-    ['/logistica/dashboard.html', 'Resumen', 'grid'], ['/logistica/calendario.html', 'Calendario', 'calendar'],
-    ['/logistica/entregas.html', 'Entregas', 'truck'], ['/logistica/asignaciones.html', 'Asignaciones', 'users']] },
-  monitoreo: { label: 'Monitoreo', home: '/monitoreo/dashboard.html', pages: [
-    ['/monitoreo/dashboard.html', 'Resumen', 'activity'], ['/monitoreo/servicios.html', 'Servicios', 'server'],
-    ['/monitoreo/metricas.html', 'Métricas', 'chart'], ['/monitoreo/alertas.html', 'Alertas', 'alert'],
-    ['/arquitectura/overview.html', 'Documentación técnica', 'hexagon']] },
+  cliente: { label: t('Mi cuenta'), home: '/cliente/dashboard.html', pages: [
+    ['/cliente/dashboard.html', t('Resumen'), 'home'], ['/cliente/pedidos.html', t('Mis pedidos'), 'box'],
+    ['/carrito.html', t('Mi carrito'), 'cart'], ['/cliente/perfil.html', t('Perfil y seguridad'), 'user'],
+    ['/ayuda.html', t('Centro de ayuda'), 'help'], ['/catalogo.html', t('Seguir comprando'), 'tag']] },
+  admin: { label: t('Administración'), home: '/admin/dashboard.html', pages: [
+    ['/admin/dashboard.html', t('Panel'), 'grid'], ['/admin/productos.html', t('Productos'), 'box'],
+    ['/admin/categorias.html', t('Categorías'), 'tag'], ['/admin/inventario.html', t('Inventario'), 'layers'],
+    ['/admin/promociones.html', t('Promociones'), 'percent'], ['/admin/pedidos.html', t('Pedidos'), 'list'],
+    ['/admin/usuarios.html', t('Usuarios y roles'), 'users'], ['/admin/incidencias.html', t('Incidencias'), 'alert'],
+    ['/admin/reportes.html', t('Reportes'), 'chart'], ['/admin/auditoria.html', t('Auditoría'), 'file']] },
+  operaciones: { label: t('Operaciones'), home: '/operaciones/dashboard.html', pages: [
+    ['/operaciones/dashboard.html', t('Resumen'), 'grid'], ['/operaciones/pedidos.html', t('Bandeja de pedidos'), 'list'],
+    ['/operaciones/revisiones.html', t('Revisiones de riesgo'), 'shield'], ['/operaciones/incidencias.html', t('Incidencias'), 'alert']] },
+  logistica: { label: t('Logística'), home: '/logistica/dashboard.html', pages: [
+    ['/logistica/dashboard.html', t('Resumen'), 'grid'], ['/logistica/calendario.html', t('Calendario'), 'calendar'],
+    ['/logistica/entregas.html', t('Entregas'), 'truck'], ['/logistica/asignaciones.html', t('Asignaciones'), 'users']] },
+  monitoreo: { label: t('Monitoreo'), home: '/monitoreo/dashboard.html', pages: [
+    ['/monitoreo/dashboard.html', t('Resumen'), 'activity'], ['/monitoreo/servicios.html', t('Servicios'), 'server'],
+    ['/monitoreo/metricas.html', t('Métricas'), 'chart'], ['/monitoreo/alertas.html', t('Alertas'), 'alert'],
+    ['/arquitectura/overview.html', t('Documentación técnica'), 'hexagon']] },
   // Documentación técnica interna (personal autorizado): no forma parte de la tienda.
-  arquitectura: { label: 'Documentación técnica', home: '/arquitectura/overview.html', pages: [
-    ['/arquitectura/overview.html', 'Visión general', 'hexagon'], ['/arquitectura/flujo-pedidos.html', 'Flujo de pedidos', 'route'],
-    ['/laboratorio.html', 'Laboratorio de la API', 'bolt'], ['/monitoreo/dashboard.html', 'Volver a monitoreo', 'activity']] },
+  arquitectura: { label: t('Documentación técnica'), home: '/arquitectura/overview.html', pages: [
+    ['/arquitectura/overview.html', t('Visión general'), 'hexagon'], ['/arquitectura/flujo-pedidos.html', t('Flujo de pedidos'), 'route'],
+    ['/laboratorio.html', t('Laboratorio de la API'), 'bolt'], ['/monitoreo/dashboard.html', t('Volver a monitoreo'), 'activity']] },
 };
 
 const here = () => (window.location.pathname === '/index.html' ? '/' : window.location.pathname);
@@ -72,7 +73,8 @@ function setActive(link, active) {
 }
 
 // ---- Categorías (para el megamenú y el pie) --------------------------------------------------
-const CATEGORY_CACHE = 'polymer.categories.v6';
+// Una caché por idioma: los nombres de categoría llegan ya traducidos.
+const CATEGORY_CACHE = `polymer.categories.v6.${lang}`;
 let categoriesPromise = null;
 
 /** Categorías visibles de la tienda, en memoria de la pestaña durante 5 minutos. */
@@ -103,23 +105,23 @@ function accountMenu() {
   if (!user) {
     const next = encodeURIComponent(window.location.pathname + window.location.search);
     return el('a', { class: 'store-action', href: `/login.html${window.location.pathname === '/login.html' ? '' : `?next=${next}`}` },
-      icon('user'), el('span', { class: 'store-action__text' }, el('small', { text: 'Hola, inicia sesión' }), el('strong', { text: 'Mi cuenta' })));
+      icon('user'), el('span', { class: 'store-action__text' }, el('small', { text: t('Hola, inicia sesión') }), el('strong', { text: t('Mi cuenta') })));
   }
   const panel = el('div', { class: 'menu__panel', hidden: true, role: 'menu' },
     el('div', { class: 'menu__meta' }, el('strong', { text: user.displayName }),
       el('small', { text: `@${user.username} · ${user.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}` })),
     ...areasFor().map(([, href, label]) => el('a', { href, role: 'menuitem', text: label })),
-    session.has('CUSTOMER') ? el('a', { href: '/cliente/pedidos.html', role: 'menuitem', text: 'Mis pedidos' }) : null,
-    el('a', { href: '/cliente/perfil.html', role: 'menuitem', text: 'Perfil y seguridad' }),
-    el('button', { type: 'button', role: 'menuitem', text: 'Cerrar sesión', onclick: async () => {
+    session.has('CUSTOMER') ? el('a', { href: '/cliente/pedidos.html', role: 'menuitem', text: t('Mis pedidos') }) : null,
+    el('a', { href: '/cliente/perfil.html', role: 'menuitem', text: t('Perfil y seguridad') }),
+    el('button', { type: 'button', role: 'menuitem', text: t('Cerrar sesión'), onclick: async () => {
       await session.logout();
-      toast('Sesión cerrada', 'ok');
-      window.location.assign('/');
+      toast(t('Sesión cerrada'), 'ok');
+      window.location.assign(localizeHref('/'));
     } }));
   const toggle = el('button', { type: 'button', class: 'store-action user-chip', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
-    'aria-label': `Cuenta de ${user.displayName}` },
-  icon('user'), el('span', { class: 'store-action__text' }, el('small', { text: `Hola, ${user.displayName.split(' ')[0]}` }),
-    el('strong', { class: 'user-chip__name', text: 'Mi cuenta' })));
+    'aria-label': t('Cuenta de {0}', user.displayName) },
+  icon('user'), el('span', { class: 'store-action__text' }, el('small', { text: t('Hola, {0}', user.displayName.split(' ')[0]) }),
+    el('strong', { class: 'user-chip__name', text: t('Mi cuenta') })));
   const close = () => { panel.hidden = true; toggle.setAttribute('aria-expanded', 'false'); };
   toggle.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -133,11 +135,11 @@ function accountMenu() {
 
 function searchForm() {
   const params = new URLSearchParams(window.location.search);
-  const input = el('input', { type: 'search', name: 'q', id: 'store-search', placeholder: 'Busca laptops, procesadores, monitores, marcas o modelos…',
+  const input = el('input', { type: 'search', name: 'q', id: 'store-search', placeholder: t('Busca laptops, procesadores, monitores, marcas o modelos…'),
     autocomplete: 'off', maxlength: '80', value: window.location.pathname === '/catalogo.html' ? (params.get('q') || '') : '',
-    'aria-label': 'Buscar productos' });
+    'aria-label': t('Buscar productos') });
   const form = el('form', { class: 'store-search', role: 'search', action: '/catalogo.html', method: 'get' },
-    input, el('button', { type: 'submit', class: 'store-search__go', 'aria-label': 'Buscar' }, icon('search')));
+    input, el('button', { type: 'submit', class: 'store-search__go', 'aria-label': t('Buscar') }, icon('search')));
   form.addEventListener('submit', (event) => {
     if (!input.value.trim()) { event.preventDefault(); input.focus(); }
   });
@@ -146,7 +148,7 @@ function searchForm() {
 
 function megaMenu() {
   const button = el('button', { type: 'button', class: 'mega__toggle', 'aria-expanded': 'false', 'aria-controls': 'mega-panel' },
-    icon('menu'), el('span', { text: 'Categorías' }));
+    icon('menu'), el('span', { text: t('Categorías') }));
   const mains = el('ul', { class: 'mega__mains', role: 'list' });
   const detail = el('div', { class: 'mega__detail' });
   const panel = el('div', { class: 'mega__panel', id: 'mega-panel', hidden: true }, mains, detail);
@@ -158,7 +160,7 @@ function megaMenu() {
     const tree = categoryTree(list);
     tree.forEach(({ main, subs }, index) => {
       const content = el('div', { class: 'mega__group' },
-        el('a', { class: 'mega__title', href: `/catalogo.html?categoria=${main.slug}` }, el('strong', { text: main.name }), el('span', { text: 'Ver todo' })),
+        el('a', { class: 'mega__title', href: `/catalogo.html?categoria=${main.slug}` }, el('strong', { text: main.name }), el('span', { text: t('Ver todo') })),
         el('ul', { class: 'mega__subs' }, subs.map((sub) => el('li', {}, el('a', { href: `/catalogo.html?categoria=${sub.slug}`, text: sub.name })))));
       const link = el('a', { class: 'mega__main', href: `/catalogo.html?categoria=${main.slug}` },
         icon(MAIN_CATEGORY_ICONS[main.slug] || 'box'), el('span', { text: main.name }), icon('chevron', 'mega__chev'));
@@ -184,9 +186,45 @@ function megaMenu() {
 
 /** Logotipo horizontal de POLYMER (SVG generado por tools/generate_brand.py). */
 function brandLink(height = 34) {
-  return el('a', { class: 'brand brand--logo', href: '/', 'aria-label': `${BRAND.name}, inicio` },
+  return el('a', { class: 'brand brand--logo', href: '/', 'aria-label': t('{0}, inicio', BRAND.name) },
     el('img', { class: 'brand__lockup', src: BRAND.logo, alt: BRAND.name, height: String(height), width: String(Math.round(height * 3.8)) }),
     el('img', { class: 'brand__mark', src: BRAND.mark, alt: '', height: String(height), width: String(height) }));
+}
+
+/**
+ * Selector de idioma. Son enlaces reales a la página equivalente (/en/products?…), así que también
+ * funcionan sin JavaScript y los buscadores los siguen; con JavaScript además se guarda la
+ * preferencia (y, con sesión, el idioma de los correos) antes de navegar.
+ */
+function languageLinks() {
+  return LANGUAGES.map(({ code, name }) => {
+    const link = el('a', { href: equivalentUrl(code), hreflang: code, lang: code, class: 'lang-menu__item', text: name });
+    if (code === lang) link.setAttribute('aria-current', 'true');
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      switchLanguage(code, { persist: session.isAuthenticated() ? (value) => accountApi.locale(value) : null });
+    });
+    return el('li', {}, link);
+  });
+}
+
+function languageMenu() {
+  const current = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
+  const menu = el('details', { class: 'lang-menu' },
+    el('summary', { class: 'lang-menu__button', 'aria-label': t('Idioma: {0}. Cambiar idioma', current.name) },
+      icon('globe'), el('span', { text: current.name }), el('span', { class: 'lang-menu__caret', 'aria-hidden': 'true', text: '▾' })),
+    el('ul', { class: 'lang-menu__list', 'aria-label': t('Idiomas disponibles') }, languageLinks()));
+  document.addEventListener('click', (event) => { if (!menu.contains(event.target)) menu.open = false; });
+  menu.addEventListener('keydown', (event) => { if (event.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); } });
+  return menu;
+}
+
+/** Selector compacto de la cabecera (sobre todo para móvil). */
+function languageSelect() {
+  const select = el('select', { class: 'lang-select', 'aria-label': t('Idioma') },
+    LANGUAGES.map(({ code }) => el('option', { value: code, text: code.toUpperCase(), selected: code === lang })));
+  select.addEventListener('change', () => switchLanguage(select.value, { persist: session.isAuthenticated() ? (value) => accountApi.locale(value) : null }));
+  return select;
 }
 
 /** Silencio global de los sonidos de la interfaz (apagados por defecto). */
@@ -195,8 +233,8 @@ function soundToggle() {
   const paint = (on) => {
     button.replaceChildren(icon(on ? 'volume' : 'volumeOff'));
     button.setAttribute('aria-pressed', String(on));
-    button.setAttribute('aria-label', on ? 'Sonidos activados: pulsa para silenciar' : 'Sonidos silenciados: pulsa para activarlos');
-    button.title = on ? 'Silenciar sonidos' : 'Activar sonidos';
+    button.setAttribute('aria-label', on ? t('Sonidos activados: pulsa para silenciar') : t('Sonidos silenciados: pulsa para activarlos'));
+    button.title = on ? t('Silenciar sonidos') : t('Activar sonidos');
   };
   paint(soundEnabled());
   button.addEventListener('click', () => {
@@ -213,10 +251,10 @@ function renderHeader() {
   if (!header) return;
   const current = window.location.pathname + window.location.search;
   const count = cart.count();
-  const cartLink = el('a', { class: 'store-action store-action--cart', href: '/carrito.html', id: 'cart-button', 'aria-label': `Carrito: ${count} unidades` },
+  const cartLink = el('a', { class: 'store-action store-action--cart', href: '/carrito.html', id: 'cart-button', 'aria-label': t('Carrito: {0} unidades', count) },
     el('span', { class: 'store-action__icon' }, icon('cart'), el('span', { class: 'icon-btn__badge', id: 'cart-count', hidden: count === 0, text: String(count) })),
-    el('span', { class: 'store-action__text' }, el('small', { text: 'Tu' }), el('strong', { text: 'Carrito' })));
-  const burger = el('button', { type: 'button', class: 'icon-btn nav-toggle', 'aria-label': 'Abrir menú', 'aria-expanded': 'false', 'aria-controls': 'primary-nav' }, icon('menu'));
+    el('span', { class: 'store-action__text' }, el('small', { text: t('Tu') }), el('strong', { text: t('Carrito') })));
+  const burger = el('button', { type: 'button', class: 'icon-btn nav-toggle', 'aria-label': t('Abrir menú'), 'aria-expanded': 'false', 'aria-controls': 'primary-nav' }, icon('menu'));
   const quick = MAIN_NAV.map(([href, label]) => {
     const link = el('a', { href, text: label });
     setActive(link, current === href || (href === '/ofertas.html' && here() === '/ofertas.html') || (href === '/ayuda.html' && here() === '/ayuda.html'));
@@ -228,26 +266,26 @@ function renderHeader() {
     setActive(link, Boolean(section) && section.home === href);
     return link;
   });
-  const nav = el('nav', { class: 'nav store-nav__links', id: 'primary-nav', 'aria-label': 'Navegación principal' },
-    el('a', { href: '/', text: 'Inicio', class: here() === '/' ? 'is-active' : '' }), ...quick,
-    areaLinks.length ? el('span', { class: 'nav__group', 'aria-label': 'Áreas del personal' }, areaLinks) : null);
+  const nav = el('nav', { class: 'nav store-nav__links', id: 'primary-nav', 'aria-label': t('Navegación principal') },
+    el('a', { href: '/', text: t('Inicio'), class: here() === '/' ? 'is-active' : '' }), ...quick,
+    areaLinks.length ? el('span', { class: 'nav__group', 'aria-label': t('Áreas del personal') }, areaLinks) : null);
   burger.addEventListener('click', () => {
     const open = !header.classList.contains('is-open');
     header.classList.toggle('is-open', open);
     burger.setAttribute('aria-expanded', String(open));
-    burger.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+    burger.setAttribute('aria-label', open ? t('Cerrar menú') : t('Abrir menú'));
   });
   header.classList.add('store-header');
   header.replaceChildren(
     el('div', { class: 'store-strip' },
-      el('span', {}, icon('truck'), ' Envío gratis desde S/ 299 en Lima Metropolitana'),
-      el('span', { class: 'hide-sm' }, icon('shield'), ' Garantía oficial de marca'),
-      el('span', { class: 'hide-sm' }, icon('card'), ' Pago contra entrega, transferencia o en tienda'),
-      el('a', { href: '/cliente/pedidos.html' }, 'Sigue tu pedido')),
+      el('span', {}, icon('truck'), t(' Envío gratis desde S/ 299 en Lima Metropolitana')),
+      el('span', { class: 'hide-sm' }, icon('shield'), t(' Garantía oficial de marca')),
+      el('span', { class: 'hide-sm' }, icon('card'), t(' Pago contra entrega, transferencia o en tienda')),
+      el('a', { href: '/cliente/pedidos.html' }, t('Sigue tu pedido'))),
     el('div', { class: 'store-bar' },
       brandLink(),
       searchForm(),
-      el('div', { class: 'topbar__actions' }, soundToggle(), accountMenu(), cartLink, burger)),
+      el('div', { class: 'topbar__actions' }, languageSelect(), soundToggle(), accountMenu(), cartLink, burger)),
     el('div', { class: 'store-nav' }, megaMenu(), nav));
 }
 
@@ -272,12 +310,12 @@ function renderBreadcrumbs() {
   if (!nav) return;
   const key = document.body.dataset.section || '';
   const section = SECTIONS[key];
-  const title = document.body.dataset.title || document.title;
-  const crumbs = [el('a', { href: '/', text: 'Inicio' })];
+  const title = document.body.dataset.title ? t(document.body.dataset.title) : document.title;
+  const crumbs = [el('a', { href: '/', text: t('Inicio') })];
   if (section) crumbs.push(el('span', { 'aria-hidden': 'true', text: '/' }), el('a', { href: section.home, text: section.label }));
   if (document.body.dataset.parent) {
     const [href, label] = document.body.dataset.parent.split('|');
-    crumbs.push(el('span', { 'aria-hidden': 'true', text: '/' }), el('a', { href, text: label }));
+    crumbs.push(el('span', { 'aria-hidden': 'true', text: '/' }), el('a', { href, text: t(label) }));
   }
   if (here() !== '/' && !(section && section.home === here())) {
     crumbs.push(el('span', { 'aria-hidden': 'true', text: '/' }), el('span', { 'aria-current': 'page', text: title }));
@@ -290,7 +328,7 @@ function renderBreadcrumbs() {
 export function setBreadcrumbs(items) {
   const nav = $('#breadcrumbs');
   if (!nav) return;
-  const crumbs = [el('a', { href: '/', text: 'Inicio' })];
+  const crumbs = [el('a', { href: '/', text: t('Inicio') })];
   items.forEach(([href, label], index) => {
     crumbs.push(el('span', { 'aria-hidden': 'true', text: '/' }));
     crumbs.push(index === items.length - 1 || !href ? el('span', { 'aria-current': 'page', text: label }) : el('a', { href, text: label }));
@@ -309,35 +347,35 @@ function renderFooter() {
   const column = (title, links) => el('nav', { class: 'site-footer__col', 'aria-label': title }, el('strong', { text: title }),
     el('ul', {}, links.map(([href, label]) => el('li', {}, el('a', { href, text: label })))));
   const benefits = el('div', { class: 'store-benefits' }, [
-    ['truck', 'Envíos a todo el Perú', 'Gratis desde S/ 299 en Lima Metropolitana'],
-    ['card', 'Paga como prefieras', 'Contra entrega, transferencia o en tienda'],
-    ['shield', 'Garantía oficial', 'Productos nuevos y sellados de marca'],
-    ['refresh', 'Cambios y devoluciones', 'Hasta 7 días por fallas de fábrica'],
+    ['truck', t('Envíos a todo el Perú'), t('Gratis desde S/ 299 en Lima Metropolitana')],
+    ['card', t('Paga como prefieras'), t('Contra entrega, transferencia o en tienda')],
+    ['shield', t('Garantía oficial'), t('Productos nuevos y sellados de marca')],
+    ['refresh', t('Cambios y devoluciones'), t('Hasta 7 días por fallas de fábrica')],
   ].map(([ic, title, text]) => el('div', { class: 'store-benefit' }, icon(ic), el('div', {}, el('strong', { text: title }), el('small', { text })))));
-  const demo = CONTACT.demo ? el('span', { class: 'demo-pill', title: 'Dato de demostración', text: 'DEMO' }) : null;
+  const demo = CONTACT.demo ? el('span', { class: 'demo-pill', title: t('Dato de demostración'), text: 'DEMO' }) : null;
   const contact = el('ul', { class: 'pm-footer__contact' },
-    el('li', {}, icon('whatsapp'), el('span', {}, `WhatsApp: ${CONTACT.whatsapp}`, demo)),
-    el('li', {}, icon('call'), el('span', {}, `Teléfono: ${CONTACT.phone}`, demo?.cloneNode(true))),
+    el('li', {}, icon('whatsapp'), el('span', {}, t('WhatsApp: {0}', CONTACT.whatsapp), demo)),
+    el('li', {}, icon('call'), el('span', {}, t('Teléfono: {0}', CONTACT.phone), demo?.cloneNode(true))),
     el('li', {}, icon('clock'), el('span', { text: CONTACT.hours })),
-    el('li', {}, icon('mail'), el('span', {}, 'Soporte: ', el('a', { href: `mailto:${CONTACT.supportEmail}`, text: CONTACT.supportEmail }))),
-    el('li', {}, icon('mail'), el('span', {}, 'Corporativo: ', el('a', { href: `mailto:${CONTACT.corporateEmail}`, text: CONTACT.corporateEmail }))),
+    el('li', {}, icon('mail'), el('span', {}, t('Soporte: '), el('a', { href: `mailto:${CONTACT.supportEmail}`, text: CONTACT.supportEmail }))),
+    el('li', {}, icon('mail'), el('span', {}, t('Corporativo: '), el('a', { href: `mailto:${CONTACT.corporateEmail}`, text: CONTACT.corporateEmail }))),
     el('li', {}, icon('map'), el('span', { text: CONTACT.city })));
   const brandColumn = el('div', { class: 'site-footer__brand' },
     brandLink(30),
     el('p', { class: 'pm-footer__slogan', text: BRAND.slogan }),
     el('p', { class: 'muted small', text: BRAND.description }),
     contact,
-    el('a', { class: 'pm-footer__claims', href: '/libro-reclamaciones.html' }, icon('book'), 'Libro de reclamaciones'));
-  const pay = el('div', { class: 'footer-pay', 'aria-label': 'Métodos de pago' },
-    el('span', { class: 'footer-pay__label', text: 'Métodos de pago' }),
+    el('a', { class: 'pm-footer__claims', href: '/libro-reclamaciones.html' }, icon('book'), t('Libro de reclamaciones')));
+  const pay = el('div', { class: 'footer-pay', 'aria-label': t('Métodos de pago') },
+    el('span', { class: 'footer-pay__label', text: t('Métodos de pago') }),
     el('div', { class: 'footer-pay__list' },
-      ...PAYMENTS.available.map((name) => el('span', { class: 'pay-badge', title: 'Disponible en el checkout' }, icon('card'), name)),
-      ...PAYMENTS.notIntegrated.map((name) => el('span', { class: 'pay-badge pay-badge--off', title: 'Aún no integrado: no se acepta' }, `${name} · próximamente`)),
-      el('a', { class: 'small', href: '/empresa.html#metodos-pago', text: 'Detalles' })));
-  const social = el('ul', { class: 'pm-social', 'aria-label': 'Redes sociales' }, SOCIAL.map(({ id, label, url }) => el('li', {},
+      ...PAYMENTS.available.map((name) => el('span', { class: 'pay-badge', title: t('Disponible en el checkout') }, icon('card'), name)),
+      ...PAYMENTS.notIntegrated.map((name) => el('span', { class: 'pay-badge pay-badge--off', title: t('Aún no integrado: no se acepta') }, t('{0} · próximamente', name))),
+      el('a', { class: 'small', href: '/empresa.html#metodos-pago', text: t('Detalles') })));
+  const social = el('ul', { class: 'pm-social', 'aria-label': t('Redes sociales') }, SOCIAL.map(({ id, label, url }) => el('li', {},
     el('a', url ? { href: url, target: '_blank', rel: 'noopener noreferrer', 'aria-label': label, title: label }
-      : { href: SOCIAL_FALLBACK, 'aria-label': `${label}: cuenta oficial aún no disponible`, title: `${label} (próximamente)` }, icon(id)))));
-  const replay = el('button', { type: 'button', text: 'Ver la intro' });
+      : { href: SOCIAL_FALLBACK, 'aria-label': t('{0}: cuenta oficial aún no disponible', label), title: t('{0} (próximamente)', label) }, icon(id)))));
+  const replay = el('button', { type: 'button', text: t('Ver la intro') });
   replay.addEventListener('click', () => {
     const url = new URL(window.location.href);
     url.searchParams.set('intro', '1');
@@ -345,30 +383,30 @@ function renderFooter() {
   });
   const legal = el('p', { class: 'pm-footer__legal' },
     el('strong', { text: `© ${new Date().getFullYear()} ${BRAND.name}. ` }), `${BRAND.slogan} `,
-    `Razón social: ${LEGAL.companyName || 'no configurada'} · RUC: ${LEGAL.taxId || 'no configurado'} · ${LEGAL.address}. `,
-    'Precios en soles (S/) con IGV. Tienda de demostración: precios, stock y promociones ilustrativos; no se procesan pagos en línea.');
+    t('Razón social: {0} · RUC: {1} · {2}. ', LEGAL.companyName || 'no configurada', LEGAL.taxId || 'no configurado', LEGAL.address),
+    t('Precios en soles (S/) con IGV. Tienda de demostración: precios, stock y promociones ilustrativos; no se procesan pagos en línea.'));
   footer.replaceChildren(
     benefits,
     el('div', { class: 'site-footer__grid' },
       brandColumn,
-      column('Sobre nosotros', [['/nosotros.html', 'Quiénes somos'], ['/nosotros.html#historia', 'Nuestra historia'],
-        ['/empresa.html#canales', 'Canales de atención'], ['/empresa.html#compra-segura', 'Compra fácil y segura'],
-        ['/empresa.html#metodos-pago', 'Métodos de pago']]),
-      column('Te informamos', [['/empresa.html#tiendas', 'Nuestras tiendas'], ['/empresa.html#cobertura', 'Cobertura de delivery'],
-        ['/legal.html#garantias', 'Garantías'], ['/legal.html#terminos', 'Términos y condiciones'], ['/legal.html#privacidad', 'Política de privacidad'],
-        ['/legal.html#cookies', 'Política de cookies'], ['/legal.html#devoluciones', 'Cambios y devoluciones']]),
-      column('Servicio al cliente', [['/contacto.html', 'Contacto'], ['/cliente/pedidos.html', 'Seguimiento de pedidos'],
-        ['/ayuda.html', 'Preguntas frecuentes'], ['/legal.html#facturacion', 'Facturación'], ['/contacto.html?tema=SALES', 'Ventas corporativas'],
-        ['/empresa.html#disponibilidad', 'Disponibilidad de productos'], ['/login.html?next=%2Fmonitoreo%2Fdashboard.html', 'Acceso del personal']]),
-      column('Destacados', [['/cliente/pedidos.html', 'Mis compras'], ['/ofertas.html', 'Ofertas'], ['/catalogo.html?categoria=computadoras', 'Laptops y PC'],
-        ['/catalogo.html?categoria=componentes', 'Componentes'], ['/catalogo.html?categoria=perifericos', 'Periféricos'],
-        ['/catalogo.html?categoria=accesorios-moviles', 'Accesorios'], ['/catalogo.html', 'Catálogo completo']])),
+      column(t('Sobre nosotros'), [['/nosotros.html', t('Quiénes somos')], ['/nosotros.html#historia', t('Nuestra historia')],
+        ['/empresa.html#canales', t('Canales de atención')], ['/empresa.html#compra-segura', t('Compra fácil y segura')],
+        ['/empresa.html#metodos-pago', t('Métodos de pago')]]),
+      column(t('Te informamos'), [['/empresa.html#tiendas', t('Nuestras tiendas')], ['/empresa.html#cobertura', t('Cobertura de delivery')],
+        ['/legal.html#garantias', t('Garantías')], ['/legal.html#terminos', t('Términos y condiciones')], ['/legal.html#privacidad', t('Política de privacidad')],
+        ['/legal.html#cookies', t('Política de cookies')], ['/legal.html#devoluciones', t('Cambios y devoluciones')]]),
+      column(t('Servicio al cliente'), [['/contacto.html', t('Contacto')], ['/cliente/pedidos.html', t('Seguimiento de pedidos')],
+        ['/ayuda.html', t('Preguntas frecuentes')], ['/legal.html#facturacion', t('Facturación')], ['/contacto.html?tema=SALES', t('Ventas corporativas')],
+        ['/empresa.html#disponibilidad', t('Disponibilidad de productos')], ['/login.html?next=%2Fmonitoreo%2Fdashboard.html', t('Acceso del personal')]]),
+      column(t('Destacados'), [['/cliente/pedidos.html', t('Mis compras')], ['/ofertas.html', t('Ofertas')], ['/catalogo.html?categoria=computadoras', t('Laptops y PC')],
+        ['/catalogo.html?categoria=componentes', t('Componentes')], ['/catalogo.html?categoria=perifericos', t('Periféricos')],
+        ['/catalogo.html?categoria=accesorios-moviles', t('Accesorios')], ['/catalogo.html', t('Catálogo completo')]])),
     pay,
     el('div', { class: 'pm-footer__bottom' },
-      social,
-      el('ul', { class: 'pm-quick', 'aria-label': 'Enlaces rápidos' },
-        [['/legal.html#terminos', 'Términos'], ['/legal.html#privacidad', 'Privacidad'], ['/legal.html#cookies', 'Cookies'],
-          ['/libro-reclamaciones.html', 'Libro de reclamaciones'], ['/ayuda.html', 'Ayuda']].map(([href, label]) => el('li', {}, el('a', { href, text: label }))),
+      el('div', { class: 'pm-footer__lang' }, social, languageMenu()),
+      el('ul', { class: 'pm-quick', 'aria-label': t('Enlaces rápidos') },
+        [['/legal.html#terminos', t('Términos')], ['/legal.html#privacidad', t('Privacidad')], ['/legal.html#cookies', t('Cookies')],
+          ['/libro-reclamaciones.html', t('Libro de reclamaciones')], ['/ayuda.html', t('Ayuda')]].map(([href, label]) => el('li', {}, el('a', { href, text: label }))),
         el('li', {}, replay)),
       legal));
 }
@@ -380,7 +418,7 @@ export function updateCartCount() {
   badge.textContent = String(count);
   badge.hidden = count === 0;
   const button = $('#cart-button');
-  if (button) button.setAttribute('aria-label', `Carrito: ${count} unidades`);
+  if (button) button.setAttribute('aria-label', t('Carrito: {0} unidades', count));
 }
 
 export function renderLayout() {

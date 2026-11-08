@@ -3,26 +3,27 @@
 import { ApiError } from './api.js';
 import { PROBLEM_TEXT } from './password-strength.js';
 import { el, formatMoney, toast } from './ui.js';
+import { t } from './i18n.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
 // ---- Ciclo de vida ---------------------------------------------------------
 export const LIFECYCLE = {
-  CREATED: { label: 'Creado', tone: 'neutral' },
-  RISK_APPROVED: { label: 'Aprobado por riesgo', tone: 'ok' },
-  RISK_REVIEW: { label: 'En revisión de riesgo', tone: 'warn' },
-  CONFIRMED: { label: 'Confirmado', tone: 'violet' },
-  PREPARING: { label: 'En preparación', tone: 'violet' },
-  READY_FOR_DISPATCH: { label: 'Listo para despacho', tone: 'blue' },
-  IN_TRANSIT: { label: 'En tránsito', tone: 'blue' },
-  DELIVERED: { label: 'Entregado', tone: 'ok' },
-  REJECTED: { label: 'Rechazado', tone: 'error' },
-  CANCELLED: { label: 'Cancelado', tone: 'error' },
+  CREATED: { label: t('Creado'), tone: 'neutral' },
+  RISK_APPROVED: { label: t('Aprobado por riesgo'), tone: 'ok' },
+  RISK_REVIEW: { label: t('En revisión de riesgo'), tone: 'warn' },
+  CONFIRMED: { label: t('Confirmado'), tone: 'violet' },
+  PREPARING: { label: t('En preparación'), tone: 'violet' },
+  READY_FOR_DISPATCH: { label: t('Listo para despacho'), tone: 'blue' },
+  IN_TRANSIT: { label: t('En tránsito'), tone: 'blue' },
+  DELIVERED: { label: t('Entregado'), tone: 'ok' },
+  REJECTED: { label: t('Rechazado'), tone: 'error' },
+  CANCELLED: { label: t('Cancelado'), tone: 'error' },
 };
 export const HAPPY_PATH = ['CREATED', 'RISK_APPROVED', 'CONFIRMED', 'PREPARING', 'READY_FOR_DISPATCH', 'IN_TRANSIT', 'DELIVERED'];
 export const TRANSITION_VERBS = {
-  CONFIRMED: 'Confirmar', PREPARING: 'Iniciar preparación', READY_FOR_DISPATCH: 'Marcar listo para despacho',
-  IN_TRANSIT: 'Despachar', DELIVERED: 'Marcar entregado', REJECTED: 'Rechazar', CANCELLED: 'Cancelar',
+  CONFIRMED: t('Confirmar'), PREPARING: t('Iniciar preparación'), READY_FOR_DISPATCH: t('Marcar listo para despacho'),
+  IN_TRANSIT: t('Despachar'), DELIVERED: t('Marcar entregado'), REJECTED: t('Rechazar'), CANCELLED: t('Cancelar'),
 };
 
 export const lifecycleBadge = (status) => {
@@ -32,14 +33,14 @@ export const lifecycleBadge = (status) => {
 
 export const channelBadge = (channel) => el('span', {
   class: `badge ${channel === 'SHOP' ? 'badge--neutral' : 'badge--warn'}`,
-  text: channel === 'SHOP' ? 'Tienda' : 'API', title: channel === 'SHOP' ? 'Pedido de la tienda' : 'Pedido registrado por la API de pedidos',
+  text: channel === 'SHOP' ? t('Tienda') : 'API', title: channel === 'SHOP' ? t('Pedido de la tienda') : t('Pedido registrado por la API de pedidos'),
 });
 
 /** Barra de progreso del pedido sobre el camino feliz. */
 export function progressBar(status) {
   const failed = status === 'REJECTED' || status === 'CANCELLED';
   const index = status === 'RISK_REVIEW' ? 1 : HAPPY_PATH.indexOf(status);
-  return el('div', { class: 'progress-steps', role: 'img', 'aria-label': `Progreso: ${(LIFECYCLE[status] || {}).label || status}` },
+  return el('div', { class: 'progress-steps', role: 'img', 'aria-label': t('Progreso: {0}', (LIFECYCLE[status] || {}).label || status) },
     HAPPY_PATH.slice(1).map((_, i) => el('span', { class: failed ? (i === 0 ? 'is-failed' : '') : (i < index ? 'is-done' : '') })));
 }
 
@@ -114,6 +115,7 @@ const ICONS = {
   tiktok: 'M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5 M14 3c.5 2.5 2.5 4.5 5 4.8',
   youtube: 'M3 8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z M10 9l5 3-5 3z',
   linkedin: 'M4 4h16v16H4z M8 10v6 M8 7.5v.01 M12 16v-6 M12 12.5a2.5 2.5 0 0 1 5 0V16',
+  globe: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M3 12h18 M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9 M12 3c-2.5 2.6-3.7 5.6-3.7 9s1.2 6.4 3.7 9',
   whatsapp: 'M4 20l1.3-3.9A8 8 0 1 1 8 19z M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8c-1-.4-1.8-1.2-2.2-2.2l.8-1-1-2z',
 };
 
@@ -163,9 +165,9 @@ export function productArt(product, className) {
 }
 
 export function stockNote(stock) {
-  if (stock <= 0) return el('span', { class: 'stock-note stock-note--out', text: 'Agotado' });
-  if (stock <= 5) return el('span', { class: 'stock-note stock-note--low', text: `Últimas ${stock} unidades` });
-  return el('span', { class: 'stock-note', text: 'En stock' });
+  if (stock <= 0) return el('span', { class: 'stock-note stock-note--out', text: t('Agotado') });
+  if (stock <= 5) return el('span', { class: 'stock-note stock-note--low', text: t('Últimas {0} unidades', stock) });
+  return el('span', { class: 'stock-note', text: t('En stock') });
 }
 
 /** Importes de la tienda en soles (PEN); los pedidos anteriores conservan su moneda (USD). */
@@ -173,16 +175,16 @@ export const money = (value, currency = 'PEN') => formatMoney(value, currency);
 
 /** Estados del pedido con el lenguaje que ve el cliente (el personal ve LIFECYCLE). */
 export const CUSTOMER_LIFECYCLE = {
-  CREATED: 'Pedido recibido', RISK_APPROVED: 'Pedido verificado', RISK_REVIEW: 'En verificación', CONFIRMED: 'Confirmado',
-  PREPARING: 'En preparación', READY_FOR_DISPATCH: 'Listo para envío', IN_TRANSIT: 'En camino', DELIVERED: 'Entregado',
-  REJECTED: 'No aprobado', CANCELLED: 'Cancelado',
+  CREATED: t('Pedido recibido'), RISK_APPROVED: t('Pedido verificado'), RISK_REVIEW: t('En verificación'), CONFIRMED: t('Confirmado'),
+  PREPARING: t('En preparación'), READY_FOR_DISPATCH: t('Listo para envío'), IN_TRANSIT: t('En camino'), DELIVERED: t('Entregado'),
+  REJECTED: t('No aprobado'), CANCELLED: t('Cancelado'),
 };
 export const customerBadge = (status) => {
   const info = LIFECYCLE[status] || { tone: 'neutral' };
   return el('span', { class: `lc lc--${info.tone}`, text: CUSTOMER_LIFECYCLE[status] || status, title: CUSTOMER_LIFECYCLE[status] || status });
 };
 /** Número de pedido visible para el cliente. */
-export const orderRef = (order) => (order.orderNumber ? `HX-${order.orderNumber}` : `Pedido ${String(order.id).slice(0, 8)}`);
+export const orderRef = (order) => (order.orderNumber ? `HX-${order.orderNumber}` : t('Pedido {0}', String(order.id).slice(0, 8)));
 
 // ---- Estados de carga y vacíos ------------------------------------------------
 export function emptyState(title, text, iconName = 'empty', action = null) {
@@ -193,12 +195,12 @@ export const skeletons = (count, className) => Array.from({ length: count }, () 
 
 export function errorMessage(error) {
   if (error instanceof ApiError) {
-    if (error.status === 0) return 'Sin conexión con el servidor.';
+    if (error.status === 0) return t('Sin conexión con el servidor.');
     // Contraseña rechazada por la política del servidor: motivo en el idioma de la interfaz.
     if (error.body && error.body.code === 'WEAK_PASSWORD' && Array.isArray(error.body.problems)) {
       return error.body.problems.map((code) => (PROBLEM_TEXT[code] ? PROBLEM_TEXT[code]() : code)).join(' ');
     }
-    return `${error.title ? `${error.title}: ` : ''}${error.message}`;
+    return `${error.title ? `${t(error.title)}: ` : ''}${t(error.message)}`;
   }
   return error && error.message ? error.message : String(error);
 }
@@ -228,7 +230,7 @@ export function modal(title, body, { actions = [], wide = false, onClose } = {})
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
   };
-  const closeButton = el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Cerrar', onclick: close, text: '✕' });
+  const closeButton = el('button', { type: 'button', class: 'icon-btn', 'aria-label': t('Cerrar'), onclick: close, text: '✕' });
   const dialog = el('div', { class: `modal__dialog${wide ? ' modal__dialog--wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId },
     el('div', { class: 'modal__head' }, el('h2', { id: titleId, text: title }), closeButton),
     body,
@@ -262,7 +264,7 @@ export function showFormError(node, error) {
 export async function submitting(button, errorNode, action, successMessage) {
   const label = button.textContent;
   button.disabled = true;
-  button.textContent = 'Procesando…';
+  button.textContent = t('Procesando…');
   if (errorNode) errorNode.hidden = true;
   try {
     const result = await action();
@@ -335,7 +337,7 @@ export function barChart(series, { label = (k) => k, height = 220 } = {}) {
  * Paginación en el cliente para listas ya filtradas por el servidor. Devuelve un contenedor que
  * se re-renderiza al cambiar de página; renderPage(items) devuelve el contenido de una página.
  */
-export function paginated(items, renderPage, { pageSize = 10, label = 'elementos' } = {}) {
+export function paginated(items, renderPage, { pageSize = 10, label = t('elementos') } = {}) {
   const container = el('div', { class: 'paginated' });
   let page = 1;
   const pages = Math.max(1, Math.ceil(items.length / pageSize));
@@ -343,12 +345,12 @@ export function paginated(items, renderPage, { pageSize = 10, label = 'elementos
     const start = (page - 1) * pageSize;
     const slice = items.slice(start, start + pageSize);
     const info = el('span', { class: 'pager__info', text: items.length
-      ? `${start + 1}–${start + slice.length} de ${items.length} ${label}` : `0 ${label}` });
-    const prev = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: '‹ Anterior', disabled: page <= 1, onclick: () => { page -= 1; draw(); } });
-    const next = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: 'Siguiente ›', disabled: page >= pages, onclick: () => { page += 1; draw(); } });
+      ? t('{0}–{1} de {2} {3}', start + 1, start + slice.length, items.length, label) : t('0 {0}', label) });
+    const prev = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: t('‹ Anterior'), disabled: page <= 1, onclick: () => { page -= 1; draw(); } });
+    const next = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: t('Siguiente ›'), disabled: page >= pages, onclick: () => { page += 1; draw(); } });
     container.replaceChildren(renderPage(slice),
-      pages > 1 || items.length ? el('nav', { class: 'pager', 'aria-label': 'Paginación' }, info,
-        pages > 1 ? el('div', { class: 'row-actions' }, prev, el('span', { class: 'pager__page', text: `Página ${page} de ${pages}` }), next) : null) : null);
+      pages > 1 || items.length ? el('nav', { class: 'pager', 'aria-label': t('Paginación') }, info,
+        pages > 1 ? el('div', { class: 'row-actions' }, prev, el('span', { class: 'pager__page', text: t('Página {0} de {1}', page, pages) }), next) : null) : null);
   };
   draw();
   return container;

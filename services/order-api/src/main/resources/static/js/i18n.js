@@ -58,7 +58,42 @@ export function t(text, ...args) {
 export const hasTranslation = (text) => lang === DEFAULT_LANG || Object.prototype.hasOwnProperty.call(catalog, String(text));
 
 /** Datos del catálogo (categorías, especificaciones…): igual que t(), pero sin marcadores. */
-export const td = (text) => (text == null ? text : t(text));
+const NUMBER = /\d+(?:[.,]\d+)?/g;
+const has = (key) => Object.prototype.hasOwnProperty.call(catalog, key);
+
+/**
+ * Traduce un DATO del catálogo (valor de ficha técnica, filtro, categoría…). Si no hay traducción exacta,
+ * prueba la plantilla con las cifras como marcadores («Hasta 22 h» → «Hasta {0} h» → «Up to {0} h»):
+ * así una sola entrada del catálogo sirve para todos los valores numéricos. Sin traducción, se deja igual.
+ */
+export function td(text) {
+  if (text == null || lang === DEFAULT_LANG) return text;
+  const source = String(text);
+  if (has(source)) return catalog[source];
+  const numbers = source.match(NUMBER);
+  if (!numbers) return source;
+  let index = 0;
+  const template = source.replace(NUMBER, () => `{${index++}}`);
+  return has(template) ? catalog[template].replace(/\{(\d+)\}/g, (match, i) => numbers[i] ?? match) : source;
+}
+
+/**
+ * Nombre de producto: solo se traduce el sustantivo genérico inicial («Adaptador de red» TP-Link Archer…),
+ * nunca la marca ni el modelo. Solo si el nombre tiene la forma «sustantivo marca modelo» (la que genera
+ * tools/generate_catalog.py); si no, devuelve el nombre original.
+ */
+export function productName(name, brand) {
+  if (!name || lang === DEFAULT_LANG) return name;
+  const words = String(name).split(' ');
+  for (let size = Math.min(4, words.length - 1); size >= 1; size -= 1) {
+    const noun = words.slice(0, size).join(' ');
+    const rest = words.slice(size).join(' ');
+    // Con marca: «sustantivo marca modelo». Sin ella (líneas de pedido), la marca empieza en mayúscula o cifra.
+    const shaped = brand ? rest.startsWith(`${brand} `) : /^[\p{Lu}\d]/u.test(rest);
+    if (shaped && has(noun)) return `${catalog[noun]} ${rest}`;
+  }
+  return name;
+}
 
 // ---- Rutas localizadas ---------------------------------------------------------------------------
 const fileBySlug = Object.fromEntries(Object.entries(routes.pages).map(([file, slugs]) => [`${lang}:${slugs[lang] ?? ''}`, file]));

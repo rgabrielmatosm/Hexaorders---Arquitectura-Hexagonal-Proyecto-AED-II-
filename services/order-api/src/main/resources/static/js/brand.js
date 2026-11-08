@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // POLYMER — configuración de marca en un solo lugar (nombre, eslogan, contacto, redes, datos legales,
 // intro). La interfaz lee estos valores; para una puesta en producción basta con editar este módulo.
 //
@@ -8,8 +9,8 @@
 export const BRAND = Object.freeze({
   name: 'POLYMER',
   displayName: 'Polymer',
-  slogan: 'Tecnología que conecta contigo.',
-  description: 'Tienda de tecnología: laptops, componentes, gaming, smartphones, redes y smart home, con asesoría de especialistas y envíos a todo el Perú.',
+  slogan: t('Tecnología que conecta contigo.'),
+  description: t('Tienda de tecnología: laptops, componentes, gaming, smartphones, redes y smart home, con asesoría de especialistas y envíos a todo el Perú.'),
   logo: '/img/polymer-logo.svg',
   logoLight: '/img/polymer-logo-light.svg',
   mark: '/img/polymer-mark.svg',
@@ -21,16 +22,16 @@ export const CONTACT = Object.freeze({
   whatsapp: '+51 900 000 000',
   supportEmail: 'soporte@example.com',
   corporateEmail: 'contacto@example.com',
-  hours: 'Lunes a sábado, de 9:00 a. m. a 6:00 p. m.',
-  city: 'Lima, Perú',
+  hours: t('Lunes a sábado, de 9:00 a. m. a 6:00 p. m.'),
+  city: t('Lima, Perú'),
 });
 
 export const LEGAL = Object.freeze({
   demo: true,                                  // DEMO: completar con los datos reales al constituir la empresa
   companyName: null,                           // razón social: no configurada
   taxId: null,                                 // RUC: no configurado (no se inventa uno)
-  address: 'Lima, Perú',
-  note: 'Tienda de demostración: razón social y RUC no configurados.',
+  address: t('Lima, Perú'),
+  note: t('Tienda de demostración: razón social y RUC no configurados.'),
 });
 
 // URL null = sin cuenta oficial todavía (no se simula ninguna). Al crearla, pegar aquí su URL.
@@ -46,8 +47,8 @@ export const SOCIAL_FALLBACK = '/empresa.html#redes';
 
 // Métodos de pago: solo los del checkout funcionan. Los demás se muestran como «no disponibles».
 export const PAYMENTS = Object.freeze({
-  available: ['Pago contra entrega', 'Transferencia bancaria', 'Pago en tienda'],
-  notIntegrated: ['Tarjetas de crédito y débito', 'Billeteras digitales'],
+  available: [t('Pago contra entrega'), t('Transferencia bancaria'), t('Pago en tienda')],
+  notIntegrated: [t('Tarjetas de crédito y débito'), t('Billeteras digitales')],
 });
 
 // Intro cinematográfica: una vez por sesión del navegador. La duración no incluye la apertura del telón.

@@ -6,6 +6,7 @@
 
 import { BRAND, INTRO, MARK_GEOMETRY } from './brand.js';
 import { play, setSound } from './audio.js';
+import { t } from './i18n.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -57,7 +58,7 @@ export function startIntro() {
   root.className = 'intro';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'false');
-  root.setAttribute('aria-label', `Bienvenida a ${BRAND.name}`);
+  root.setAttribute('aria-label', t('Bienvenida a {0}', BRAND.name));
   const left = document.createElement('div'); left.className = 'intro__curtain intro__curtain--left';
   const right = document.createElement('div'); right.className = 'intro__curtain intro__curtain--right';
   const stage = document.createElement('div'); stage.className = 'intro__stage';
@@ -70,8 +71,8 @@ export function startIntro() {
   const slogan = document.createElement('p'); slogan.className = 'intro__slogan'; slogan.textContent = BRAND.slogan;
   stage.append(svg, word, slogan);
   const actions = document.createElement('div'); actions.className = 'intro__actions';
-  const withSound = button('Entrar con sonido', 'intro__btn intro__btn--sound');
-  const skip = button('Omitir intro', 'intro__btn');
+  const withSound = button(t('Entrar con sonido'), 'intro__btn intro__btn--sound');
+  const skip = button(t('Omitir intro'), 'intro__btn');
   actions.append(withSound, skip);
   root.append(left, right, stage, actions);
   document.body.append(root);
@@ -121,7 +122,7 @@ export function startIntro() {
     setSound(true);
     play('welcome', { force: true });
     withSound.disabled = true;
-    withSound.textContent = 'Sonido activado';
+    withSound.textContent = t('Sonido activado');
     window.setTimeout(open, 900);
   });
   // Un clic en el fondo también abre (la intro nunca atrapa a la persona).

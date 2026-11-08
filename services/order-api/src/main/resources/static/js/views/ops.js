@@ -8,37 +8,38 @@ import { GRAFANA_URL, PROMETHEUS_URL, opsApi } from '../api.js';
 import { LIFECYCLE, emptyState, errorMessage, kpi, lifecycleBadge, skeletons } from '../components.js';
 import { route } from '../router.js';
 import { el, formatDateTime, formatRelative } from '../ui.js';
+import { t } from '../i18n.js';
 
 const ROLES = ['OBSERVABILITY_VIEWER', 'ADMIN'];
 
 export const DASHBOARDS = [
-  ['polymer', 'POLYMER · Puertos, adaptadores y métricas', 'Dashboard original (conservado sin cambios).'],
-  ['polymer-business', 'Business Operations', 'Ciclo de vida, checkout, logística e incidencias.'],
-  ['polymer-risk', 'Risk Engine', 'Evaluaciones, latencias e integración Java → Python.'],
-  ['polymer-api', 'API Performance', 'Tráfico, percentiles y errores HTTP.'],
-  ['polymer-infrastructure', 'Infrastructure', 'Targets, JVM, HikariCP y scraping.'],
-  ['polymer-security', 'Security & Audit', 'Inicios de sesión, accesos denegados y actividad.'],
-  ['polymer-logistics', 'Logistics Operations', 'Entregas, conflictos de agenda y despacho.'],
+  ['polymer', t('POLYMER · Puertos, adaptadores y métricas'), t('Dashboard original (conservado sin cambios).')],
+  ['polymer-business', t('Business Operations'), t('Ciclo de vida, checkout, logística e incidencias.')],
+  ['polymer-risk', t('Risk Engine'), t('Evaluaciones, latencias e integración Java → Python.')],
+  ['polymer-api', t('API Performance'), t('Tráfico, percentiles y errores HTTP.')],
+  ['polymer-infrastructure', t('Infrastructure'), t('Targets, JVM, HikariCP y scraping.')],
+  ['polymer-security', t('Security & Audit'), t('Inicios de sesión, accesos denegados y actividad.')],
+  ['polymer-logistics', t('Logistics Operations'), t('Entregas, conflictos de agenda y despacho.')],
 ];
 
 const head = (title, lead, ...actions) => el('div', { class: 'view__head' },
-  el('div', {}, el('p', { class: 'eyebrow', text: 'Monitoreo' }), el('h1', { class: 'view__title', text: title }),
+  el('div', {}, el('p', { class: 'eyebrow', text: t('Monitoreo') }), el('h1', { class: 'view__title', text: title }),
     el('p', { class: 'section__lead', text: lead })),
   actions.length ? el('div', { class: 'row-actions' }, actions) : null);
 
 const external = (href, text) => el('a', { class: 'btn btn--ghost btn--sm', href, target: '_blank', rel: 'noopener', text: `${text} ↗` });
 
 function unavailableNotice() {
-  return el('div', { class: 'notice-box notice-box--warn' }, el('strong', { text: 'Prometheus no responde. ' }),
-    'order-api no pudo consultar http://prometheus:9090 dentro de la red de Docker. El resto de la aplicación sigue funcionando; revisa ',
+  return el('div', { class: 'notice-box notice-box--warn' }, el('strong', { text: t('Prometheus no responde. ') }),
+    t('order-api no pudo consultar http://prometheus:9090 dentro de la red de Docker. El resto de la aplicación sigue funcionando; revisa '),
     el('code', { text: '.\\polymer.cmd status' }), '.');
 }
 
-const STATE = { firing: ['Disparada', 'error'], pending: ['Pendiente', 'warn'], inactive: ['Inactiva', 'ok'] };
+const STATE = { firing: [t('Disparada'), 'error'], pending: [t('Pendiente'), 'warn'], inactive: [t('Inactiva'), 'ok'] };
 const stateBadge = (state) => { const [label, tone] = STATE[state] || [state, 'neutral']; return el('span', { class: `badge badge--${tone === 'error' ? 'error' : tone === 'warn' ? 'warn' : tone === 'ok' ? 'ok' : 'neutral'}`, text: label }); };
 
 function formatValue(indicator) {
-  if (indicator.value === null || indicator.value === undefined) return 'sin datos';
+  if (indicator.value === null || indicator.value === undefined) return t('sin datos');
   const v = indicator.value;
   if (indicator.unit === 's') return v < 1 ? `${(v * 1000).toFixed(0)} ms` : `${v.toFixed(2)} s`;
   if (indicator.unit === '%') return `${v.toFixed(2)} %`;
@@ -53,24 +54,24 @@ route('/observabilidad-tecnica', async (root) => {
   const prom = el('div', {}, skeletons(3, 'skeleton--row'));
   const statuses = el('div', {}, skeletons(4, 'skeleton--row'));
   root.append(el('section', { class: 'view' },
-    head('Salud técnica', 'Comprobaciones activas del backend y estado de Prometheus. Vista de solo lectura.',
+    head(t('Salud técnica'), t('Comprobaciones activas del backend y estado de Prometheus. Vista de solo lectura.'),
       external(`${GRAFANA_URL}/d/polymer`, 'Grafana'), external(`${PROMETHEUS_URL}/targets`, 'Prometheus')),
     health,
     el('div', { class: 'grid-2-even card--spaced' },
       el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Prometheus' }), prom),
-      el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Pedidos por estado (PostgreSQL)' }), statuses)),
-    el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: 'Dashboards de Grafana' }),
+      el('article', { class: 'card' }, el('h3', { class: 'card__title', text: t('Pedidos por estado (PostgreSQL)') }), statuses)),
+    el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: t('Dashboards de Grafana') }),
       el('ul', { class: 'dash-links' }, DASHBOARDS.map(([uid, title, text]) => el('li', {},
         el('a', { href: `${GRAFANA_URL}/d/${uid}`, target: '_blank', rel: 'noopener' }, el('strong', { text: `${title} ↗` }), el('small', { text }))))))));
   const [h, m] = await Promise.allSettled([opsApi.health(), opsApi.monitoring()]);
   if (h.status === 'fulfilled') {
     const v = h.value;
-    const tile = (label, ok, detail) => el('div', { class: `kpi kpi--${ok ? 'ok' : 'error'}` }, el('span', { text: label }), el('strong', { text: ok ? 'Disponible' : 'Caído' }), el('small', { class: 'kpi__hint', text: detail }));
-    health.replaceChildren(tile('PostgreSQL', v.database, 'SELECT 1 desde order-api'), tile('Motor de riesgo', v.riskEngine, 'GET /health/ready'),
-      kpi('Incidencias abiertas', v.openIncidents, v.openIncidents ? 'warn' : ''), kpi('Comprobado', formatDateTime(v.checkedAt).split(',').pop().trim()));
+    const tile = (label, ok, detail) => el('div', { class: `kpi kpi--${ok ? 'ok' : 'error'}` }, el('span', { text: label }), el('strong', { text: ok ? t('Disponible') : t('Caído') }), el('small', { class: 'kpi__hint', text: detail }));
+    health.replaceChildren(tile('PostgreSQL', v.database, t('SELECT 1 desde order-api')), tile(t('Motor de riesgo'), v.riskEngine, t('GET /health/ready')),
+      kpi(t('Incidencias abiertas'), v.openIncidents, v.openIncidents ? 'warn' : ''), kpi(t('Comprobado'), formatDateTime(v.checkedAt).split(',').pop().trim()));
     statuses.replaceChildren(el('ul', { class: 'activity' }, Object.keys(LIFECYCLE).map((status) => el('li', {}, lifecycleBadge(status), el('strong', { text: ` ${v.ordersByStatus[status] ?? 0}` })))));
   } else {
-    health.replaceChildren(el('div', { class: 'card' }, emptyState('No se pudo consultar la salud', errorMessage(h.reason), 'shield')));
+    health.replaceChildren(el('div', { class: 'card' }, emptyState(t('No se pudo consultar la salud'), errorMessage(h.reason), 'shield')));
     statuses.replaceChildren();
   }
   if (m.status === 'fulfilled' && m.value.available) {
@@ -78,76 +79,76 @@ route('/observabilidad-tecnica', async (root) => {
     const up = s.targets.filter((t) => t.health === 'up').length;
     const firing = s.alerts.filter((a) => a.state === 'firing').length;
     prom.replaceChildren(el('div', { class: 'kpis kpis--compact' },
-      kpi('Targets activos', `${up}/${s.targets.length}`, up === s.targets.length ? 'ok' : 'error'),
-      kpi('Alertas disparadas', firing, firing ? 'error' : 'ok'), kpi('Reglas de alerta', s.alerts.length)),
-    el('div', { class: 'row-actions row-actions--start' }, el('a', { class: 'btn btn--ghost btn--sm', href: '/monitoreo/servicios.html', text: 'Servicios' }),
-      el('a', { class: 'btn btn--ghost btn--sm', href: '/monitoreo/alertas.html', text: 'Alertas' }), el('a', { class: 'btn btn--ghost btn--sm', href: '/monitoreo/metricas.html', text: 'Métricas' })));
+      kpi(t('Targets activos'), `${up}/${s.targets.length}`, up === s.targets.length ? 'ok' : 'error'),
+      kpi(t('Alertas disparadas'), firing, firing ? 'error' : 'ok'), kpi(t('Reglas de alerta'), s.alerts.length)),
+    el('div', { class: 'row-actions row-actions--start' }, el('a', { class: 'btn btn--ghost btn--sm', href: '/monitoreo/servicios.html', text: t('Servicios') }),
+      el('a', { class: 'btn btn--ghost btn--sm', href: '/monitoreo/alertas.html', text: t('Alertas') }), el('a', { class: 'btn btn--ghost btn--sm', href: '/monitoreo/metricas.html', text: t('Métricas') })));
   } else {
-    prom.replaceChildren(m.status === 'fulfilled' ? unavailableNotice() : emptyState('No se pudo consultar el monitoreo', errorMessage(m.reason)));
+    prom.replaceChildren(m.status === 'fulfilled' ? unavailableNotice() : emptyState(t('No se pudo consultar el monitoreo'), errorMessage(m.reason)));
   }
-}, { roles: ROLES, title: 'Monitoreo' });
+}, { roles: ROLES, title: t('Monitoreo') });
 
 // ---- Servicios ------------------------------------------------------------------------------
 route('/monitoreo/servicios', async (root) => {
   const body = el('div', {}, skeletons(4, 'skeleton--row'));
   const deps = el('div', { class: 'kpis' }, skeletons(2, 'skeleton--row'));
   root.append(el('section', { class: 'view' },
-    head('Servicios', 'Targets que Prometheus recoge cada 10 s y comprobaciones directas del backend.', external(`${PROMETHEUS_URL}/targets`, 'Targets en Prometheus')),
-    deps, el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: 'Targets de Prometheus' }), body)));
+    head(t('Servicios'), t('Targets que Prometheus recoge cada 10 s y comprobaciones directas del backend.'), external(`${PROMETHEUS_URL}/targets`, t('Targets en Prometheus'))),
+    deps, el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: t('Targets de Prometheus') }), body)));
   const [h, m] = await Promise.allSettled([opsApi.health(), opsApi.monitoring()]);
   if (h.status === 'fulfilled') {
-    deps.replaceChildren(kpi('PostgreSQL (desde order-api)', h.value.database ? 'Disponible' : 'Caído', h.value.database ? 'ok' : 'error'),
-      kpi('Motor de riesgo (desde order-api)', h.value.riskEngine ? 'Disponible' : 'Caído', h.value.riskEngine ? 'ok' : 'error'),
-      kpi('order-api', 'Disponible', 'ok', 'Esta página la sirve order-api'));
+    deps.replaceChildren(kpi(t('PostgreSQL (desde order-api)'), h.value.database ? t('Disponible') : t('Caído'), h.value.database ? 'ok' : 'error'),
+      kpi(t('Motor de riesgo (desde order-api)'), h.value.riskEngine ? t('Disponible') : t('Caído'), h.value.riskEngine ? 'ok' : 'error'),
+      kpi('order-api', t('Disponible'), 'ok', t('Esta página la sirve order-api')));
   } else deps.replaceChildren();
-  if (m.status !== 'fulfilled') { body.replaceChildren(emptyState('No se pudo consultar el monitoreo', errorMessage(m.reason))); return; }
+  if (m.status !== 'fulfilled') { body.replaceChildren(emptyState(t('No se pudo consultar el monitoreo'), errorMessage(m.reason))); return; }
   if (!m.value.available) { body.replaceChildren(unavailableNotice()); return; }
   body.replaceChildren(el('div', { class: 'table-scroll' }, el('table', { class: 'table' },
-    el('thead', {}, el('tr', {}, ['Job', 'Instancia', 'Estado', 'Último scrape', 'Duración', 'Error'].map((x) => el('th', { scope: 'col', text: x })))),
+    el('thead', {}, el('tr', {}, [t('Job'), t('Instancia'), t('Estado'), t('Último scrape'), t('Duración'), t('Error')].map((x) => el('th', { scope: 'col', text: x })))),
     el('tbody', {}, m.value.targets.map((t) => el('tr', {},
       el('td', {}, el('strong', { text: t.job })), el('td', { class: 'mono small', text: t.instance }),
       el('td', {}, el('span', { class: `badge badge--${t.health === 'up' ? 'ok' : 'error'}`, text: t.health.toUpperCase() })),
       el('td', { text: t.lastScrape ? formatRelative(t.lastScrape) : '—' }),
       el('td', { class: 'mono', text: `${(t.scrapeSeconds * 1000).toFixed(1)} ms` }),
       el('td', { class: 'small', text: t.lastError || '—' })))))));
-}, { roles: ROLES, title: 'Servicios' });
+}, { roles: ROLES, title: t('Servicios') });
 
 // ---- Métricas -------------------------------------------------------------------------------
 route('/monitoreo/metricas', async (root) => {
   const grid = el('div', { class: 'metric-grid' }, skeletons(8, 'skeleton--row'));
   const checked = el('p', { class: 'muted small' });
   root.append(el('section', { class: 'view' },
-    head('Métricas', 'Indicadores calculados por Prometheus con consultas fijas definidas en el adaptador (no se aceptan consultas arbitrarias desde el navegador).',
-      external(`${GRAFANA_URL}/d/polymer-business`, 'Business Operations'), external(`${GRAFANA_URL}/d/polymer-api`, 'API Performance')),
+    head(t('Métricas'), t('Indicadores calculados por Prometheus con consultas fijas definidas en el adaptador (no se aceptan consultas arbitrarias desde el navegador).'),
+      external(`${GRAFANA_URL}/d/polymer-business`, t('Business Operations')), external(`${GRAFANA_URL}/d/polymer-api`, t('API Performance'))),
     checked, grid,
-    el('p', { class: 'muted small card--spaced', text: '«sin datos» significa que todavía no hay muestras (por ejemplo, sin tráfico en los últimos 5 minutos), nunca un cero inventado.' })));
+    el('p', { class: 'muted small card--spaced', text: t('«sin datos» significa que todavía no hay muestras (por ejemplo, sin tráfico en los últimos 5 minutos), nunca un cero inventado.') })));
   const s = await opsApi.monitoring();
   if (!s.available) { grid.replaceChildren(unavailableNotice()); return; }
-  checked.textContent = `Consultado ${formatDateTime(s.checkedAt)}`;
+  checked.textContent = t('Consultado {0}', formatDateTime(s.checkedAt));
   grid.replaceChildren(...s.indicators.map((i) => el('article', { class: `metric-card${i.value === null ? ' is-empty' : ''}` },
     el('span', { class: 'metric-card__label', text: i.label }), el('strong', { class: 'metric-card__value', text: formatValue(i) }),
     el('code', { class: 'metric-card__key', text: i.key }))));
-}, { roles: ROLES, title: 'Métricas' });
+}, { roles: ROLES, title: t('Métricas') });
 
 // ---- Alertas --------------------------------------------------------------------------------
 route('/monitoreo/alertas', async (root) => {
   const body = el('div', {}, skeletons(6, 'skeleton--row'));
   const summary = el('div', { class: 'kpis' });
   root.append(el('section', { class: 'view' },
-    head('Alertas', 'Reglas de alerta cargadas en Prometheus (infra/prometheus/alerts.yml) y su estado actual. No hay Alertmanager ni envío de notificaciones.',
-      external(`${PROMETHEUS_URL}/alerts`, 'Alertas en Prometheus')),
-    summary, el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: 'Reglas' }), body)));
+    head(t('Alertas'), t('Reglas de alerta cargadas en Prometheus (infra/prometheus/alerts.yml) y su estado actual. No hay Alertmanager ni envío de notificaciones.'),
+      external(`${PROMETHEUS_URL}/alerts`, t('Alertas en Prometheus'))),
+    summary, el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: t('Reglas') }), body)));
   const s = await opsApi.monitoring();
   if (!s.available) { body.replaceChildren(unavailableNotice()); return; }
   const by = (state) => s.alerts.filter((a) => a.state === state).length;
-  summary.replaceChildren(kpi('Disparadas', by('firing'), by('firing') ? 'error' : 'ok'), kpi('Pendientes', by('pending'), by('pending') ? 'warn' : ''),
-    kpi('Inactivas', by('inactive'), 'ok'), kpi('Total de reglas', s.alerts.length));
+  summary.replaceChildren(kpi(t('Disparadas'), by('firing'), by('firing') ? 'error' : 'ok'), kpi(t('Pendientes'), by('pending'), by('pending') ? 'warn' : ''),
+    kpi(t('Inactivas'), by('inactive'), 'ok'), kpi(t('Total de reglas'), s.alerts.length));
   const order = { firing: 0, pending: 1, inactive: 2 };
   body.replaceChildren(el('div', { class: 'table-scroll' }, el('table', { class: 'table' },
-    el('thead', {}, el('tr', {}, ['Alerta', 'Grupo', 'Severidad', 'Estado', 'Activa desde', 'Descripción'].map((x) => el('th', { scope: 'col', text: x })))),
+    el('thead', {}, el('tr', {}, [t('Alerta'), t('Grupo'), t('Severidad'), t('Estado'), t('Activa desde'), t('Descripción')].map((x) => el('th', { scope: 'col', text: x })))),
     el('tbody', {}, [...s.alerts].sort((a, b) => (order[a.state] ?? 3) - (order[b.state] ?? 3)).map((a) => el('tr', {},
       el('td', {}, el('strong', { text: a.name })), el('td', { class: 'small', text: a.group }),
       el('td', {}, el('span', { class: `badge badge--${a.severity === 'critical' ? 'error' : a.severity === 'warning' ? 'warn' : 'neutral'}`, text: a.severity })),
       el('td', {}, stateBadge(a.state)), el('td', { text: a.activeSince ? formatRelative(a.activeSince) : '—' }),
       el('td', { class: 'small', text: a.summary || '—' })))))));
-}, { roles: ROLES, title: 'Alertas' });
+}, { roles: ROLES, title: t('Alertas') });
