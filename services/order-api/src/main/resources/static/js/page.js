@@ -35,7 +35,7 @@ async function start() {
   const canvas = $('#grid-canvas');
   if (canvas && section && section !== 'cliente') initGrid(canvas);
   else if (canvas) canvas.remove();
-  window.addEventListener('hexa:unauthenticated', () => {
+  window.addEventListener('polymer:unauthenticated', () => {
     if (session.isAuthenticated()) {
       session.expire();
       toast('Tu sesión ha caducado: vuelve a iniciar sesión', 'warn');

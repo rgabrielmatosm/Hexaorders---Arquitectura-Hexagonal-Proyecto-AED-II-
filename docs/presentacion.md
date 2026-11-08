@@ -1,12 +1,12 @@
-# Guion verbal: HexaOrders
+# Guion verbal: POLYMER
 
 Duración orientativa: 3 a 4 minutos a unas 140 palabras por minuto. Las referencias al final son material de respaldo; no hace falta leerlas durante la exposición.
 
-Buenos días. Presento HexaOrders, una aplicación que registra pedidos, calcula su riesgo y conserva la decisión en PostgreSQL. La implementé con Java, Python y Docker Compose. El objetivo es demostrar una arquitectura hexagonal mediante una regla que podemos comprobar: las decisiones del negocio permanecen independientes de los mecanismos que reciben, almacenan y transportan datos.
+Buenos días. Presento POLYMER, una aplicación que registra pedidos, calcula su riesgo y conserva la decisión en PostgreSQL. La implementé con Java, Python y Docker Compose. El objetivo es demostrar una arquitectura hexagonal mediante una regla que podemos comprobar: las decisiones del negocio permanecen independientes de los mecanismos que reciben, almacenan y transportan datos.
 
 La arquitectura hexagonal, también llamada puertos y adaptadores, fue descrita por Alistair Cockburn en 2005. Su propuesta distingue el interior de la aplicación de su exterior. El interior contiene las reglas del dominio y los casos de uso. El exterior contiene tecnologías como HTTP, una base de datos o un framework. El hexágono es una representación visual; no exige seis servicios ni seis capas. [Artículo original de Cockburn](https://alistair.cockburn.us/hexagonal-architecture).
 
-Un puerto expresa un contrato que la aplicación ofrece o necesita. Un adaptador conecta ese contrato con una tecnología concreta. En HexaOrders, el controlador REST es un adaptador de entrada: transforma una solicitud en la operación de crear un pedido. El caso de uso consulta el riesgo mediante un puerto de salida, cuya implementación llama al servicio Python. Otro puerto permite guardar el pedido y su resultado mediante un adaptador PostgreSQL. Las dependencias del código apuntan hacia los contratos del núcleo.
+Un puerto expresa un contrato que la aplicación ofrece o necesita. Un adaptador conecta ese contrato con una tecnología concreta. En POLYMER, el controlador REST es un adaptador de entrada: transforma una solicitud en la operación de crear un pedido. El caso de uso consulta el riesgo mediante un puerto de salida, cuya implementación llama al servicio Python. Otro puerto permite guardar el pedido y su resultado mediante un adaptador PostgreSQL. Las dependencias del código apuntan hacia los contratos del núcleo.
 
 El servicio Java utiliza Spring Boot para HTTP, configuración e integración. El servicio Python utiliza FastAPI para exponer reglas deterministas de riesgo: no estamos presentando esas reglas como inteligencia artificial. Ambos conservan sus decisiones de negocio separadas de sus adaptadores. La comunicación es síncrona y tiene un tiempo máximo de espera. Consultamos el riesgo antes de persistir, evitando mantener una transacción de base de datos abierta durante una llamada de red.
 

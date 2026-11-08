@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: db
-  namespace: hexaorders
+  namespace: polymer
 spec:
   clusterIP: None
   selector:
@@ -17,7 +17,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: db
-  namespace: hexaorders
+  namespace: polymer
 spec:
   serviceName: db
   replicas: 1
@@ -28,7 +28,7 @@ spec:
     metadata:
       labels:
         app: db
-        app.kubernetes.io/part-of: hexaorders
+        app.kubernetes.io/part-of: polymer
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 60

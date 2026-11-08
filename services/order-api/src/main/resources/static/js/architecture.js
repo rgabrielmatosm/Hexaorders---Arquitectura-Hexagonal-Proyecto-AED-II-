@@ -9,7 +9,7 @@
 import { ApiError, ordersApi } from './api.js';
 import { $, $$, el, reducedMotion, toast } from './ui.js';
 
-const JAVA = 'services/order-api/src/main/java/com/hexaorders/';
+const JAVA = 'services/order-api/src/main/java/com/polymer/';
 const PY = 'services/risk-engine/risk_engine/';
 
 const NODES = [
@@ -412,7 +412,7 @@ async function runRequest() {
     } catch (error) {
       rows.push(evidenceRow('Relectura GET /api/orders/{id}', `falló: ${error.message}`));
     }
-    window.dispatchEvent(new CustomEvent('hexa:orders-changed'));
+    window.dispatchEvent(new CustomEvent('polymer:orders-changed'));
   } else {
     rows.push(evidenceRow('Estado HTTP', failure.status ? String(failure.status) : 'sin respuesta'));
     if (failure.title) rows.push(evidenceRow('Título (ProblemDetail)', failure.title));

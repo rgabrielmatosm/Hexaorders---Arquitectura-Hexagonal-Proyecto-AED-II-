@@ -12,13 +12,13 @@ import { el, formatDateTime, formatRelative } from '../ui.js';
 const ROLES = ['OBSERVABILITY_VIEWER', 'ADMIN'];
 
 export const DASHBOARDS = [
-  ['hexaorders', 'HexaOrders · Puertos, adaptadores y métricas', 'Dashboard original (conservado sin cambios).'],
-  ['hexaorders-business', 'Business Operations', 'Ciclo de vida, checkout, logística e incidencias.'],
-  ['hexaorders-risk', 'Risk Engine', 'Evaluaciones, latencias e integración Java → Python.'],
-  ['hexaorders-api', 'API Performance', 'Tráfico, percentiles y errores HTTP.'],
-  ['hexaorders-infrastructure', 'Infrastructure', 'Targets, JVM, HikariCP y scraping.'],
-  ['hexaorders-security', 'Security & Audit', 'Inicios de sesión, accesos denegados y actividad.'],
-  ['hexaorders-logistics', 'Logistics Operations', 'Entregas, conflictos de agenda y despacho.'],
+  ['polymer', 'POLYMER · Puertos, adaptadores y métricas', 'Dashboard original (conservado sin cambios).'],
+  ['polymer-business', 'Business Operations', 'Ciclo de vida, checkout, logística e incidencias.'],
+  ['polymer-risk', 'Risk Engine', 'Evaluaciones, latencias e integración Java → Python.'],
+  ['polymer-api', 'API Performance', 'Tráfico, percentiles y errores HTTP.'],
+  ['polymer-infrastructure', 'Infrastructure', 'Targets, JVM, HikariCP y scraping.'],
+  ['polymer-security', 'Security & Audit', 'Inicios de sesión, accesos denegados y actividad.'],
+  ['polymer-logistics', 'Logistics Operations', 'Entregas, conflictos de agenda y despacho.'],
 ];
 
 const head = (title, lead, ...actions) => el('div', { class: 'view__head' },
@@ -31,7 +31,7 @@ const external = (href, text) => el('a', { class: 'btn btn--ghost btn--sm', href
 function unavailableNotice() {
   return el('div', { class: 'notice-box notice-box--warn' }, el('strong', { text: 'Prometheus no responde. ' }),
     'order-api no pudo consultar http://prometheus:9090 dentro de la red de Docker. El resto de la aplicación sigue funcionando; revisa ',
-    el('code', { text: '.\\hexaorders.cmd status' }), '.');
+    el('code', { text: '.\\polymer.cmd status' }), '.');
 }
 
 const STATE = { firing: ['Disparada', 'error'], pending: ['Pendiente', 'warn'], inactive: ['Inactiva', 'ok'] };
@@ -54,7 +54,7 @@ route('/observabilidad-tecnica', async (root) => {
   const statuses = el('div', {}, skeletons(4, 'skeleton--row'));
   root.append(el('section', { class: 'view' },
     head('Salud técnica', 'Comprobaciones activas del backend y estado de Prometheus. Vista de solo lectura.',
-      external(`${GRAFANA_URL}/d/hexaorders`, 'Grafana'), external(`${PROMETHEUS_URL}/targets`, 'Prometheus')),
+      external(`${GRAFANA_URL}/d/polymer`, 'Grafana'), external(`${PROMETHEUS_URL}/targets`, 'Prometheus')),
     health,
     el('div', { class: 'grid-2-even card--spaced' },
       el('article', { class: 'card' }, el('h3', { class: 'card__title', text: 'Prometheus' }), prom),
@@ -118,7 +118,7 @@ route('/monitoreo/metricas', async (root) => {
   const checked = el('p', { class: 'muted small' });
   root.append(el('section', { class: 'view' },
     head('Métricas', 'Indicadores calculados por Prometheus con consultas fijas definidas en el adaptador (no se aceptan consultas arbitrarias desde el navegador).',
-      external(`${GRAFANA_URL}/d/hexaorders-business`, 'Business Operations'), external(`${GRAFANA_URL}/d/hexaorders-api`, 'API Performance')),
+      external(`${GRAFANA_URL}/d/polymer-business`, 'Business Operations'), external(`${GRAFANA_URL}/d/polymer-api`, 'API Performance')),
     checked, grid,
     el('p', { class: 'muted small card--spaced', text: '«sin datos» significa que todavía no hay muestras (por ejemplo, sin tráfico en los últimos 5 minutos), nunca un cero inventado.' })));
   const s = await opsApi.monitoring();

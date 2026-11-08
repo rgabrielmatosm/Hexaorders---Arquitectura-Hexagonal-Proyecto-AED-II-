@@ -152,8 +152,8 @@ def check():
     anon = Session()
     for _ in range(3):
         anon.call('GET', '/api/catalog/products', expect=200)
-    hits = eventually('aciertos de caché en Prometheus', lambda: sum(prom('hexaorders_cache_requests_total{result="hit"}')), timeout=60)
-    ok(hits > 0, f'Lecturas del catálogo servidas desde Redis ({hits:.0f} aciertos en hexaorders_cache_requests_total)')
+    hits = eventually('aciertos de caché en Prometheus', lambda: sum(prom('polymer_cache_requests_total{result="hit"}')), timeout=60)
+    ok(hits > 0, f'Lecturas del catálogo servidas desde Redis ({hits:.0f} aciertos en polymer_cache_requests_total)')
 
     print('RabbitMQ, consumidor idempotente y Mailpit')
     customer, email = new_customer()
@@ -173,7 +173,7 @@ def check():
        f"La cola de mensajes fallidos (DLQ) existe, es durable y está vacía (mensajes: {dlq.get('messages')}, argumentos: {dlq.get('arguments')})")
     exchange = get_json(f'{RABBITMQ}/api/exchanges/%2F/hexaorders.events', auth=rabbit)
     ok(exchange['type'] == 'topic' and exchange['durable'], 'Exchange hexaorders.events (topic, durable)')
-    eventually('outbox vacío', lambda: prom('hexaorders_outbox_pending') == [0.0], timeout=60)
+    eventually('outbox vacío', lambda: prom('polymer_outbox_pending') == [0.0], timeout=60)
     ok(True, 'Outbox transaccional vacío: todos los eventos confirmados por el broker')
 
     print('Trazas distribuidas (OpenTelemetry Collector → Tempo)')
@@ -231,8 +231,8 @@ def check():
     for uid in ['loki', 'tempo', 'prometheus']:
         status, raw, _ = http('GET', f'{GRAFANA}/api/datasources/uid/{uid}/health', auth=grafana_auth())
         ok(status == 200 and json.loads(raw).get('status') == 'OK', f'Fuente de datos {uid}: OK')
-    for uid in ['hexaorders', 'hexaorders-business', 'hexaorders-risk', 'hexaorders-api', 'hexaorders-infrastructure',
-                'hexaorders-security', 'hexaorders-logistics', 'hexaorders-integrations']:
+    for uid in ['polymer', 'polymer-business', 'polymer-risk', 'polymer-api', 'polymer-infrastructure',
+                'polymer-security', 'polymer-logistics', 'polymer-integrations']:
         dashboard = get_json(f'{GRAFANA}/api/dashboards/uid/{uid}', auth=grafana_auth())
         ok(dashboard['dashboard']['uid'] == uid, f'Dashboard {uid} aprovisionado')
 
@@ -246,7 +246,7 @@ def degraded(state: Path):
     customer, email = new_customer()
     order, _ = place_order(customer, products)
     ok(order['status'] in ('RISK_APPROVED', 'RISK_REVIEW'), 'Sin RabbitMQ el pedido se crea y se evalúa igualmente')
-    pending = eventually('eventos retenidos en el outbox', lambda: (lambda v: v[0] if v and v[0] > 0 else None)(prom('hexaorders_outbox_pending')), timeout=60)
+    pending = eventually('eventos retenidos en el outbox', lambda: (lambda v: v[0] if v and v[0] > 0 else None)(prom('polymer_outbox_pending')), timeout=60)
     ok(pending > 0, f'Los eventos esperan en el outbox ({pending:.0f} pendientes): no se pierden')
     state.write_text(json.dumps({'email': email, 'order': order['id']}), encoding='utf-8')
 
@@ -254,7 +254,7 @@ def degraded(state: Path):
 def recovered(state: Path):
     print('Recuperación: RabbitMQ de nuevo en marcha')
     saved = json.loads(state.read_text(encoding='utf-8'))
-    eventually('outbox vacío tras la recuperación', lambda: prom('hexaorders_outbox_pending') == [0.0], timeout=120)
+    eventually('outbox vacío tras la recuperación', lambda: prom('polymer_outbox_pending') == [0.0], timeout=120)
     ok(True, 'El outbox se vació al volver RabbitMQ')
     messages = eventually('correos del pedido retenido', lambda: (lambda m: m if len(m) >= 2 else None)(mails_to(saved['email'])), timeout=120)
     ok(all(saved['order'][:8] in m['Subject'] for m in messages), f'Llegaron los correos del pedido creado durante la caída ({len(messages)})')
@@ -279,7 +279,7 @@ def persist_read(state: Path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('command', choices=['check', 'degraded', 'recovered', 'persist-write', 'persist-read'])
-    parser.add_argument('--state', type=Path, default=Path(os.environ.get('TEMP', '/tmp')) / 'hexaorders-integration-state.json')
+    parser.add_argument('--state', type=Path, default=Path(os.environ.get('TEMP', '/tmp')) / 'polymer-integration-state.json')
     args = parser.parse_args()
     {'check': check, 'degraded': lambda: degraded(args.state), 'recovered': lambda: recovered(args.state),
      'persist-write': lambda: persist_write(args.state), 'persist-read': lambda: persist_read(args.state)}[args.command]()

@@ -11,8 +11,8 @@ from risk_engine.application.score_risk import ScoreRisk
 def test_tracing_is_off_unless_explicitly_enabled():
     assert tracing_endpoint({}) is None
     assert tracing_endpoint({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318"}) is None
-    assert tracing_endpoint({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318/", "HEXAORDERS_INTEGRATIONS": "on"}) == "http://otel-collector:4318"
-    assert tracing_endpoint({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://no-such-host.invalid:4318", "HEXAORDERS_INTEGRATIONS": "auto"}) is None
+    assert tracing_endpoint({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4318/", "POLYMER_INTEGRATIONS": "on"}) == "http://otel-collector:4318"
+    assert tracing_endpoint({"OTEL_EXPORTER_OTLP_ENDPOINT": "http://no-such-host.invalid:4318", "POLYMER_INTEGRATIONS": "auto"}) is None
     assert instrument(create_app(ScoreRisk()), environ={}) is False
 
 

@@ -2,7 +2,7 @@ global:
   scrape_interval: 10s
   evaluation_interval: 10s
   external_labels:
-    project: hexaorders
+    project: polymer
 rule_files:
   - /etc/prometheus/alerts.yml
 scrape_configs:

@@ -5,14 +5,14 @@
 FROM grafana/grafana:12.4.1
 COPY provisioning/datasource.yml /etc/grafana/provisioning/datasources/prometheus.yml
 COPY provisioning/dashboards.yml /etc/grafana/provisioning/dashboards/default.yml
-COPY dashboards/hexaorders.json /etc/grafana/dashboards/hexaorders.json
-# v3: dashboards añadidos (el original hexaorders.json se conserva sin cambios).
-COPY dashboards/hexaorders-business.json /etc/grafana/dashboards/hexaorders-business.json
-COPY dashboards/hexaorders-risk.json /etc/grafana/dashboards/hexaorders-risk.json
-COPY dashboards/hexaorders-api.json /etc/grafana/dashboards/hexaorders-api.json
-COPY dashboards/hexaorders-infrastructure.json /etc/grafana/dashboards/hexaorders-infrastructure.json
-COPY dashboards/hexaorders-security.json /etc/grafana/dashboards/hexaorders-security.json
-COPY dashboards/hexaorders-logistics.json /etc/grafana/dashboards/hexaorders-logistics.json
+COPY dashboards/polymer.json /etc/grafana/dashboards/polymer.json
+# v3: dashboards añadidos (el original polymer.json se conserva sin cambios).
+COPY dashboards/polymer-business.json /etc/grafana/dashboards/polymer-business.json
+COPY dashboards/polymer-risk.json /etc/grafana/dashboards/polymer-risk.json
+COPY dashboards/polymer-api.json /etc/grafana/dashboards/polymer-api.json
+COPY dashboards/polymer-infrastructure.json /etc/grafana/dashboards/polymer-infrastructure.json
+COPY dashboards/polymer-security.json /etc/grafana/dashboards/polymer-security.json
+COPY dashboards/polymer-logistics.json /etc/grafana/dashboards/polymer-logistics.json
 # v5: fuentes Loki y Tempo (archivo nuevo; datasource.yml no cambia) y dashboard de integraciones.
 COPY provisioning/datasource-logs-traces.yml /etc/grafana/provisioning/datasources/logs-traces.yml
-COPY dashboards/hexaorders-integrations.json /etc/grafana/dashboards/hexaorders-integrations.json
+COPY dashboards/polymer-integrations.json /etc/grafana/dashboards/polymer-integrations.json

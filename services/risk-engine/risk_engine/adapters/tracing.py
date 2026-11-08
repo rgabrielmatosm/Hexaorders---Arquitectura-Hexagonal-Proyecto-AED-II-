@@ -1,7 +1,7 @@
 """Driven adapter for distributed tracing (OpenTelemetry → OTLP/HTTP → otel-collector → Tempo).
 
 Only the composition root calls it. It is enabled when OTEL_EXPORTER_OTLP_ENDPOINT is set and
-HEXAORDERS_INTEGRATIONS is "on", or "auto" and the collector host resolves in Docker's DNS (full
+POLYMER_INTEGRATIONS is "on", or "auto" and the collector host resolves in Docker's DNS (full
 profile). Otherwise the app runs exactly as before, without exporting anything.
 """
 
@@ -17,7 +17,7 @@ from fastapi import FastAPI
 def tracing_endpoint(environ: dict[str, str] | None = None) -> str | None:
     env = os.environ if environ is None else environ
     endpoint = env.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
-    mode = env.get("HEXAORDERS_INTEGRATIONS", "off").strip().lower()
+    mode = env.get("POLYMER_INTEGRATIONS", "off").strip().lower()
     if not endpoint or mode not in ("on", "auto"):
         return None
     if mode == "auto":

@@ -207,9 +207,9 @@ def main():
 
     if PROMETHEUS:
         print('Métricas nuevas en Prometheus')
-        wanted = ['hexaorders_shop_orders_placed_total', 'hexaorders_order_transitions_total', 'hexaorders_orders_by_status',
-                  'hexaorders_auth_logins_total', 'hexaorders_deliveries_total', 'hexaorders_delivery_conflicts_total',
-                  'hexaorders_incidents_reported_total', 'hexaorders_access_denied_total', 'jvm_memory_used_bytes',
+        wanted = ['polymer_shop_orders_placed_total', 'polymer_order_transitions_total', 'polymer_orders_by_status',
+                  'polymer_auth_logins_total', 'polymer_deliveries_total', 'polymer_delivery_conflicts_total',
+                  'polymer_incidents_reported_total', 'polymer_access_denied_total', 'jvm_memory_used_bytes',
                   'hikaricp_connections_active', 'orders_created_total', 'risk_evaluations_total']
         for attempt in range(20):
             with urllib.request.urlopen(PROMETHEUS + '/api/v1/label/__name__/values', timeout=10) as response:

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Gateway web de HexaOrders (ADR 0011): Nginx sirve los recursos estáticos públicos (css, js, img)
+# Gateway web de POLYMER (ADR 0011): Nginx sirve los recursos estáticos públicos (css, js, img)
 # y reenvía TODO lo demás (páginas HTML y /api) a order-api, que conserva Spring Security, la
 # sesión, el CSRF y la protección de páginas por rol. Imagen sin privilegios (puerto 8080 interno).
 FROM busybox:1.37.0-musl AS tools

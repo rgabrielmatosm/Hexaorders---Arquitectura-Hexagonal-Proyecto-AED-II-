@@ -43,7 +43,7 @@ def _invalid_json_constant(value: str) -> None:
 
 
 def create_app(score_risk: ScoreRiskPort) -> FastAPI:
-    app = FastAPI(title="HexaOrders risk engine", version="1.0.0")
+    app = FastAPI(title="POLYMER risk engine", version="1.0.0")
     # A private registry lets each test instantiate a clean application.
     registry = CollectorRegistry()
     evaluations = Counter(

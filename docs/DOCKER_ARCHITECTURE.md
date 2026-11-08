@@ -1,6 +1,6 @@
-# Arquitectura Docker de HexaOrders (v5)
+# Arquitectura Docker de POLYMER (v5)
 
-HexaOrders se ejecuta íntegramente con Docker Compose en **dos modos**:
+POLYMER se ejecuta íntegramente con Docker Compose en **dos modos**:
 
 - **básico**: 6 contenedores;
 - **completo** (perfil `full`): 13 contenedores.
@@ -110,14 +110,14 @@ flowchart TB
 | | Básico | Completo (`full`) |
 | --- | --- | --- |
 | Contenedores | db, risk-engine, order-api, prometheus, grafana, frontend | + redis, rabbitmq, mailpit, loki, tempo, otel-collector, alloy |
-| PowerShell | `.\hexaorders.cmd start -Mode basic` | `.\hexaorders.cmd start` (por defecto) |
+| PowerShell | `.\polymer.cmd start -Mode basic` | `.\polymer.cmd start` (por defecto) |
 | Docker directo | `docker compose up --build -d` | `$env:COMPOSE_PROFILES='full'; docker compose up --build -d` |
 | Pedidos, portales, seguridad, métricas, dashboards | ✅ | ✅ |
 | Caché Redis | catálogo desde PostgreSQL | ✅ |
 | Eventos y correos | eventos guardados en el outbox, sin envío | ✅ RabbitMQ → Mailpit |
 | Trazas y logs centralizados | — | ✅ Tempo y Loki |
 
-**Cómo sabe order-api qué hay desplegado.** Al arrancar, `IntegrationEnvironment` comprueba si los nombres `redis`, `rabbitmq` y `otel-collector` resuelven en el DNS de Docker (`HEXAORDERS_INTEGRATIONS=auto`). Con eso activa o desactiva cada integración, sin interruptores manuales. Las dependencias de arranque del perfil completo se declaran con `required: false`, así que en el modo básico no bloquean.
+**Cómo sabe order-api qué hay desplegado.** Al arrancar, `IntegrationEnvironment` comprueba si los nombres `redis`, `rabbitmq` y `otel-collector` resuelven en el DNS de Docker (`POLYMER_INTEGRATIONS=auto`). Con eso activa o desactiva cada integración, sin interruptores manuales. Las dependencias de arranque del perfil completo se declaran con `required: false`, así que en el modo básico no bloquean.
 
 **Degradación en tiempo de ejecución.** Si Redis o RabbitMQ se detienen con el sistema en marcha, la aplicación sigue funcionando:
 
@@ -134,7 +134,7 @@ Lo prueba `verify`, en los pasos 7b, `degraded` y `recovered`.
 | <http://127.0.0.1:3000> | Grafana (usuario `admin`, `secrets\grafana_password.txt`) | ambos |
 | <http://127.0.0.1:9091> | Prometheus | ambos |
 | <http://127.0.0.1:8025> | Mailpit (correos capturados) | full |
-| <http://127.0.0.1:15672> | Consola de RabbitMQ (usuario `hexaorders`, `secrets\rabbitmq_password.txt`) | full |
+| <http://127.0.0.1:15672> | Consola de RabbitMQ (usuario `polymer`, `secrets\rabbitmq_password.txt`) | full |
 
 ## 5. Volúmenes persistentes
 
@@ -149,7 +149,7 @@ Lo prueba `verify`, en los pasos 7b, `degraded` y `recovered`.
 | `tempo_data` | tempo | Trazas (retención de 72 h) |
 | `alloy_data` | alloy | Posiciones de lectura de logs |
 
-`.\hexaorders.cmd stop` (o `docker compose down`) **conserva** todos los volúmenes. Solo `stop -RemoveData` los borra. Nunca se usa `down -v` como solución automática.
+`.\polymer.cmd stop` (o `docker compose down`) **conserva** todos los volúmenes. Solo `stop -RemoveData` los borra. Nunca se usa `down -v` como solución automática.
 
 ## 6. Secretos
 
@@ -160,7 +160,7 @@ Hay cuatro archivos en `secrets\`, excluidos de Git, generados por `tools\init-e
 | `db_password.txt` | PostgreSQL |
 | `grafana_password.txt` | Usuario `admin` de Grafana |
 | `demo_password.txt` | Cuentas de demostración |
-| `rabbitmq_password.txt` | Usuario `hexaorders` de RabbitMQ (v5) |
+| `rabbitmq_password.txt` | Usuario `polymer` de RabbitMQ (v5) |
 
 Si existe el volumen de PostgreSQL, Grafana o RabbitMQ pero falta su secreto, `start` se detiene con instrucciones en lugar de generar una contraseña nueva que dejaría el servicio sin acceso a sus datos.
 
@@ -173,7 +173,7 @@ Si existe el volumen de PostgreSQL, Grafana o RabbitMQ pero falta su secreto, `s
 - Imágenes con versión fijada y usuarios sin privilegios: Nginx `nginx-unprivileged`, Redis 999, Loki y Tempo 10001.
 - Límites de memoria y CPU.
 - Rotación de logs (`json-file`, 3 × 10 MB).
-- **Única montura del host:** el socket de Docker, en solo lectura, para Alloy, que solo lee los logs de los contenedores con la etiqueta `com.hexaorders.logs=true`.
+- **Única montura del host:** el socket de Docker, en solo lectura, para Alloy, que solo lee los logs de los contenedores con la etiqueta `com.polymer.logs=true`.
 
 `tools/validate_delivery.py` comprueba todo esto en `check` y en el CI.
 
@@ -194,9 +194,9 @@ En un equipo con 8 GB de RAM usa el **modo básico**. El modo completo puede fun
 
 | Variable | Servicio | Valor en Compose |
 | --- | --- | --- |
-| `HEXAORDERS_INTEGRATIONS` | order-api, risk-engine | `auto` (activa cada integración si su servicio existe) |
+| `POLYMER_INTEGRATIONS` | order-api, risk-engine | `auto` (activa cada integración si su servicio existe) |
 | `REDIS_HOST` | order-api | `redis` |
-| `RABBITMQ_HOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD_FILE` | order-api | `rabbitmq`, `hexaorders`, `/run/secrets/rabbitmq_password` |
+| `RABBITMQ_HOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD_FILE` | order-api | `rabbitmq`, `polymer`, `/run/secrets/rabbitmq_password` |
 | `SMTP_HOST`, `SMTP_PORT` | order-api | `mailpit`, `1025` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | order-api, risk-engine | `http://otel-collector:4318` |
 | `OTEL_SERVICE_NAME` | risk-engine | `risk-engine` |
@@ -205,14 +205,14 @@ En un equipo con 8 GB de RAM usa el **modo básico**. El modo completo puede fun
 ## 10. Comandos
 
 ```powershell
-.\hexaorders.cmd start              # modo completo (13 contenedores)
-.\hexaorders.cmd start -Mode basic  # modo básico (6 contenedores)
-.\hexaorders.cmd status
-.\hexaorders.cmd logs
-.\hexaorders.cmd smoke              # pruebas HTTP e integraciones contra tu entorno en marcha
-.\hexaorders.cmd stop               # conserva los datos
-.\hexaorders.cmd check              # validación sin Docker
-.\hexaorders.cmd verify             # prueba integral aislada (la misma del CI)
+.\polymer.cmd start              # modo completo (13 contenedores)
+.\polymer.cmd start -Mode basic  # modo básico (6 contenedores)
+.\polymer.cmd status
+.\polymer.cmd logs
+.\polymer.cmd smoke              # pruebas HTTP e integraciones contra tu entorno en marcha
+.\polymer.cmd stop               # conserva los datos
+.\polymer.cmd check              # validación sin Docker
+.\polymer.cmd verify             # prueba integral aislada (la misma del CI)
 ```
 
 Guía completa para Windows: [`WINDOWS_DOCKER_GUIDE.md`](WINDOWS_DOCKER_GUIDE.md).

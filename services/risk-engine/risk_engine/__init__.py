@@ -1,1 +1,1 @@
-"""HexaOrders risk scoring service."""
+"""POLYMER risk scoring service."""

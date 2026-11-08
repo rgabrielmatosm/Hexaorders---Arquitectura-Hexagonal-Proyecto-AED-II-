@@ -1,4 +1,4 @@
-# Guía para enseñar y defender HexaOrders
+# Guía para enseñar y defender POLYMER
 
 Preparada el 21 de octubre de 2026 a partir del código del proyecto. Pensada para alguien con conocimientos básicos de programación que todavía no domina Docker ni arquitectura hexagonal.
 
@@ -10,7 +10,7 @@ Enseña en este orden: **problema → recorrido de un pedido → responsabilidad
 
 ## 2. Explicación inicial, en 30 segundos
 
-«HexaOrders es un sistema que registra pedidos y calcula su nivel de riesgo. El usuario introduce un cliente y un importe. Java recibe la solicitud, pide a Python que calcule el riesgo, determina si el pedido se aprueba o requiere revisión y lo guarda en PostgreSQL. Docker Compose permite levantar todos los servicios juntos. Prometheus recoge métricas y Grafana las representa. La arquitectura hexagonal mantiene las reglas de negocio independientes de esas tecnologías».
+«POLYMER es un sistema que registra pedidos y calcula su nivel de riesgo. El usuario introduce un cliente y un importe. Java recibe la solicitud, pide a Python que calcule el riesgo, determina si el pedido se aprueba o requiere revisión y lo guarda en PostgreSQL. Docker Compose permite levantar todos los servicios juntos. Prometheus recoge métricas y Grafana las representa. La arquitectura hexagonal mantiene las reglas de negocio independientes de esas tecnologías».
 
 El riesgo es una **regla de demostración basada en el importe**. No es inteligencia artificial ni una probabilidad de fraude obtenida de datos reales. `REVIEW` significa revisión, no rechazo del pedido. No se realizan pagos, despachos ni comprobaciones de identidad.
 
@@ -128,7 +128,7 @@ Usa esta analogía: el negocio pide «guarda este pedido» mediante un contrato.
 | Adaptadores de salida | `HttpRiskAssessmentAdapter`, `JdbcOrderRepository`, `MicrometerOrderTelemetry` | Implementan HTTP, persistencia y métricas. |
 | Composición | `config/HexagonalConfiguration.java` | Selecciona e inyecta las implementaciones concretas. |
 
-Todos esos caminos Java parten de `services/order-api/src/main/java/com/hexaorders/`.
+Todos esos caminos Java parten de `services/order-api/src/main/java/com/polymer/`.
 
 En Python, parte de `services/risk-engine/risk_engine/`: `adapters/http.py` recibe HTTP; `application/ports.py` define `ScoreRiskPort`; `application/score_risk.py` contiene el caso de uso; `domain/risk.py` conserva la regla; `bootstrap.py` conecta los componentes. Python no necesita un puerto de salida artificial: su cálculo no llama a otra infraestructura.
 
@@ -175,10 +175,10 @@ En una máquina con Docker Desktop iniciado (contenedores Linux, Compose >= 2.23
 
 ```powershell
 Set-Location 'C:\Users\frank\Downloads\PROYECTO DOCKER'
-.\hexaorders.cmd start
+.\polymer.cmd start
 ```
 
-`hexaorders.cmd start` muestra cada etapa en pantalla; explica cada una: generar las contraseñas si faltan, validar la configuración, construir las imágenes ejecutando los tests, arrancar esperando a que los servicios estén sanos y mostrar el estado y las direcciones. Si quieres enseñar los comandos de Docker uno a uno, son estos:
+`polymer.cmd start` muestra cada etapa en pantalla; explica cada una: generar las contraseñas si faltan, validar la configuración, construir las imágenes ejecutando los tests, arrancar esperando a que los servicios estén sanos y mostrar el estado y las direcciones. Si quieres enseñar los comandos de Docker uno a uno, son estos:
 
 ```powershell
 .\tools\init-env.ps1
@@ -189,11 +189,11 @@ docker compose up -d --wait --wait-timeout 240
 docker compose ps
 ```
 
-Antes de la sesión puedes ejecutar `.\hexaorders.cmd verify` para repetir en tu equipo la misma prueba integral que pasa en GitHub (requiere tener detenido el entorno con `.\hexaorders.cmd stop`). El primer build descarga imágenes y dependencias: hazlo antes de la sesión para no depender del tiempo de descarga durante la explicación.
+Antes de la sesión puedes ejecutar `.\polymer.cmd verify` para repetir en tu equipo la misma prueba integral que pasa en GitHub (requiere tener detenido el entorno con `.\polymer.cmd stop`). El primer build descarga imágenes y dependencias: hazlo antes de la sesión para no depender del tiempo de descarga durante la explicación.
 
 El script crea `secrets\db_password.txt` y `secrets\grafana_password.txt` si no existen (reutiliza las contraseñas de un `.env` anterior). Compose los monta como archivos de solo lectura; no hace falta cargar nada en cada terminal nueva. Si una política de PowerShell impide ejecutarlo, revisa esa restricción antes de la sesión; no cambies políticas de todo el equipo sin necesidad. `secrets/` debe conservarse privado y está excluido de Git. No lo proyectes ni lo incluyas en capturas.
 
-Accesos: aplicación `http://127.0.0.1:8080`; Grafana `http://127.0.0.1:3000/d/hexaorders`; targets Prometheus `http://127.0.0.1:9091/targets`; alertas `http://127.0.0.1:9091/alerts`. Grafana utiliza `admin` y la contraseña generada para esa instalación.
+Accesos: aplicación `http://127.0.0.1:8080`; Grafana `http://127.0.0.1:3000/d/polymer`; targets Prometheus `http://127.0.0.1:9091/targets`; alertas `http://127.0.0.1:9091/alerts`. Grafana utiliza `admin` y la contraseña generada para esa instalación.
 
 ## 11. Demostración guiada con evidencias
 
@@ -263,8 +263,8 @@ Si deseas observar la alerta de servicio caído, mantén Python detenido hasta q
 ### F. Mostrar conservación de datos
 
 ```powershell
-.\hexaorders.cmd stop
-.\hexaorders.cmd start
+.\polymer.cmd stop
+.\polymer.cmd start
 Invoke-RestMethod http://127.0.0.1:8080/api/orders
 ```
 
@@ -323,7 +323,7 @@ No uses capturas de contraseñas. Si una comprobación no se ejecutó o falló, 
 12. `infra/prometheus/` e `infra/grafana/`: observabilidad.
 13. Pruebas de arquitectura de ambos servicios: evidencia de la regla de dependencias.
 
-El árbol completo está en `docs/estructura.txt`. Los caminos Java abreviados de esta lista parten de `services/order-api/src/main/java/com/hexaorders/`; la migración parte de `src/main/resources/db/migration/` de ese servicio.
+El árbol completo está en `docs/estructura.txt`. Los caminos Java abreviados de esta lista parten de `services/order-api/src/main/java/com/polymer/`; la migración parte de `src/main/resources/db/migration/` de ese servicio.
 
 ## 14. Preguntas para ensayar la defensa
 

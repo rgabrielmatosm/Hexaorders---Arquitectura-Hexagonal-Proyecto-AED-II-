@@ -92,7 +92,7 @@ export async function grafanaReachable() {
 
 /** Notifica a la interfaz el resultado de la última llamada a la API Java. */
 export function reportApiStatus(ok, detail = '') {
-  window.dispatchEvent(new CustomEvent('hexa:api-status', { detail: { ok, detail, at: new Date() } }));
+  window.dispatchEvent(new CustomEvent('polymer:api-status', { detail: { ok, detail, at: new Date() } }));
 }
 
 // ---- Plataforma v3: escrituras con sesión y token CSRF ------------------------
@@ -142,7 +142,7 @@ export async function send(method, url, body, { headers = {}, retry = true } = {
     return send(method, url, body, { headers, retry: false });
   }
   if (response.status === 401 && url !== '/api/auth/login') {
-    window.dispatchEvent(new CustomEvent('hexa:unauthenticated'));
+    window.dispatchEvent(new CustomEvent('polymer:unauthenticated'));
   }
   if (!response.ok) {
     const message = (data && (data.detail || data.title)) || `Error HTTP ${response.status}`;

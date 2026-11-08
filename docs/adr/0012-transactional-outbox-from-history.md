@@ -23,7 +23,7 @@ Funcionamiento:
 
 - Entrega **al menos una vez**, sin pérdidas. No se afirma «exactamente una vez».
 - Los eventos no llevan datos personales; el consumidor busca el destinatario por `orderId`.
-- Si RabbitMQ no está, los pedidos funcionan y los eventos esperan (`hexaorders_outbox_pending`).
+- Si RabbitMQ no está, los pedidos funcionan y los eventos esperan (`polymer_outbox_pending`).
 - Los eventos derivan del historial, así que cualquier cambio futuro de estado genera su evento sin código adicional en los casos de uso.
 
 Detalle: [`ASYNCHRONOUS_EVENTS.md`](../ASYNCHRONOUS_EVENTS.md).

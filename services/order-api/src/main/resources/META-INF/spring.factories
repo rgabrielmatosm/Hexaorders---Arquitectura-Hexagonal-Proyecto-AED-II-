@@ -1,1 +1,1 @@
-org.springframework.boot.env.EnvironmentPostProcessor=com.hexaorders.config.IntegrationEnvironment
+org.springframework.boot.env.EnvironmentPostProcessor=com.polymer.config.IntegrationEnvironment

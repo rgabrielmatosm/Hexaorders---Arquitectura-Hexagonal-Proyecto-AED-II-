@@ -4,8 +4,8 @@
 FROM rabbitmq:4.1.8-management-alpine
 COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
 COPY enabled_plugins /etc/rabbitmq/enabled_plugins
-COPY hexaorders-entrypoint.sh /usr/local/bin/hexaorders-entrypoint.sh
-RUN chmod 0755 /usr/local/bin/hexaorders-entrypoint.sh
-ENTRYPOINT ["/usr/local/bin/hexaorders-entrypoint.sh"]
+COPY polymer-entrypoint.sh /usr/local/bin/polymer-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/polymer-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/polymer-entrypoint.sh"]
 CMD ["rabbitmq-server"]
 HEALTHCHECK --interval=10s --timeout=10s --start-period=40s --retries=10 CMD ["rabbitmq-diagnostics", "-q", "ping"]

@@ -1,6 +1,6 @@
-# Arquitectura hexagonal de HexaOrders (v4 y v5)
+# Arquitectura hexagonal de POLYMER (v4 y v5)
 
-Este documento describe cómo está organizado el código y por qué la arquitectura hexagonal es **verificable**, no decorativa. Las rutas son relativas a `services/order-api/src/main/java/com/hexaorders/` salvo que se indique otra cosa.
+Este documento describe cómo está organizado el código y por qué la arquitectura hexagonal es **verificable**, no decorativa. Las rutas son relativas a `services/order-api/src/main/java/com/polymer/` salvo que se indique otra cosa.
 
 ## 1. Regla de dependencias
 
@@ -8,7 +8,7 @@ Este documento describe cómo está organizado el código y por qué la arquitec
 flowchart LR
     subgraph IN [Adaptadores de entrada · adapter/in/web]
         REST[Controladores REST<br/>ShopController, OperationsController,<br/>LogisticsController, OpsController, ContactController…]
-        SEC[Spring Security<br/>SecurityConfiguration + HexaUserPrincipal]
+        SEC[Spring Security<br/>SecurityConfiguration + PolymerUserPrincipal]
     end
     subgraph CORE [Núcleo]
         PIN[Puertos de entrada<br/>application/port/in]
@@ -152,7 +152,7 @@ sequenceDiagram
         R->>PY: POST /score (timeouts)
         PY-->>R: riskScore 0–100
         CS->>DB: placeOrder (una transacción: pedido, líneas, dirección, stock condicional, historial)
-        CS->>M: orders_created, hexaorders_shop_orders_placed
+        CS->>M: orders_created, polymer_shop_orders_placed
         CS-->>S: PlacementResult(created=true)
         S-->>P: 201 Created
         P->>C: redirige a /cliente/seguimiento.html?id=…
@@ -305,7 +305,7 @@ flowchart LR
 `ObservedPortsConfiguration` registra un `BeanPostProcessor`. Cada bean que implementa un puerto de `application.port.in` o `application.port.out` se envuelve en un proxy JDK, que abre una *Observation* por llamada. Así se obtiene:
 
 - un span por caso de uso y por puerto en Tempo, por ejemplo `commerce-use-cases.place-order`, `commerce-order-repository.place-order` y `risk-assessment-port.assess`;
-- un temporizador `hexaorders_port_calls_seconds{kind,port,method}` en Prometheus.
+- un temporizador `polymer_port_calls_seconds{kind,port,method}` en Prometheus.
 
 Los servicios y el dominio no conocen Micrometer.
 

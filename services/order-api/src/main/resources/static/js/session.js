@@ -25,7 +25,7 @@ export function homeFor(user) {
   return '/catalogo.html';
 }
 
-function emit() { window.dispatchEvent(new CustomEvent('hexa:session', { detail: current })); }
+function emit() { window.dispatchEvent(new CustomEvent('polymer:session', { detail: current })); }
 
 export const session = {
   user: () => current,

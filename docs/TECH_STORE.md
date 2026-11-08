@@ -1,4 +1,4 @@
-# HexaOrders v6 — tienda tecnológica (documentación técnica)
+# POLYMER v6 — tienda tecnológica (documentación técnica)
 
 La v6 convierte la interfaz en una **tienda virtual de tecnología**. Este documento es técnico: explica cómo se implementó. La tienda (`http://localhost:8080`) no muestra nada de esto; lo comprueban `tools/check_frontend.py` y `tools/ui-e2e/pages-e2e.js`.
 
@@ -89,7 +89,7 @@ Regenerar el catálogo después de editar los datos:
 
 ```powershell
 py tools\generate_catalog.py          # escribe V7 (solo antes de publicarla; las migraciones aplicadas no se modifican)
-py tools\generate_catalog.py --check  # lo ejecuta .\hexaorders.cmd check y el CI
+py tools\generate_catalog.py --check  # lo ejecuta .\polymer.cmd check y el CI
 ```
 
 Los filtros técnicos (`procesador`, `ram`, `almacenamiento`, `gpu`, `pantalla`, `resolucion`, `frecuencia`, `conectividad`, `bateria`, `capacidad`, `potencia`, `formato`) **se derivan de la ficha técnica**, así que siempre corresponden a atributos reales. Las marcas y modelos son reales para que la búsqueda resulte realista. **Los precios, el stock y las promociones son de demostración**, no ofertas del mercado; el pie de la tienda lo indica.
@@ -143,6 +143,6 @@ Compatibilidad:
 ## 7. Persistencia y actualización desde la v5
 
 - Al arrancar la v6 sobre una base v5, Flyway aplica V6 y V7 **una sola vez** y conserva usuarios, contraseñas y pedidos.
-- Detener Docker, reiniciar o reconstruir imágenes no repite ni pierde nada: el catálogo vive en el volumen `hexaorders_postgres_data`.
+- Detener Docker, reiniciar o reconstruir imágenes no repite ni pierde nada: el catálogo vive en el volumen `polymer_postgres_data`.
 - El administrador puede editar productos, precios y promociones; esos cambios **no se pisan**, porque V7 nunca vuelve a ejecutarse e inserta con `ON CONFLICT DO NOTHING`.
-- La caché de Redis usa claves nuevas (`hexaorders:catalog6:…`), así que ninguna entrada de la v5 se mezcla con la v6.
+- La caché de Redis usa claves nuevas (`polymer:catalog6:…`), así que ninguna entrada de la v5 se mezcla con la v6.

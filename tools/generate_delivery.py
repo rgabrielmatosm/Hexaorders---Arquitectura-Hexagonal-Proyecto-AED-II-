@@ -124,16 +124,16 @@ def monitoring_configmap() -> str:
         'alerts.yml': 'infra/prometheus/alerts.yml',
         'datasource.yml': 'infra/grafana/provisioning/datasource.yml',
         'dashboards.yml': 'infra/grafana/provisioning/dashboards.yml',
-        'hexaorders.json': 'infra/grafana/dashboards/hexaorders.json',
-        'hexaorders-business.json': 'infra/grafana/dashboards/hexaorders-business.json',
-        'hexaorders-risk.json': 'infra/grafana/dashboards/hexaorders-risk.json',
-        'hexaorders-api.json': 'infra/grafana/dashboards/hexaorders-api.json',
-        'hexaorders-infrastructure.json': 'infra/grafana/dashboards/hexaorders-infrastructure.json',
-        'hexaorders-security.json': 'infra/grafana/dashboards/hexaorders-security.json',
-        'hexaorders-logistics.json': 'infra/grafana/dashboards/hexaorders-logistics.json',
-        'hexaorders-integrations.json': 'infra/grafana/dashboards/hexaorders-integrations.json',
+        'polymer.json': 'infra/grafana/dashboards/polymer.json',
+        'polymer-business.json': 'infra/grafana/dashboards/polymer-business.json',
+        'polymer-risk.json': 'infra/grafana/dashboards/polymer-risk.json',
+        'polymer-api.json': 'infra/grafana/dashboards/polymer-api.json',
+        'polymer-infrastructure.json': 'infra/grafana/dashboards/polymer-infrastructure.json',
+        'polymer-security.json': 'infra/grafana/dashboards/polymer-security.json',
+        'polymer-logistics.json': 'infra/grafana/dashboards/polymer-logistics.json',
+        'polymer-integrations.json': 'infra/grafana/dashboards/polymer-integrations.json',
     }
-    doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'hexaorders'},
+    doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'polymer'},
            'data': {key: read_text(ROOT / value) for key, value in paths.items()}}
     return json.dumps(doc, ensure_ascii=False, indent=2) + '\n'
 

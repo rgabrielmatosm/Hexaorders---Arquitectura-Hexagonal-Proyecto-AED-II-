@@ -1,6 +1,6 @@
 # ADR 0016 — Marca POLYMER en la capa de presentación
 
-- **Estado:** aceptada (POLYMER)
+- **Estado:** aceptada; el punto 1 fue **sustituido por la [ADR 0017](0017-polymer-technical-identity-and-safe-volume-migration.md)**, que extiende el nombre POLYMER a la identidad técnica
 - **Contexto:** la tienda v6 debía convertirse en una marca comercial, **POLYMER** («Tecnología que conecta contigo.»), con estos elementos:
   - logotipo propio, intro cinematográfica, sistema de movimiento y sonidos;
   - pie comercial completo e identidad común para todos los roles.
@@ -9,10 +9,7 @@
 
 ## Decisión
 
-1. **Separar marca comercial y nombre técnico.**
-   - POLYMER es lo que ve la persona: títulos, logotipo, textos, correos y pie.
-   - HexaOrders sigue siendo el nombre del sistema: `com.hexaorders`, `hexaorders_*`, `hexaorders.mail.from`, la red y los volúmenes de Docker, los dashboards y las claves del navegador.
-   - El dominio y la aplicación no cambian. Las únicas piezas Java tocadas son textos, como la firma del correo o la marca por defecto, y un tema de contacto nuevo (`CLAIM`).
+1. **Primera etapa: solo la capa de presentación.** Títulos, logotipo, textos, correos y pie pasaron a POLYMER sin tocar paquetes, contenedores ni métricas. *(Sustituido por la ADR 0017: después se migró también la identidad técnica.)*
 2. **Configuración de marca en un único módulo** (`static/js/brand.js`): nombre, eslogan, contacto, datos legales, redes, métodos de pago e intro.
    - Los datos que no existen se dejan en `null` y se muestran como «no configurado»: RUC, razón social y cuentas oficiales.
    - Los de contacto usan valores de demostración marcados como tales.
@@ -37,7 +34,7 @@
 
 ## Consecuencias
 
-- **Revertir la marca** es reversible y acotado: basta con volver a la etiqueta `pre-polymer` del repositorio. V8 solo cambia textos de productos, y una V9 podría devolverlos si hiciera falta.
+- **Revertir la marca** es acotado: V8 solo cambia textos de productos.
 - **Comprobaciones automáticas de la marca:**
   - `check_frontend.py` falla si la marca anterior aparece en un texto visible de la tienda o si un enlace interno lleva a una página inexistente;
   - `pages-e2e.js` comprueba el texto visible con todos los roles;

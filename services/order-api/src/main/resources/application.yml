@@ -11,6 +11,7 @@ spring:
   rabbitmq:
     host: ${RABBITMQ_HOST:rabbitmq}
     port: 5672
+    # Usuario heredado: RabbitMQ lo guardó en su volumen al inicializarse (docs/MIGRACION_POLYMER.md).
     username: ${RABBITMQ_USER:hexaorders}
     publisher-confirm-type: correlated
     publisher-returns: true

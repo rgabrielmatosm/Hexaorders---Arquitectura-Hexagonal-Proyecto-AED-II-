@@ -2,10 +2,11 @@
 
 > **Tecnología que conecta contigo.**
 
-POLYMER es la marca comercial de la tienda. HexaOrders es el **nombre técnico** del sistema: siguen igual
-los paquetes Java (`com.hexaorders`), las tablas, las claves de configuración, los contenedores, las rutas
-de la API, los dashboards y las métricas (`hexaorders_*`), los números de pedido (`HX-…`) y las claves de
-almacenamiento del navegador. El cambio de marca afecta solo a la **capa de presentación**.
+POLYMER es el nombre del producto y del sistema: *POLYMER — Sistema de Gestión de Pedidos de Productos
+Tecnológicos*. La identidad visual (este documento) y la técnica (paquete `com.polymer`, proyecto de
+Compose `polymer`, imágenes `polymer/*`, métricas `polymer_*`, dashboards y lanzador `polymer.cmd`) usan
+el mismo nombre. Los pocos identificadores heredados que se conservan por estar ligados a datos
+persistentes se explican en [`docs/MIGRACION_POLYMER.md`](../MIGRACION_POLYMER.md).
 
 ## 1. Logotipo
 
@@ -26,7 +27,7 @@ una marca *gamer*.
 ### Versión final: `tools/generate_brand.py`
 
 Todos los archivos salen de **una sola definición geométrica**, así nunca se desalinean. `--check` lo
-verifica en `.\hexaorders.cmd check` y en el CI.
+verifica en `.\polymer.cmd check` y en el CI.
 
 | Archivo (`static/img/`) | Uso |
 | --- | --- |
@@ -142,9 +143,9 @@ y en el Libro de reclamaciones.
 
 | Cambio | Archivo |
 | --- | --- |
-| Migración **V8** no destructiva: la marca propia de los productos pasa de `HexaOrders` a `Polymer`, el valor por defecto de `products.brand` y el tema de contacto `CLAIM`. No toca usuarios, contraseñas, pedidos ni líneas de pedido | `db/migration/V8__polymer_brand.sql` |
+| Migración **V8** no destructiva: la marca propia de los productos pasa de `POLYMER` a `Polymer`, el valor por defecto de `products.brand` y el tema de contacto `CLAIM`. No toca usuarios, contraseñas, pedidos ni líneas de pedido | `db/migration/V8__polymer_brand.sql` |
 | Firma de los correos: «— Equipo Polymer · Tecnología que conecta contigo.» | `NotificationComposer` |
-| Remitente por defecto: `Polymer <no-reply@hexaorders.local>` (la dirección técnica no cambia) | `IntegrationConfiguration` |
+| Remitente por defecto: `Polymer <no-reply@polymer.local>` (la dirección técnica no cambia) | `IntegrationConfiguration` |
 | Marca por defecto de un producto nuevo sin marca: `Polymer` | `ProductDetails` |
 | Tema `CLAIM` (Libro de reclamaciones) | `ContactMessage` |
 | Rutas cortas `/empresa`, `/legal`, `/libro-reclamaciones` | `WebPagesConfiguration` |

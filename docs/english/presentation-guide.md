@@ -1,10 +1,10 @@
-# HexaOrders — Presentation Guide (English)
+# POLYMER — Presentation Guide (English)
 
-**HexaOrders — Order Management & Risk Assessment System.** This guide prepares the oral defense: concepts, a short and a full speaking script, the live demonstration and difficult questions with answers grounded in the code. The explanation is verbal (no slides); the technical part is explained on `docker-compose.yml` and on the running application.
+**POLYMER — Order Management & Risk Assessment System.** This guide prepares the oral defense: concepts, a short and a full speaking script, the live demonstration and difficult questions with answers grounded in the code. The explanation is verbal (no slides); the technical part is explained on `docker-compose.yml` and on the running application.
 
 > Version 3 (commerce platform, roles, lifecycle, logistics): see the 5–8 minute [interview explanation](interview-explanation.md).
 
-> Tip: keep `docker-compose.yml`, the web UI (<http://127.0.0.1:8080>) and Grafana (<http://127.0.0.1:3000/d/hexaorders>) open in three tabs before you start.
+> Tip: keep `docker-compose.yml`, the web UI (<http://127.0.0.1:8080>) and Grafana (<http://127.0.0.1:3000/d/polymer>) open in three tabs before you start.
 
 ---
 
@@ -63,7 +63,7 @@ Do not claim more than these sources say.
 ## 7. Project structure
 
 ```text
-services/order-api/src/main/java/com/hexaorders/
+services/order-api/src/main/java/com/polymer/
   domain/              Order, OrderDraft, OrderStatus, OrderStatistics   (pure Java)
   application/port/in  OrderUseCases                                     (input port)
   application/port/out RiskAssessmentPort, OrderRepository, OrderTelemetry (output ports)
@@ -153,7 +153,7 @@ Prometheus scrapes Java (`/actuator/prometheus` on the internal port 9090) and P
 
 - Business metrics: `orders_created_total{status}`, `orders_risk_failures_total` and `risk_evaluations_total{decision}`.
 - Technical metrics: `http_server_requests_seconds_*` and `risk_evaluation_duration_seconds_*`.
-- Alert rules: `HexaOrdersServiceDown` and `RiskRequestsFailing`.
+- Alert rules: `PolymerServiceDown` and `RiskRequestsFailing`.
 
 ## 18. Grafana
 
@@ -171,7 +171,7 @@ The 5xx panel shows the 503s when we stop the risk engine.
 
 | Step | Say | Do |
 | --- | --- | --- |
-| 1 | "Everything runs from one YAML file." | `.\hexaorders.cmd start` (better: start it before the session). |
+| 1 | "Everything runs from one YAML file." | `.\polymer.cmd start` (better: start it before the session). |
 | 2 | "This order goes through every layer." | Create an order of **125.50** → APPROVED, risk 10. |
 | 3 | "The threshold is a domain rule in Java." | Create **1500.00** → REVIEW, risk 75. |
 | 4 | "The domain validates, not the browser." | Try **0** in *Architecture → Run a real request* → 400, nothing stored. |
@@ -179,17 +179,17 @@ The 5xx panel shows the 503s when we stop the risk engine.
 | 6 | "What if Python is down?" | `docker compose stop risk-engine`, create an order → **503**, total unchanged. |
 | 7 | "Recovery." | `docker compose start risk-engine` → orders work again. |
 | 8 | "We can observe all of this." | *Observability* tab, then Grafana: orders, latency, the 5xx spike. |
-| 9 | "Data is persistent." | `.\hexaorders.cmd stop` then `start` → orders are still there. |
+| 9 | "Data is persistent." | `.\polymer.cmd stop` then `start` → orders are still there. |
 
 ## 20. Conclusions
 
-HexaOrders shows that hexagonal architecture is a **verifiable rule**, not a folder name. The domain and the use cases do not know Spring, FastAPI, PostgreSQL or Grafana. Each external technology sits behind a port and can be tested or replaced independently. The cost is more interfaces and discipline, which is justified here by two external integrations and two languages.
+POLYMER shows that hexagonal architecture is a **verifiable rule**, not a folder name. The domain and the use cases do not know Spring, FastAPI, PostgreSQL or Grafana. Each external technology sits behind a port and can be tested or replaced independently. The cost is more interfaces and discipline, which is justified here by two external integrations and two languages.
 
 ---
 
 ## Short speaking script (≈ 3–4 minutes)
 
-> Good morning. I'm going to present **HexaOrders**, an order management and risk assessment system. A customer creates an order; a Java service asks a Python service for a risk score; the Java domain decides whether the order is approved or needs review; and the result is stored in PostgreSQL. Everything runs with Docker Compose and is monitored with Prometheus and Grafana.
+> Good morning. I'm going to present **POLYMER**, an order management and risk assessment system. A customer creates an order; a Java service asks a Python service for a risk score; the Java domain decides whether the order is approved or needs review; and the result is stored in PostgreSQL. Everything runs with Docker Compose and is monitored with Prometheus and Grafana.
 >
 > The core idea is **hexagonal architecture**, also called ports and adapters, described by Alistair Cockburn in 2005. We separate the inside of the application, the business rules and use cases, from the outside: HTTP, databases and other services. The inside defines **ports**, which are interfaces. The outside provides **adapters** that implement or use them. Source-code dependencies always point towards the core.
 >
@@ -201,7 +201,7 @@ HexaOrders shows that hexagonal architecture is a **verifiable rule**, not a fol
 
 ## Full speaking script (≈ 10 minutes)
 
-**Opening (30 s).** Good morning. Today I'll present HexaOrders, an order management and risk assessment system built to demonstrate hexagonal architecture with Java, Python, PostgreSQL, Docker Compose, Prometheus and Grafana. First the concepts, then the code, then a live demonstration.
+**Opening (30 s).** Good morning. Today I'll present POLYMER, an order management and risk assessment system built to demonstrate hexagonal architecture with Java, Python, PostgreSQL, Docker Compose, Prometheus and Grafana. First the concepts, then the code, then a live demonstration.
 
 **Concept (1.5 min).** Hexagonal architecture, or ports and adapters, was described by Alistair Cockburn in 2005. The application has an inside and an outside. Inside: the domain, meaning the business rules, and the use cases. Outside: everything technical, such as web frameworks, databases, message brokers and other services. The inside defines ports. An input port says what the application can do; an output port says what it needs from the world. Adapters connect ports to technologies. The key rule is that source-code dependencies point inwards: the domain depends on nothing external. The hexagon is just a drawing; it does not mean six services.
 

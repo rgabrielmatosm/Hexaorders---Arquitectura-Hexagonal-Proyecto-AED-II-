@@ -30,10 +30,10 @@ Los 3 jobs originales usan `static_configs`. Los 6 nuevos usan `dns_sd_configs`:
 
 | Métrica | Origen |
 | --- | --- |
-| `hexaorders_cache_requests_total{cache,result}`, `hexaorders_cache_invalidations_total` | Caché Redis |
-| `hexaorders_outbox_pending`, `hexaorders_events_published_total{type}`, `hexaorders_events_publish_failures_total` | Outbox y publicación |
-| `hexaorders_events_consumed_total{type,result}`, `hexaorders_notifications_sent_total{type}` | Consumidor y SMTP |
-| `hexaorders_port_calls_seconds_{count,sum,max}{kind,port,method,error}` | Cada caso de uso y puerto de salida (proxy en `ObservedPortsConfiguration`) |
+| `polymer_cache_requests_total{cache,result}`, `polymer_cache_invalidations_total` | Caché Redis |
+| `polymer_outbox_pending`, `polymer_events_published_total{type}`, `polymer_events_publish_failures_total` | Outbox y publicación |
+| `polymer_events_consumed_total{type,result}`, `polymer_notifications_sent_total{type}` | Consumidor y SMTP |
+| `polymer_port_calls_seconds_{count,sum,max}{kind,port,method,error}` | Cada caso de uso y puerto de salida (proxy en `ObservedPortsConfiguration`) |
 | `nginx_requests_total`, `nginx_connections_current{state}`, `nginx_connections_*_total` | Gateway, convertido por el collector |
 | `rabbitmq_*` (p. ej. `rabbitmq_queue_messages_ready{queue}`) | Plugin `rabbitmq_prometheus`, con métricas por cola |
 | `otelcol_receiver_accepted_spans`, `otelcol_exporter_sent_spans`, `otelcol_exporter_send_failed_spans` | Collector |
@@ -45,7 +45,7 @@ Ninguna etiqueta contiene datos personales ni identificadores de alta cardinalid
 
 ```mermaid
 flowchart LR
-    subgraph contenedores ["Contenedores con la etiqueta com.hexaorders.logs=true"]
+    subgraph contenedores ["Contenedores con la etiqueta com.polymer.logs=true"]
         A[order-api]
         B[risk-engine]
         C[frontend · JSON]
@@ -116,7 +116,7 @@ No recibe las métricas de las aplicaciones: Prometheus ya las recoge directamen
 | Loki (v5) | `loki` | `infra/grafana/provisioning/datasource-logs-traces.yml` |
 | Tempo (v5) | `tempo` | ídem |
 
-Dashboard nuevo **HexaOrders — Platform Integrations** (`/d/hexaorders-integrations`, 14 paneles):
+Dashboard nuevo **POLYMER — Platform Integrations** (`/d/polymer-integrations`, 14 paneles):
 
 - caché, outbox, DLQ, correos, eventos y colas de RabbitMQ;
 - Nginx;

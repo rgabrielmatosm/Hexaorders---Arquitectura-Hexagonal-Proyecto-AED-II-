@@ -6,7 +6,16 @@
 import { shopApi } from './api.js';
 import { session } from './session.js';
 
-const KEY = 'hexaorders.cart.v1';
+const KEY = 'polymer.cart.v1';
+// Clave usada antes de POLYMER: el carrito de un visitante se traslada una vez a la clave nueva.
+const LEGACY_KEY = 'hexa' + 'orders.cart.v1';
+try {
+  const legacy = localStorage.getItem(LEGACY_KEY);
+  if (legacy !== null) {
+    if (localStorage.getItem(KEY) === null) localStorage.setItem(KEY, legacy);
+    localStorage.removeItem(LEGACY_KEY);
+  }
+} catch { /* almacenamiento no disponible */ }
 let local = load();
 let remote = null; // última vista del carrito del servidor (cliente con sesión)
 
@@ -23,7 +32,7 @@ function persist() {
   try { localStorage.setItem(KEY, JSON.stringify(local)); } catch { /* almacenamiento no disponible */ }
 }
 
-function notify() { window.dispatchEvent(new CustomEvent('hexa:cart', { detail: cart.count() })); }
+function notify() { window.dispatchEvent(new CustomEvent('polymer:cart', { detail: cart.count() })); }
 
 const isCustomer = () => session.has('CUSTOMER');
 

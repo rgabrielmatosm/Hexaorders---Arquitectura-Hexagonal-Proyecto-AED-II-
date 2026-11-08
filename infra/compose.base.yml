@@ -1,12 +1,12 @@
-# HEXAORDERS — entregar docker-compose.yml, generado desde este archivo.
+# POLYMER — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
 #
 # v5 · Modos de ejecución (docs/DOCKER_ARCHITECTURE.md):
 #   básico   (sin perfil)        db, risk-engine, order-api, prometheus, grafana y frontend (gateway).
 #   completo (perfil "full")     + redis, rabbitmq, mailpit, loki, tempo, otel-collector y alloy.
-#   PowerShell: .\hexaorders.cmd start  (completo)  ·  .\hexaorders.cmd start -Mode basic
-name: hexaorders
+#   PowerShell: .\polymer.cmd start  (completo)  ·  .\polymer.cmd start -Mode basic
+name: polymer
 
 x-runtime: &runtime
   restart: unless-stopped
@@ -18,7 +18,7 @@ x-runtime: &runtime
       max-file: '3'
   # Alloy solo recoge los logs de contenedores con esta etiqueta (nunca los de otros proyectos).
   labels:
-    com.hexaorders.logs: 'true'
+    com.polymer.logs: 'true'
 
 services:
   # 1. Adaptador de persistencia: solo order-api conoce esta base de datos.
@@ -48,13 +48,13 @@ services:
   # 2. Segundo hexágono: Python calcula riesgo mediante reglas deterministas.
   risk-engine:
     <<: *runtime
-    image: hexaorders/risk-engine:1.0.0
+    image: polymer/risk-engine:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_RISK__
     environment:
       # v5: trazas OTLP solo si existe otel-collector (perfil "full"); si no, se ejecuta igual que antes.
-      HEXAORDERS_INTEGRATIONS: auto
+      POLYMER_INTEGRATIONS: auto
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_SERVICE_NAME: risk-engine
     depends_on:
@@ -78,7 +78,7 @@ services:
   # 3. Adaptador REST -> puerto de entrada -> caso de uso -> puertos de salida.
   order-api:
     <<: *runtime
-    image: hexaorders/order-api:1.0.0
+    image: polymer/order-api:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_JAVA__
@@ -95,7 +95,7 @@ services:
       PROMETHEUS_URL: http://prometheus:9090
       JAVA_TOOL_OPTIONS: '-XX:MaxRAMPercentage=65.0 -XX:+ExitOnOutOfMemoryError'
       # v5: cada integración se activa sola si su servicio existe (perfil "full"); ver IntegrationEnvironment.
-      HEXAORDERS_INTEGRATIONS: auto
+      POLYMER_INTEGRATIONS: auto
       REDIS_HOST: redis
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: hexaorders
@@ -141,7 +141,7 @@ services:
   # 4. Pull de métricas; no forma parte del núcleo ni del camino del pedido.
   prometheus:
     <<: *runtime
-    image: hexaorders/prometheus:1.0.0
+    image: polymer/prometheus:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_PROMETHEUS__
@@ -171,7 +171,7 @@ services:
   # 5. Datasources (Prometheus; v5: Loki y Tempo) y dashboards provisionados: cero configuración manual.
   grafana:
     <<: *runtime
-    image: hexaorders/grafana:1.0.0
+    image: polymer/grafana:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_GRAFANA__
@@ -208,7 +208,7 @@ services:
   # 6. Gateway web (v5, ADR 0011): sirve css/js/img y reenvía páginas y /api a order-api.
   frontend:
     <<: *runtime
-    image: hexaorders/frontend:1.0.0
+    image: polymer/frontend:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_FRONTEND__
@@ -260,7 +260,7 @@ services:
   rabbitmq:
     <<: *runtime
     profiles: [full]
-    image: hexaorders/rabbitmq:1.0.0
+    image: polymer/rabbitmq:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_RABBITMQ__
@@ -271,7 +271,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
-      - '127.0.0.1:15672:15672'  # consola de gestión (usuario hexaorders, secrets\rabbitmq_password.txt)
+      - '127.0.0.1:15672:15672'  # consola de gestión (usuario polymer, secrets\rabbitmq_password.txt)
     networks: [edge, messaging, telemetry]
     read_only: true
     tmpfs: ['/tmp:rw,nosuid,size=32m', '/etc/rabbitmq/conf.d:rw,noexec,nosuid,size=1m']
@@ -313,7 +313,7 @@ services:
   loki:
     <<: *runtime
     profiles: [full]
-    image: hexaorders/loki:1.0.0
+    image: polymer/loki:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_LOKI__
@@ -337,7 +337,7 @@ services:
   tempo:
     <<: *runtime
     profiles: [full]
-    image: hexaorders/tempo:1.0.0
+    image: polymer/tempo:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_TEMPO__
@@ -361,7 +361,7 @@ services:
   otel-collector:
     <<: *runtime
     profiles: [full]
-    image: hexaorders/otel-collector:1.0.0
+    image: polymer/otel-collector:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_OTEL_COLLECTOR__
@@ -387,7 +387,7 @@ services:
   alloy:
     <<: *runtime
     profiles: [full]
-    image: hexaorders/alloy:1.0.0
+    image: polymer/alloy:1.0.0
     build:
       context: .
       dockerfile_inline: __INLINE_ALLOY__
@@ -396,7 +396,7 @@ services:
       loki:
         condition: service_healthy
     volumes:
-      - alloy_data:/var/lib/hexaorders-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
+      - alloy_data:/var/lib/polymer-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [telemetry]
     read_only: true

@@ -4,8 +4,8 @@
   <parent>
     <groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.7</version><relativePath/>
   </parent>
-  <groupId>com.hexaorders</groupId><artifactId>order-api</artifactId><version>1.0.0</version>
-  <name>HexaOrders API</name><description>Hexagonal Java order application</description>
+  <groupId>com.polymer</groupId><artifactId>order-api</artifactId><version>1.0.0</version>
+  <name>POLYMER API</name><description>Hexagonal Java order application</description>
   <properties><java.version>21</java.version></properties>
   <dependencies>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>

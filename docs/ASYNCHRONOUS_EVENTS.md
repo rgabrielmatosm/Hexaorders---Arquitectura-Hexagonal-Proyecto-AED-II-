@@ -37,7 +37,7 @@ sequenceDiagram
 
 ## 3. Outbox transaccional (ADR 0012)
 
-Cada cambio de un pedido ya escribe una fila en `order_status_history`, y cada programación de entrega una fila en `delivery_changes`, **dentro de la misma transacción** del cambio. HexaOrders usa esas tablas como outbox (patrón *polling publisher*):
+Cada cambio de un pedido ya escribe una fila en `order_status_history`, y cada programación de entrega una fila en `delivery_changes`, **dentro de la misma transacción** del cambio. POLYMER usa esas tablas como outbox (patrón *polling publisher*):
 
 - Un cambio confirmado siempre tiene su evento y uno deshecho nunca lo tiene.
 - No hubo que cambiar los casos de uso ni las transacciones existentes.
@@ -80,7 +80,7 @@ Exchange `hexaorders.events` (topic, durable). Mensajes JSON UTF-8, persistentes
 | Duplicados | El consumidor es **idempotente**: `processed_events(event_id, consumer)`. |
 | Reintentos | Cuatro intentos con *back-off* exponencial (1 s → 10 s). Después, el mensaje va a `hexaorders.notifications.dlq`. |
 | Mensajes inválidos | Directamente a la DLQ, sin reintentos. |
-| Broker caído | Los pedidos funcionan; los eventos esperan en el outbox (`hexaorders_outbox_pending`) y se envían al volver. |
+| Broker caído | Los pedidos funcionan; los eventos esperan en el outbox (`polymer_outbox_pending`) y se envían al volver. |
 | Reinicios | Colas durables, mensajes persistentes, `hostname: rabbitmq` estable y volumen `rabbitmq_data`. |
 | Exactamente una vez | **No se afirma.** Si el proceso cae después de enviar el correo y antes de registrarlo, el correo puede repetirse. |
 
@@ -123,14 +123,14 @@ Ejemplos de asunto:
 
 | Métrica | Significado |
 | --- | --- |
-| `hexaorders_outbox_pending` | Eventos pendientes de confirmar por el broker |
-| `hexaorders_events_published_total{type}` | Eventos confirmados por RabbitMQ |
-| `hexaorders_events_publish_failures_total` | Intentos fallidos (el evento sigue en el outbox) |
-| `hexaorders_events_consumed_total{type,result}` | `sent`, `duplicate` o `skipped` |
-| `hexaorders_notifications_sent_total{type}` | Correos aceptados por el servidor SMTP |
+| `polymer_outbox_pending` | Eventos pendientes de confirmar por el broker |
+| `polymer_events_published_total{type}` | Eventos confirmados por RabbitMQ |
+| `polymer_events_publish_failures_total` | Intentos fallidos (el evento sigue en el outbox) |
+| `polymer_events_consumed_total{type,result}` | `sent`, `duplicate` o `skipped` |
+| `polymer_notifications_sent_total{type}` | Correos aceptados por el servidor SMTP |
 | `rabbitmq_queue_messages_ready{queue}` / `_unacked` | Profundidad de las colas (plugin `rabbitmq_prometheus`) |
 
-Están en el dashboard **HexaOrders — Platform Integrations** (`/d/hexaorders-integrations`).
+Están en el dashboard **POLYMER — Platform Integrations** (`/d/polymer-integrations`).
 
 ## 9. Pruebas
 

@@ -100,11 +100,11 @@ _, health = request(grafana + '/api/health')
 assert health.get('database') == 'ok', health
 if os.environ.get('GRAFANA_PASSWORD'):
     credentials = base64.b64encode(('admin:' + os.environ['GRAFANA_PASSWORD']).encode()).decode()
-    _, dashboard = request(grafana + '/api/dashboards/uid/hexaorders', headers={'Authorization': 'Basic ' + credentials})
-    assert dashboard['dashboard']['uid'] == 'hexaorders'
+    _, dashboard = request(grafana + '/api/dashboards/uid/polymer', headers={'Authorization': 'Basic ' + credentials})
+    assert dashboard['dashboard']['uid'] == 'polymer'
     # v3: el dashboard original y los 5 nuevos están aprovisionados.
-    for uid in ['hexaorders-business', 'hexaorders-risk', 'hexaorders-api', 'hexaorders-infrastructure', 'hexaorders-security',
-                'hexaorders-logistics', 'hexaorders-integrations']:
+    for uid in ['polymer-business', 'polymer-risk', 'polymer-api', 'polymer-infrastructure', 'polymer-security',
+                'polymer-logistics', 'polymer-integrations']:
         _, extra = request(grafana + '/api/dashboards/uid/' + uid, headers={'Authorization': 'Basic ' + credentials})
         assert extra['dashboard']['uid'] == uid, uid
 print('OK: tres riesgos, persistencia, estadísticas, validación, recursos del frontend, targets Prometheus y Grafana')

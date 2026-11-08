@@ -32,12 +32,12 @@ flowchart LR
 
 | Clave | Contenido | TTL |
 | --- | --- | --- |
-| `hexaorders:catalog:version` | Número de versión del catálogo | sin TTL |
-| `hexaorders:catalog6:v{n}:categories` | Categorías (v6: con subcategorías) | 60 s |
-| `hexaorders:catalog6:v{n}:products:{all\|categoría}` | Productos activos con su ficha técnica | 60 s |
-| `hexaorders:catalog6:v{n}:product:{id}` | Ficha de un producto | 60 s |
+| `polymer:catalog:version` | Número de versión del catálogo | sin TTL |
+| `polymer:catalog6:v{n}:categories` | Categorías (v6: con subcategorías) | 60 s |
+| `polymer:catalog6:v{n}:products:{all\|categoría}` | Productos activos con su ficha técnica | 60 s |
+| `polymer:catalog6:v{n}:product:{id}` | Ficha de un producto | 60 s |
 
-`invalidate()` ejecuta `INCR hexaorders:catalog:version`: todas las claves anteriores dejan de usarse a la vez y caducan solas. No hace falta recorrer claves con `KEYS` ni `SCAN`. Si Redis no responde durante una invalidación, queda **pendiente** y se aplica en cuanto Redis vuelve. Mientras tanto se lee de PostgreSQL.
+`invalidate()` ejecuta `INCR polymer:catalog:version`: todas las claves anteriores dejan de usarse a la vez y caducan solas. No hace falta recorrer claves con `KEYS` ni `SCAN`. Si Redis no responde durante una invalidación, queda **pendiente** y se aplica en cuanto Redis vuelve. Mientras tanto se lee de PostgreSQL.
 
 Redis está configurado con `maxmemory 48mb` y `allkeys-lru`, y guarda una instantánea cada 5 minutos en el volumen `redis_data`, que es prescindible.
 
@@ -61,10 +61,10 @@ Redis está configurado con `maxmemory 48mb` y `allkeys-lru`, y guarda una insta
 
 | Métrica | Valores |
 | --- | --- |
-| `hexaorders_cache_requests_total{cache="catalog",result}` | `hit`, `miss`, `error`, `bypass` |
-| `hexaorders_cache_invalidations_total` | Invalidaciones aplicadas |
+| `polymer_cache_requests_total{cache="catalog",result}` | `hit`, `miss`, `error`, `bypass` |
+| `polymer_cache_invalidations_total` | Invalidaciones aplicadas |
 
-Panel «Aciertos de caché del catálogo» en `/d/hexaorders-integrations`.
+Panel «Aciertos de caché del catálogo» en `/d/polymer-integrations`.
 
 ## 7. Pruebas
 
@@ -78,6 +78,6 @@ Panel «Aciertos de caché del catálogo» en `/d/hexaorders-integrations`.
 
 ## 8. Cambios de la v6
 
-- El prefijo pasa a `hexaorders:catalog6:`, porque el formato de los productos cambió (marca, modelo, ficha técnica): ninguna entrada guardada por la v5 se lee con la v6.
+- El prefijo pasa a `polymer:catalog6:`, porque el formato de los productos cambió (marca, modelo, ficha técnica): ninguna entrada guardada por la v5 se lee con la v6.
 - La búsqueda de la tienda (`/api/catalog/search`) filtra y pagina sobre el listado **cacheado** de productos activos (556). Los **precios no se cachean**: las promociones se aplican en cada consulta (`PricingService`), así que activar o desactivar una campaña se ve al momento.
 - Una categoría leída sin el campo `active` (dato anterior a la v6) se considera visible.

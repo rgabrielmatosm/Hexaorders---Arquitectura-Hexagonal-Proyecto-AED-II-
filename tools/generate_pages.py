@@ -1,4 +1,4 @@
-"""Genera las páginas HTML del sitio multipágina de HexaOrders desde un único registro.
+"""Genera las páginas HTML del sitio multipágina de POLYMER desde un único registro.
 
 Cada página es un archivo HTML real (URL propia, se puede abrir directamente y recargar) con la
 misma cabecera, hojas de estilo y punto de entrada (js/page.js). El contenido lo renderiza la

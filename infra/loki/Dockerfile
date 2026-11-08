@@ -6,6 +6,6 @@ RUN mkdir -p /data-dir
 FROM grafana/loki:3.7.9
 COPY --from=tools /bin/busybox /usr/local/bin/busybox
 COPY --from=tools --chown=10001:10001 /data-dir /loki
-COPY loki.yaml /etc/loki/hexaorders.yaml
-CMD ["-config.file=/etc/loki/hexaorders.yaml"]
+COPY loki.yaml /etc/loki/polymer.yaml
+CMD ["-config.file=/etc/loki/polymer.yaml"]
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=10 CMD ["/usr/local/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/ready"]

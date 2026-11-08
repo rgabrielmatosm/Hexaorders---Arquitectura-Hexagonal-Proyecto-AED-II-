@@ -174,7 +174,7 @@ function categoryModal(categories) {
   { actions: [el('button', { type: 'button', class: 'btn btn--ghost', text: 'Cancelar', onclick: () => dialog.close() }), save] });
   save.addEventListener('click', async () => {
     await submitting(save, errorNode, () => adminApi.createCategory(slug.value, name.value, parent.value ? Number(parent.value) : null), 'Categoría creada')
-      .then(() => { try { sessionStorage.removeItem('hexaorders.categories.v6'); } catch { /* sin almacenamiento */ } dialog.close(); rerender(); }).catch(() => {});
+      .then(() => { try { sessionStorage.removeItem('polymer.categories.v6'); } catch { /* sin almacenamiento */ } dialog.close(); rerender(); }).catch(() => {});
   });
 }
 
@@ -597,7 +597,7 @@ async function reports(root) {
       el('td', {}, el('a', { href: link(`/producto/${p.productId}`), text: p.name })), el('td', { class: 'mono', text: String(p.units) }),
       el('td', { class: 'mono', text: money(p.revenue, p.currency) }))))
     : emptyState('Sin ventas todavía', 'Aquí verás los productos con más unidades vendidas.', 'chart'));
-  exportBtn.addEventListener('click', () => downloadCsv('hexaorders-ventas-por-categoria.csv',
+  exportBtn.addEventListener('click', () => downloadCsv('polymer-ventas-por-categoria.csv',
     [['categoria', 'moneda', 'unidades', 'ingresos'], ...d.salesByCategory.map((c) => [c.category, c.currency, c.units, c.revenue])]));
 }
 

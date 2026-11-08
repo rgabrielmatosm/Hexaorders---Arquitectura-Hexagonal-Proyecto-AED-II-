@@ -72,7 +72,7 @@ function setActive(link, active) {
 }
 
 // ---- Categorías (para el megamenú y el pie) --------------------------------------------------
-const CATEGORY_CACHE = 'hexaorders.categories.v6';
+const CATEGORY_CACHE = 'polymer.categories.v6';
 let categoriesPromise = null;
 
 /** Categorías visibles de la tienda, en memoria de la pestaña durante 5 minutos. */
@@ -388,8 +388,8 @@ export function renderLayout() {
   renderSidebar();
   renderBreadcrumbs();
   renderFooter();
-  window.addEventListener('hexa:cart', updateCartCount);
-  window.addEventListener('hexa:session', () => { renderHeader(); });
+  window.addEventListener('polymer:cart', updateCartCount);
+  window.addEventListener('polymer:session', () => { renderHeader(); });
   // Navegación con teclado: los enlaces de la barra lateral también se resaltan al enfocar.
   $$('.side-nav a').forEach((a) => a.addEventListener('focus', () => a.scrollIntoView({ block: 'nearest' })));
 }

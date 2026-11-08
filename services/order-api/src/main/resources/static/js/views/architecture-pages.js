@@ -63,7 +63,7 @@ route('/arquitectura/flujo-pedidos', async (root) => {
         ['CommerceService → CatalogRepository', 'Precios y stock del catálogo: el total se calcula en el servidor (Quote).'],
         ['CommerceService → RiskAssessmentPort → FastAPI', 'POST /score con timeouts, antes de abrir la transacción. Si falla: 503 y nada se guarda.'],
         ['CommerceService → PostgreSQL (una transacción)', 'Pedido + líneas + dirección + stock condicional (stock ≥ cantidad) + historial + auditoría.'],
-        ['Métricas', 'orders_created, hexaorders_shop_orders_placed y la latencia HTTP llegan a Prometheus y Grafana.'],
+        ['Métricas', 'orders_created, polymer_shop_orders_placed y la latencia HTTP llegan a Prometheus y Grafana.'],
       ].map(([title, text], i) => el('li', {}, el('span', { class: 'flow-steps__num', text: String(i + 1) }), el('div', {}, el('strong', { text: title }), el('p', { class: 'muted small', text })))))),
     el('article', { class: 'card card--spaced' }, el('h3', { class: 'card__title', text: 'Ciclo de vida y quién puede ejecutar cada transición' }),
       el('div', { class: 'lifecycle-map' }, Object.keys(LIFECYCLE).map((status) => el('div', { class: 'lifecycle-map__row' },

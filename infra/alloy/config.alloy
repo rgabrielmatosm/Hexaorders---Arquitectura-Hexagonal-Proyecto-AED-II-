@@ -1,15 +1,15 @@
-// Solo contenedores con la etiqueta com.hexaorders.logs=true (los de este proyecto): nunca se
+// Solo contenedores con la etiqueta com.polymer.logs=true (los de este proyecto): nunca se
 // recogen logs de otros contenedores de tu Docker Desktop.
-discovery.docker "hexaorders" {
+discovery.docker "polymer" {
   host             = "unix:///var/run/docker.sock"
   refresh_interval = "10s"
   filter {
     name   = "label"
-    values = ["com.hexaorders.logs=true"]
+    values = ["com.polymer.logs=true"]
   }
 }
 
-discovery.relabel "hexaorders" {
+discovery.relabel "polymer" {
   targets = []
 
   rule {
@@ -31,10 +31,10 @@ discovery.relabel "hexaorders" {
   }
 }
 
-loki.source.docker "hexaorders" {
+loki.source.docker "polymer" {
   host             = "unix:///var/run/docker.sock"
-  targets          = discovery.docker.hexaorders.targets
-  relabel_rules    = discovery.relabel.hexaorders.rules
+  targets          = discovery.docker.polymer.targets
+  relabel_rules    = discovery.relabel.polymer.rules
   refresh_interval = "10s"
   forward_to       = [loki.process.redact.receiver]
 }

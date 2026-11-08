@@ -1,4 +1,4 @@
-# Handoff técnico — HexaOrders v6 (preparado para Google Antigravity)
+# Handoff técnico — POLYMER v6 (preparado para Google Antigravity)
 
 Documento de traspaso para **cualquier herramienta o equipo que continúe el proyecto**: Google Antigravity para los retoques visuales finales, otro asistente de IA, Copilot o personas. Describe el estado real del repositorio, **qué se puede retocar libremente**, qué requiere pruebas de regresión y **qué no se debe romper**.
 
@@ -9,7 +9,7 @@ Documento de traspaso para **cualquier herramienta o equipo que continúe el pro
 >    - Modo básico: `frontend`, `order-api`, `risk-engine`, `db`, `prometheus`, `grafana`.
 >    - Perfil `full`: `redis`, `rabbitmq`, `mailpit`, `loki`, `tempo`, `otel-collector`, `alloy`.
 >    - Conserva también sus healthchecks, perfiles, límites, `read_only`, `cap_drop: ALL`, `no-new-privileges`, secretos en archivo, redes y volúmenes.
-> 3. **No ejecutes `docker compose down -v`** como solución: borra PostgreSQL, Prometheus, Grafana, RabbitMQ, Loki y Tempo. Usa `.\hexaorders.cmd stop` (conserva datos).
+> 3. **No ejecutes `docker compose down -v`** como solución: borra PostgreSQL, Prometheus, Grafana, RabbitMQ, Loki y Tempo. Usa `.\polymer.cmd stop` (conserva datos).
 > 4. **No edites a mano** `docker-compose.yml`, `k8s/10-monitoring-config.yaml`, los HTML generados ni `tools/ui-e2e/pages.json`: se generan con `tools/generate_delivery.py` y `tools/generate_pages.py`. El CI falla si no están al día.
 > 5. **No modifiques migraciones Flyway publicadas** (`V1`–`V7`). Crea `V8__…sql` no destructiva. El catálogo de demostración se edita en `tools/catalog_v6_data.py`, y solo antes de publicar una migración nueva.
 > 6. **No pongas secretos en Git.** Viven en `secrets/*.txt` (ignorado) y los crea `tools/init-env.ps1` sin sobrescribir nunca.
@@ -52,7 +52,7 @@ Ver [`DOCKER_ARCHITECTURE.md`](DOCKER_ARCHITECTURE.md) y [`DOCKER_SERVICES.md`](
 ## 3. Estructura relevante
 
 ```text
-services/order-api/src/main/java/com/hexaorders/
+services/order-api/src/main/java/com/polymer/
   domain/                 reglas puras (pedido, catálogo, ciclo de vida, logística, contacto, monitoreo…)
   application/port/in     casos de uso que ofrece el núcleo
   application/port/out    lo que el núcleo necesita (repositorios, riesgo, telemetría, monitoreo…)
@@ -120,7 +120,7 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
 | Sitio multipágina (39 páginas + laboratorio) | Implementado; `pages-e2e.js` en verde en local (244 comprobaciones, sin Prometheus) y en CI con el stack Docker |
 | Observabilidad (8 dashboards, 9 alertas, regla de compatibilidad, Loki y Tempo) | `check_observability.py` en verde; Grafana real en `smoke.py` (CI) |
 | Docker Compose | Generado, validado con el esquema oficial y ejecutado en el job `compose` del CI |
-| Windows | `hexaorders.cmd`/`hexaorders.ps1` probados en el job `windows` (PowerShell 5.1); **sin prueba manual en Docker Desktop** ([guía](WINDOWS_DOCKER_GUIDE.md)) |
+| Windows | `polymer.cmd`/`polymer.ps1` probados en el job `windows` (PowerShell 5.1); **sin prueba manual en Docker Desktop** ([guía](WINDOWS_DOCKER_GUIDE.md)) |
 | Kubernetes | Manifiestos actualizados y validados; **no desplegados** |
 
 ## 9. Dependencias
@@ -134,7 +134,7 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
 
 - `infra/compose.base.yml` + `services/` + `infra/` → `tools/generate_delivery.py` → `docker-compose.yml` autosuficiente (un `COPY` con heredocs por directorio).
 - Puertos solo en `127.0.0.1`: 8080 (Nginx: sitio + API), 9091 (Prometheus), 3000 (Grafana), 15672 (consola de RabbitMQ) y 8025 (Mailpit). Entre contenedores se usan los nombres de servicio.
-- Modos: `.\hexaorders.cmd start` (completo, por defecto) o `start -Mode basic`. Los servicios del perfil `full` son opcionales: order-api los detecta con `HEXAORDERS_INTEGRATIONS=auto`.
+- Modos: `.\polymer.cmd start` (completo, por defecto) o `start -Mode basic`. Los servicios del perfil `full` son opcionales: order-api los detecta con `POLYMER_INTEGRATIONS=auto`.
 - Java → Redis: `RedisCatalogCache` ([`REDIS_INTEGRATION.md`](REDIS_INTEGRATION.md)).
 - Java → RabbitMQ → SMTP: `RabbitMqEventPublisher`, `BusinessEventListener` y `SmtpMailSender` ([`ASYNCHRONOUS_EVENTS.md`](ASYNCHRONOUS_EVENTS.md)).
 - Trazas y logs: [`OBSERVABILITY_STACK.md`](OBSERVABILITY_STACK.md).
@@ -144,13 +144,13 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
 
 ## 11. Grafana y Prometheus
 
-- Prometheus: `prometheus.yml` (3 jobs originales + 6 por DNS en la v5, 10 s) y `alerts.yml` (grupo original + `hexaorders-compat` + `hexaorders-platform`).
-- Grafana: datasources `prometheus`, `loki` y `tempo`, y 8 dashboards (`hexaorders` original + `business`, `risk`, `api`, `infrastructure`, `security`, `logistics`, `integrations`).
+- Prometheus: `prometheus.yml` (3 jobs originales + 6 por DNS en la v5, 10 s) y `alerts.yml` (grupo original + `polymer-compat` + `polymer-platform`).
+- Grafana: datasources `prometheus`, `loki` y `tempo`, y 8 dashboards (`polymer` original + `business`, `risk`, `api`, `infrastructure`, `security`, `logistics`, `integrations`).
 - Línea base protegida: `infra/observability-baseline.json`.
 
 ## 12. No modificar sin acuerdo explícito
 
-- `infra/grafana/dashboards/hexaorders.json`, los grupos existentes de `alerts.yml`, `prometheus.yml`, `provisioning/`, `infra/observability-baseline.json`.
+- `infra/grafana/dashboards/polymer.json`, los grupos existentes de `alerts.yml`, `prometheus.yml`, `provisioning/`, `infra/observability-baseline.json`.
 - Migraciones `V1`–`V5`; contrato de `/api/orders`, de `risk-engine /score` y de los eventos (`schemaVersion` 1).
 - `domain/` y sus invariantes (umbral 70, transiciones, validaciones).
 - `SecurityConfiguration` (reglas de API y de páginas, CSP, CSRF) y `WebPagesConfiguration`.
@@ -169,11 +169,11 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
 
 | Comando | Qué ejecuta |
 | --- | --- |
-| `.\hexaorders.cmd test` | pytest (motor de riesgo) y Maven (dominio, servicios, adaptadores, seguridad, ArchUnit) |
-| `.\hexaorders.cmd check` | Entregable al día, validación Compose/Kubernetes, `check_observability.py`, `generate_pages.py --check`, `check_frontend.py` |
-| `.\hexaorders.cmd verify` | Stack real con Docker (modo completo): build con tests, promtool, `otelcol validate`, `smoke.py`, `platform_smoke.py`, `integration_smoke.py` (check, degradación, recuperación y persistencia), y caída y recuperación del motor de riesgo |
-| `.\hexaorders.cmd verify -Mode basic` | Lo mismo en el modo básico, sin integraciones |
-| `.\hexaorders.cmd smoke` | Solo las pruebas de humo contra un stack ya levantado |
+| `.\polymer.cmd test` | pytest (motor de riesgo) y Maven (dominio, servicios, adaptadores, seguridad, ArchUnit) |
+| `.\polymer.cmd check` | Entregable al día, validación Compose/Kubernetes, `check_observability.py`, `generate_pages.py --check`, `check_frontend.py` |
+| `.\polymer.cmd verify` | Stack real con Docker (modo completo): build con tests, promtool, `otelcol validate`, `smoke.py`, `platform_smoke.py`, `integration_smoke.py` (check, degradación, recuperación y persistencia), y caída y recuperación del motor de riesgo |
+| `.\polymer.cmd verify -Mode basic` | Lo mismo en el modo básico, sin integraciones |
+| `.\polymer.cmd smoke` | Solo las pruebas de humo contra un stack ya levantado |
 | `node tools/ui-e2e/ui-e2e.js` | Laboratorio y flujos por rol (necesita `DEMO_PASSWORD`) |
 | `node tools/ui-e2e/pages-e2e.js` | Todas las páginas con todos los roles, enlaces, recarga, formularios, monitoreo y móvil (necesita `DEMO_PASSWORD`) |
 
@@ -214,4 +214,4 @@ Tabla completa (39 páginas + laboratorio, rol, contenido y API de cada una), UR
   - la intro se repite con `?intro=1`; con `?intro=0` se desactiva en esa visita.
 - **Selectores nuevos que usan las pruebas** (`intro-e2e.js`): `#polymer-intro`, `.intro__word span`, «Entrar con sonido», «Omitir intro», `#sound-toggle`, `.pm-footer`, `.pm-social`, `.fly-dot`, `#cart-button.is-bumped`, `.order-thanks` (confirmación animada).
 - **Pruebas e intro:** las pruebas que no prueban la intro la marcan como vista con `addInitScript` (`sessionStorage['polymer.intro.seen'] = '1'`). Haz lo mismo si escribes una prueba nueva.
-- **No renombres** paquetes, tablas, métricas, contenedores, claves de configuración ni claves de `localStorage` o `sessionStorage` existentes. HexaOrders es el nombre técnico (ADR 0016).
+- **Identificadores heredados:** no renombres el usuario ni las colas de RabbitMQ (`hexaorders.*`), ni las migraciones Flyway ya publicadas: están ligados a datos persistentes (docs/MIGRACION_POLYMER.md).

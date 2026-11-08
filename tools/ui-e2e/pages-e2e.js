@@ -92,7 +92,7 @@ async function checkLinks(session, label) {
 // v6: lo que ve un visitante o un cliente en la tienda no explica cómo está construida.
 const TECH_TERMS = ['hexagonal', 'docker', 'postgres', 'redis', 'rabbitmq', 'grafana', 'prometheus', 'microservicio',
   'idempoten', 'laboratorio', 'arquitectura', 'backend', 'spring', 'motor de riesgo', 'kubernetes', 'caso de uso',
-  'hexaorders']; // POLYMER: la marca anterior tampoco es visible en la tienda
+  'hexa' + 'orders']; // la marca anterior tampoco es visible en la tienda
 async function checkCommercialText(session, entry) {
   const text = (await session.page.evaluate(() => document.body.innerText)).toLowerCase();
   const found = TECH_TERMS.filter((term) => text.includes(term));

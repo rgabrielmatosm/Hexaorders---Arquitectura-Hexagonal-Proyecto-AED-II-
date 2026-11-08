@@ -1,4 +1,4 @@
-name: Verify HexaOrders
+name: Verify POLYMER
 on:
   push:
   pull_request:
@@ -7,7 +7,7 @@ permissions:
 jobs:
   # Prueba integral con Docker. GitHub solo ofrece contenedores Linux en runners Ubuntu
   # (los runners Windows no ejecutan contenedores Linux), así que este job usa Ubuntu, pero
-  # ejecuta EXACTAMENTE el mismo script PowerShell que usas en Windows: tools/hexaorders.ps1.
+  # ejecuta EXACTAMENTE el mismo script PowerShell que usas en Windows: tools/polymer.ps1.
   compose:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -28,8 +28,8 @@ jobs:
       # validación del collector, servicios sanos, smoke y plataforma a través del gateway Nginx,
       # integraciones reales (Redis, RabbitMQ, Mailpit, Tempo, OpenTelemetry, Loki, Grafana),
       # degradación sin Redis/RabbitMQ, persistencia tras reiniciar y HTTP 503 sin risk-engine.
-      - name: Verify delivery end to end (tools/hexaorders.ps1 verify, modo full)
-        run: ./tools/hexaorders.ps1 verify -Mode full -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery') -KeepRunning
+      - name: Verify delivery end to end (tools/polymer.ps1 verify, modo full)
+        run: ./tools/polymer.ps1 verify -Mode full -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-delivery') -KeepRunning
       # Interfaz web contra el stack REAL que verify deja en marcha: formulario, panel,
       # explorador de arquitectura, observabilidad con Prometheus/Grafana y vista móvil.
       - uses: actions/setup-node@v4
@@ -79,16 +79,16 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hexaorders-ui-screenshots
+          name: polymer-ui-screenshots
           path: ${{ runner.temp }}/ui-screenshots
           if-no-files-found: ignore
       # Seguros aunque falle cualquier paso anterior: si no existe el entregable, terminan sin error.
       - name: Show diagnostics on failure
         if: failure()
-        run: ./tools/hexaorders.ps1 diagnose -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery')
+        run: ./tools/polymer.ps1 diagnose -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-delivery')
       - name: Cleanup ephemeral CI resources
         if: always()
-        run: ./tools/hexaorders.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-delivery')
+        run: ./tools/polymer.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-delivery')
 
   # Lo que se ejecuta en un PC con Windows: lanzador .cmd, scripts en Windows PowerShell 5.1,
   # generación de secretos, generador determinista y tests unitarios de Python y Java.
@@ -118,18 +118,18 @@ jobs:
             else { Write-Host "OK $($_.Name)" }
           }
           if ($failed) { exit 1 }
-      - name: Windows launcher shows help (hexaorders.cmd)
+      - name: Windows launcher shows help (polymer.cmd)
         shell: cmd
-        run: hexaorders.cmd help
+        run: polymer.cmd help
       # Este paso y "check" se ejecutan con Windows PowerShell 5.1 (powershell.exe), el que
-      # trae Windows; hexaorders.cmd usa PowerShell 7 si está instalado, como en este runner.
+      # trae Windows; polymer.cmd usa PowerShell 7 si está instalado, como en este runner.
       - name: Generate secrets with Windows PowerShell 5.1 (idempotent, no trailing newline)
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'secrets-test'
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools\hexaorders.ps1 secrets -WorkDir $dir
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\polymer.ps1 secrets -WorkDir $dir
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $first = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools\hexaorders.ps1 secrets -WorkDir $dir
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\polymer.ps1 secrets -WorkDir $dir
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $second = Get-Content -Raw (Join-Path $dir 'secrets\db_password.txt')
           if ($first -ne $second) { throw 'secrets no es idempotente' }
@@ -144,11 +144,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Delivery up to date and valid on Windows (Windows PowerShell 5.1 check)
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools\hexaorders.ps1 check
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\polymer.ps1 check
           if ($LASTEXITCODE -ne 0) { exit 1 }
-      - name: Unit tests on Windows (hexaorders.cmd test)
+      - name: Unit tests on Windows (polymer.cmd test)
         run: |
-          .\hexaorders.cmd test
+          .\polymer.cmd test
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   # v5: el modo básico (6 contenedores, sin el perfil "full") también debe funcionar completo:
@@ -169,11 +169,102 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify basic mode end to end (tools/hexaorders.ps1 verify -Mode basic)
-        run: ./tools/hexaorders.ps1 verify -Mode basic -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-basic')
+      - name: Verify basic mode end to end (tools/polymer.ps1 verify -Mode basic)
+        run: ./tools/polymer.ps1 verify -Mode basic -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-basic')
       - name: Show diagnostics on failure
         if: failure()
-        run: ./tools/hexaorders.ps1 diagnose -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-basic')
+        run: ./tools/polymer.ps1 diagnose -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-basic')
       - name: Cleanup ephemeral CI resources
         if: always()
-        run: ./tools/hexaorders.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'hexaorders-basic')
+        run: ./tools/polymer.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-basic')
+
+  # Actualización REAL de un usuario: HexaOrders v6 en marcha (13 contenedores) con datos y
+  # contraseñas aleatorias → POLYMER descomprimido en OTRA carpeta, sin secrets\ (el ZIP nunca
+  # incluye contraseñas) → polymer.ps1 start. Debe recuperar las contraseñas originales, copiar y
+  # verificar los volúmenes hexaorders_* → polymer_*, conservar los originales, arrancar los 13
+  # contenedores y mantener intactos pedidos, usuarios y mensajes.
+  migrate-from-v6:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python tooling
+        run: python -m pip install --disable-pip-version-check -r requirements-tools.txt
+      - name: HexaOrders v6 (commit 6cc87c0) en marcha con datos, como en el equipo del usuario
+        shell: bash
+        run: |
+          set -euo pipefail
+          OLD="$RUNNER_TEMP/Descargas/HexaOrders-v6"
+          mkdir -p "$OLD"
+          git show 6cc87c0:docker-compose.yml > "$OLD/docker-compose.yml"
+          git show 6cc87c0:tools/init-env.ps1 > "$RUNNER_TEMP/init-env-v6.ps1"
+          # Sin variables de entorno: contraseñas aleatorias, distintas de las que generaría POLYMER.
+          pwsh -NoProfile -File "$RUNNER_TEMP/init-env-v6.ps1" -Root "$OLD"
+          docker compose -f "$OLD/docker-compose.yml" --profile full up -d --wait --wait-timeout 420
+          test "$(docker compose -f "$OLD/docker-compose.yml" --profile full ps -q | wc -l)" -eq 13
+          ORDER=$(curl -sf -X POST http://127.0.0.1:8080/api/orders -H 'Content-Type: application/json' \
+                  -d '{"customerId":"cliente-v6","amount":321.50}' | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          docker compose -f "$OLD/docker-compose.yml" exec -T db psql -U orders -d orders -v ON_ERROR_STOP=1 -tAc \
+            "INSERT INTO contact_messages (name, email, topic, message) VALUES ('Migración CI', 'ci@example.com', 'OTHER', 'Dato creado en HexaOrders v6 antes de migrar')"
+          COUNTS=$(docker compose -f "$OLD/docker-compose.yml" exec -T db psql -U orders -d orders -tAc \
+            "SELECT (SELECT count(*) FROM orders) || '/' || (SELECT count(*) FROM app_users) || '/' || (SELECT count(*) FROM products) || '/' || (SELECT count(*) FROM contact_messages)")
+          echo "Pedido v6: $ORDER · pedidos/usuarios/productos/mensajes: $COUNTS"
+          printf '%s\n%s\n' "$ORDER" "$COUNTS" > "$RUNNER_TEMP/v6-state.txt"
+      - name: POLYMER en otra carpeta SIN secrets\ → polymer.ps1 start (importa secretos y migra volúmenes)
+        run: |
+          $new = Join-Path $env:RUNNER_TEMP 'Descargas/POLYMER'
+          New-Item -ItemType Directory -Force $new | Out-Null
+          Copy-Item docker-compose.yml $new
+          if (Test-Path (Join-Path $new 'secrets')) { throw 'La carpeta nueva no debería tener secrets' }
+          ./tools/polymer.ps1 start -WorkDir $new -AssumeYes
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Comprobar datos conservados, 13 contenedores sanos y volúmenes originales intactos
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW="$RUNNER_TEMP/Descargas/POLYMER"
+          ORDER=$(sed -n 1p "$RUNNER_TEMP/v6-state.txt"); BEFORE=$(sed -n 2p "$RUNNER_TEMP/v6-state.txt")
+          C="docker compose -f $NEW/docker-compose.yml"
+          RUNNING=$($C ps --status running -q | wc -l)
+          echo "Contenedores polymer en marcha: $RUNNING"; $C ps
+          test "$RUNNING" -eq 13
+          test "$($C ps --format '{{.Health}}' | grep -c unhealthy || true)" -eq 0
+          for v in postgres_data prometheus_data grafana_data redis_data rabbitmq_data loki_data tempo_data alloy_data; do
+            docker volume inspect "hexaorders_$v" >/dev/null   # el original sigue existiendo
+            docker volume inspect "polymer_$v" >/dev/null
+          done
+          echo "Volúmenes: 8 originales conservados y 8 polymer_* migrados"
+          cat "$NEW/polymer-migration.log"
+          cmp -s "$NEW/secrets/db_password.txt" "$RUNNER_TEMP/Descargas/HexaOrders-v6/secrets/db_password.txt"
+          cmp -s "$NEW/secrets/grafana_password.txt" "$RUNNER_TEMP/Descargas/HexaOrders-v6/secrets/grafana_password.txt"
+          echo "Contraseñas originales importadas (sin mostrarlas)"
+          AFTER=$($C exec -T db psql -U orders -d orders -tAc \
+            "SELECT (SELECT count(*) FROM orders) || '/' || (SELECT count(*) FROM app_users) || '/' || (SELECT count(*) FROM products) || '/' || (SELECT count(*) FROM contact_messages)")
+          echo "Antes: $BEFORE · después: $AFTER"
+          test "$BEFORE" = "$AFTER"
+          curl -sf "http://127.0.0.1:8080/api/orders/$ORDER" | python -c 'import json,sys; o=json.load(sys.stdin); assert o["customerId"]=="cliente-v6" and float(o["amount"])==321.5, o; print("Pedido de la v6 intacto:", o["id"])'
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT count(*) FROM contact_messages WHERE name = 'Migración CI'")" -eq 1
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT max(version::int) FROM flyway_schema_history")" -eq 9
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT display_name FROM app_users WHERE username = 'admin'")" = "Administración Polymer"
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT count(*) FROM products WHERE brand = 'Polymer'")" -ge 1
+          python tools/platform_smoke.py --demo-password-file "$NEW/secrets/demo_password.txt"
+          python tools/store_smoke.py --demo-password-file "$NEW/secrets/demo_password.txt"
+      - name: Segunda ejecución de migrate (idempotente, no vuelve a copiar)
+        run: |
+          ./tools/polymer.ps1 migrate -WorkDir (Join-Path $env:RUNNER_TEMP 'Descargas/POLYMER')
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Show diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          docker ps -a
+          docker volume ls
+          for c in $(docker ps -aq); do echo "== $(docker inspect -f '{{.Name}}' $c)"; docker logs --tail 60 $c 2>&1 | tail -60; done

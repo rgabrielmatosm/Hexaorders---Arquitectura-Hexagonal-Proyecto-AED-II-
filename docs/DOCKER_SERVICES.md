@@ -1,4 +1,4 @@
-# Servicios Docker de HexaOrders (v5)
+# Servicios Docker de POLYMER (v5)
 
 Para cada contenedor se indica qué hace, cómo se integra y **qué prueba demuestra que funciona**. Ningún servicio se considera funcional solo por estar encendido. Las pruebas son:
 
@@ -6,7 +6,7 @@ Para cada contenedor se indica qué hace, cómo se integra y **qué prueba demue
 - `integration_smoke.py`: modo completo;
 - los healthchecks de Compose.
 
-Todas se ejecutan en `.\hexaorders.cmd verify` y en el CI.
+Todas se ejecutan en `.\polymer.cmd verify` y en el CI.
 
 | # | Servicio | Imagen | Modo | Puerto en el host | Redes | Volumen |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -88,7 +88,7 @@ Los 3 jobs originales sin cambios. La v5 añade `rabbitmq`, `otel-collector`, `n
 - **Invalidación.** Se invalida por versión tras cualquier cambio de productos, categorías o stock, incluidos los pedidos y las cancelaciones.
 - **No es fuente de verdad.** La idempotencia de pedidos sigue en PostgreSQL. Ver [`REDIS_INTEGRATION.md`](REDIS_INTEGRATION.md).
 - **Configuración.** `maxmemory 48mb`, `allkeys-lru`. Solo en la red interna `cache`.
-- **Verificación.** Aciertos en `hexaorders_cache_requests_total{result="hit"}`. Con Redis detenido, el catálogo responde desde PostgreSQL (`degraded`).
+- **Verificación.** Aciertos en `polymer_cache_requests_total{result="hit"}`. Con Redis detenido, el catálogo responde desde PostgreSQL (`degraded`).
 
 ## 8. rabbitmq — eventos de negocio
 
@@ -102,7 +102,7 @@ Los 3 jobs originales sin cambios. La v5 añade `rabbitmq`, `otel-collector`, `n
 
 ## 9. mailpit — correo de desarrollo
 
-Servidor SMTP que **captura** los correos de notificación: no los envía a Internet. Es una herramienta de desarrollo, **no un proveedor de correo de producción**. Los destinatarios son las cuentas de demostración (`*@hexaorders.local`) y los clientes de prueba (`*@example.test`).
+Servidor SMTP que **captura** los correos de notificación: no los envía a Internet. Es una herramienta de desarrollo, **no un proveedor de correo de producción**. Los destinatarios son las cuentas de demostración (`*@polymer.local`) y los clientes de prueba (`*@example.test`).
 
 **Verificación:** `integration_smoke.py` registra un cliente, compra y busca sus correos en la API de Mailpit.
 
@@ -133,6 +133,6 @@ Recibe OTLP solo del collector y guarda 72 h. Grafana enlaza trazas con logs (Te
 
 ## 13. alloy — agente de logs (servicio adicional)
 
-Lee los logs de los contenedores **de este proyecto** (etiqueta `com.hexaorders.logs=true`) mediante la API de Docker, con el socket en solo lectura. Elimina cualquier valor que siga a `password`, `token`, `cookie`, `authorization`… y los envía a Loki con las etiquetas `service`, `project`, `container` y `stream`. Docker Desktop para Windows expone `/var/run/docker.sock` a los contenedores Linux. Ver [ADR 0013](adr/0013-log-collection-with-alloy.md).
+Lee los logs de los contenedores **de este proyecto** (etiqueta `com.polymer.logs=true`) mediante la API de Docker, con el socket en solo lectura. Elimina cualquier valor que siga a `password`, `token`, `cookie`, `authorization`… y los envía a Loki con las etiquetas `service`, `project`, `container` y `stream`. Docker Desktop para Windows expone `/var/run/docker.sock` a los contenedores Linux. Ver [ADR 0013](adr/0013-log-collection-with-alloy.md).
 
 **Verificación:** los logs de los servicios aparecen en Loki (punto 10).

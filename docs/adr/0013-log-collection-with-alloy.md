@@ -13,7 +13,7 @@
 
 **Decisión.** Contenedor `alloy` (perfil `full`) con `/var/run/docker.sock` montado en **solo lectura**. Docker Desktop lo expone a los contenedores Linux también en Windows.
 
-- **Ámbito.** Solo descubre los contenedores con la etiqueta `com.hexaorders.logs=true`, añadida a todos los servicios del proyecto: nunca lee contenedores ajenos.
+- **Ámbito.** Solo descubre los contenedores con la etiqueta `com.polymer.logs=true`, añadida a todos los servicios del proyecto: nunca lee contenedores ajenos.
 - **Etiquetas.** Añade `service`, `project`, `container` y `stream`.
 - **Privacidad.** Sustituye por `<redacted>` cualquier valor que siga a `password`, `secret`, `token`, `authorization`, `cookie` o `jsessionid`, y envía el resultado a Loki.
 - **Endurecimiento.** Se ejecuta como root sin capacidades (`cap_drop: ALL`), con `read_only` y sin puertos publicados.

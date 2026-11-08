@@ -1,14 +1,14 @@
 ﻿<#
 .SYNOPSIS
-    Genera los secretos de HexaOrders como archivos en <Root>\secrets\ (excluido de Git).
+    Genera los secretos de POLYMER como archivos en <Root>\secrets\ (excluido de Git).
 
 .DESCRIPTION
     Compose monta cada archivo de secrets\ como secreto de solo lectura en /run/secrets:
       db_password.txt       contraseña de PostgreSQL
       grafana_password.txt  contraseña del usuario admin de Grafana
-      demo_password.txt     contraseña común de las cuentas de demostración de HexaOrders
+      demo_password.txt     contraseña común de las cuentas de demostración de POLYMER
                             (admin, operador, logistica, logistica2, observador, cliente)
-      rabbitmq_password.txt v5: contraseña del usuario hexaorders de RabbitMQ (perfil "full")
+      rabbitmq_password.txt v5: contraseña del usuario polymer de RabbitMQ (perfil "full")
 
     Un archivo existente NUNCA se sobrescribe: PostgreSQL, Grafana y RabbitMQ guardan la
     contraseña inicial en sus volúmenes y cambiarla rompería un entorno ya inicializado.
@@ -28,7 +28,7 @@
 .EXAMPLE
     .\tools\init-env.ps1
 .EXAMPLE
-    .\tools\init-env.ps1 -Root C:\despliegue\hexaorders
+    .\tools\init-env.ps1 -Root C:\despliegue\polymer
 #>
 [CmdletBinding()]
 param(
@@ -78,7 +78,7 @@ foreach ($item in $secrets) {
         $content = @(Get-ChildItem -LiteralPath $path -Force)
         if ($content.Count -gt 0) {
             throw ("'$path' es un DIRECTORIO con contenido, no un archivo de secreto. No se ha borrado nada. " +
-                   "Detén los contenedores (.\hexaorders.cmd stop), revisa su contenido, muévelo fuera de secrets\ y vuelve a ejecutar este script.")
+                   "Detén los contenedores (.\polymer.cmd stop), revisa su contenido, muévelo fuera de secrets\ y vuelve a ejecutar este script.")
         }
         Write-Warning "'$path' era un directorio vacío (Docker Desktop lo crea si el archivo no existía al arrancar). Se reemplaza por el archivo de secreto."
         Remove-Item -LiteralPath $path
@@ -111,5 +111,5 @@ if (-not $onWindows) {
 
 Write-Host "Secretos listos en $secretsDir (excluido de Git; no compartas su contenido)."
 Write-Host "Contraseña de Grafana (usuario admin): $(Join-Path $secretsDir 'grafana_password.txt')"
-Write-Host "Contraseña de las cuentas de demostración de HexaOrders: $(Join-Path $secretsDir 'demo_password.txt')"
-Write-Host "Contraseña de RabbitMQ (usuario hexaorders, consola http://127.0.0.1:15672): $(Join-Path $secretsDir 'rabbitmq_password.txt')"
+Write-Host "Contraseña de las cuentas de demostración de POLYMER: $(Join-Path $secretsDir 'demo_password.txt')"
+Write-Host "Contraseña de RabbitMQ (usuario hexaorders, heredado; consola http://127.0.0.1:15672): $(Join-Path $secretsDir 'rabbitmq_password.txt')"
