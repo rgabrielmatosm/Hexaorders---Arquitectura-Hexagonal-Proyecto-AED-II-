@@ -115,7 +115,7 @@ function Wait-Healthy([string[]]$Services) {
     [void](Invoke-Dc (@('up', '-d', '--wait', '--wait-timeout', '180') + $Services))
 }
 
-function Invoke-Redis([string[]]$Arguments) { return (Invoke-Dc (@('exec', '-T', 'redis', 'redis-cli', '--no-raw') + $Arguments)).Trim() }
+function Invoke-RedisCli([string[]]$Arguments) { return (Invoke-Dc (@('exec', '-T', 'redis', 'redis-cli', '--no-raw') + $Arguments)).Trim() }
 
 function Invoke-RedisRaw([string[]]$Arguments) { return (Invoke-Dc (@('exec', '-T', 'redis', 'redis-cli', '--raw') + $Arguments)).Trim() }
 
@@ -328,7 +328,7 @@ function Invoke-Redis {
 
     Show-Step '1. Partir de un cache miss: se borra SOLO esta clave de caché (no datos; equivale a que expire)'
     Show-Code "docker compose exec redis redis-cli DEL $key"
-    [void](Invoke-Redis @('DEL', $key))
+    [void](Invoke-RedisCli @('DEL', $key))
     Assert-Evidence ((Invoke-RedisRaw @('EXISTS', $key)) -eq '0') 'La clave no existe en Redis'
     $before = Get-ApiMetrics; Show-CacheMetrics $before
     Wait-Presenter
