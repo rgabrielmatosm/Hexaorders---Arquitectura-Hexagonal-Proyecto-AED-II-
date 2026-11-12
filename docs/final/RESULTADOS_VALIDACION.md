@@ -29,7 +29,55 @@ el stack completo se valida en el CI.
 
 ## 2. CI con Docker real
 
-RESULTADOS_CI
+Ejecución **[43324523676](https://github.com/rgabrielmatosm/Hexaorders---Arquitectura-Hexagonal-Proyecto-AED-II-/actions/runs/43324523676)** del workflow `Verify POLYMER` sobre el commit `016f521` (rama
+`claude/clever-curie-1597uv`): **los 4 jobs en verde** (`compose`, `compose-basic`, `windows`,
+`migrate-from-v6`). Las ejecuciones [43321136405](https://github.com/rgabrielmatosm/Hexaorders---Arquitectura-Hexagonal-Proyecto-AED-II-/actions/runs/43321136405) y [43324404093](https://github.com/rgabrielmatosm/Hexaorders---Arquitectura-Hexagonal-Proyecto-AED-II-/actions/runs/43324404093) (commits anteriores) también terminaron en verde.
+
+| Job | Qué ejecutó (Docker real salvo `windows`) | Resultado |
+| --- | --- | --- |
+| `compose` | `polymer.ps1 verify` (13 contenedores sanos, smoke de tienda, plataforma e integraciones, persistencia tras reinicio, `risk-engine` caído → 503), Playwright (UI, 45 páginas × roles, intro, idiomas y contraseñas) y **todos los escenarios de la exposición** | ✅ |
+| `compose-basic` | Modo `basic` de extremo a extremo | ✅ |
+| `windows` | Análisis de todos los `.ps1` con PowerShell 5.1, secretos, `check` y pruebas unitarias (Java y Python) | ✅ |
+| `migrate-from-v6` | HexaOrders v6 con datos → POLYMER (secretos importados, volúmenes migrados, recuentos idénticos), `change-password` de PostgreSQL, Grafana y RabbitMQ | ✅ |
+
+### Escenarios de la exposición (`tools/demo/polymer-demo.ps1`, en el orden del CI)
+
+Cada escenario falla si una evidencia no se cumple; todos terminaron con «OK».
+
+| Escenario | Evidencias comprobadas | Duración |
+| --- | --- | --- |
+| `preparar` | 1 | 1 s |
+| `arquitectura` | 11 | 23 s |
+| `rabbitmq` | 5 | 5 s |
+| `postgres` | 3 | 20 s |
+| `riesgo` | 3 | 2 s |
+| `observabilidad` | 2 | 4 s |
+| `redis-caida` | 3 | 34 s |
+| `rabbitmq-caida` | 6 | 21 s |
+| `riesgo-caida` | 3 | 11 s |
+| `activar-demo` | 2 | 17 s |
+| `redis` | 8 | 18 s |
+| `adaptador` | 2 | 9 s |
+| `desactivar-demo` | 1 | 18 s |
+| `preparar` | 1 | 1 s |
+
+Evidencias observadas (texto literal del registro del CI):
+
+- **Arquitectura:** ArchUnit (8 reglas) y AdapterSubstitutionTest (4 pruebas) en verde.
+- **RabbitMQ:** outbox_published contiene order-status-27; processed_events contiene order-status-27; Correo de notificación en Mailpit (http://127.0.0.1:8025); Exchange topic durable, cola durable con consumidor y DLQ configurada.
+- **PostgreSQL:** Huella del pedido antes del reinicio: 100017|36.25|RISK_APPROVED|1|2 → Huella después del reinicio: 100017|36.25|RISK_APPROVED|1|2; El pedido, sus líneas y su historial son idénticos tras el reinicio.
+- **Microservicios:** risk-engine devolvió 10 y el dominio Java aprobó; risk-engine devolvió 75 y el pedido quedó EN REVISIÓN (visible en Operaciones → Revisión de riesgo); risk-engine registró las llamadas POST /score de order-api.
+- **Observabilidad:** Prometheus muestra 3 pedidos de la tienda, igual que order-api (3); Prometheus recopila 9 targets; order-api, risk-engine y prometheus en UP.
+  Valores leídos de Prometheus en ese momento: pedidos de la tienda `APPROVED` 2 y `REVIEW` 1;
+  HTTP `200` 15 y `201` 5; latencia p95 0,037 s; eventos publicados `ORDER_CREATED` 2,
+  `ORDER_APPROVED` 1, `ORDER_STATUS_CHANGED` 1; outbox pendiente 0; correos enviados 4; 9 *targets* con
+  `up = 1` (alloy, loki, nginx, order-api, otel-collector, prometheus, rabbitmq, risk-engine, tempo).
+  Son contadores desde el último reinicio de `order-api` (escenario E).
+- **Redis (TTL de demostración 15 s):** polymer_cache_requests_total{result="miss"} aumentó; polymer_cache_requests_total{result="hit"} aumentó; TTL = -2: la clave ya no existe; Nuevo miss tras la expiración; Entrada nueva en Redis con TTL completo (15 s).
+- **Redis caído:** Catálogo servido sin Redis: 556 productos en 388 ms; Aumentan error/bypass: RedisCatalogCache degrada sin romper la tienda; El catálogo vuelve a servirse desde Redis sin intervención manual.
+- **RabbitMQ caído:** El evento order-status-37 sigue PENDIENTE (no está en outbox_published); El evento order-status-37 se publicó al volver RabbitMQ; El pedido no se perdió.
+- **risk-engine caído:** POST /api/shop/orders → 503 Service Unavailable (RiskUnavailableException); Ningún pedido sin evaluación de riesgo en PostgreSQL; Tras la recuperación el pedido se crea (201).
+- **Sustitución de adaptador:** Pedido creado con el puntaje fijo 10 sin consultar risk-engine; order-api vuelve a la configuración de docker-compose.yml (TTL 60 s, adaptador HTTP).
 
 ## 3. Errores encontrados por la validación y corregidos
 

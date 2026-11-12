@@ -44,7 +44,7 @@ PowerShell 5.1). Ninguna funcionalidad se marca como verificada solo porque exis
 | `change-password` (PostgreSQL, Grafana, RabbitMQ) | ✅ | Job `migrate-from-v6` |
 | Secretos aleatorios y memorables, nunca impresos | ✅ | Job `windows`; `integration_smoke.py` comprueba que ningún log de Loki contiene un secreto |
 | Observabilidad: Prometheus (9 jobs, 9 alertas), Grafana (8 dashboards), Loki, Tempo, Collector, Alloy | ✅ | `integration_smoke.py` (targets UP, fuentes de datos OK, dashboards aprovisionados, logs en Loki, trazas en Tempo), `check_observability.py` |
-| Escenarios de la exposición (`tools/demo/polymer-demo.ps1`) | ESTADO_ESCENARIOS | Paso «Exposición» del job `compose` |
+| Escenarios de la exposición (`tools/demo/polymer-demo.ps1`) | ✅ | Paso «Exposición» del job `compose`, ejecución [43324523676](https://github.com/rgabrielmatosm/Hexaorders---Arquitectura-Hexagonal-Proyecto-AED-II-/actions/runs/43324523676): 14 ejecuciones de escenario en verde |
 | Comandos `health`, `rebuild`, `restart`, `demo`, `demo-on`, `demo-off` | 🟡 | Analizados con PowerShell 5.1 en CI; `demo-on`/`demo-off` se ejecutan en el paso «Exposición»; `health`, `rebuild` y `restart` no se ejecutan en el CI |
 | Manifiestos de Kubernetes (`k8s/`) | 🟡 | Validados estáticamente (`validate_delivery.py`: 14 objetos); nunca desplegados en un clúster |
 | Guía de despliegue en Google Cloud (`docs/despliegue-cloud.md`) | 🟡 | No ejecutada |
