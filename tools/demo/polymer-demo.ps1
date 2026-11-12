@@ -50,7 +50,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$RepoRoot = (Resolve-Path (Join-Path (Join-Path $PSScriptRoot '..') '..')).Path
 if (-not $ComposeFile) { $ComposeFile = Join-Path $RepoRoot 'docker-compose.yml' }
 $ComposeFile = (Resolve-Path $ComposeFile).Path
 $SecretsDir = Join-Path (Split-Path -Parent $ComposeFile) 'secrets'
@@ -647,6 +647,9 @@ function Set-DemoMode([bool]$On) {
 # ------------------------------------------------------------------ main
 
 $started = Get-Date
+# POLYMER_DEMO_TRANSCRIPT: guarda toda la salida (el CI la muestra si un escenario falla).
+if ($env:POLYMER_DEMO_TRANSCRIPT) { Start-Transcript -Path $env:POLYMER_DEMO_TRANSCRIPT -Append | Out-Null }
+try {
 switch ($Scenario) {
     'preparar'       { Invoke-Preparar }
     'arquitectura'   { Invoke-Arquitectura }
@@ -665,6 +668,14 @@ switch ($Scenario) {
         Invoke-Preparar; Invoke-Arquitectura; Invoke-Redis; Invoke-RabbitMq; Invoke-Postgres; Invoke-Riesgo
         Invoke-Observabilidad; Invoke-RedisCaida; Invoke-RabbitMqCaida; Invoke-RiesgoCaida
     }
+}
+} catch {
+    Write-Host ''
+    Write-Host "ERROR en el escenario «$Scenario»: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    throw
+} finally {
+    if ($env:POLYMER_DEMO_TRANSCRIPT) { Stop-Transcript | Out-Null }
 }
 Write-Host ''
 Write-Host ("OK demostración «{0}»: {1} evidencias comprobadas en {2:N0} s" -f $Scenario, $script:Evidence, ((Get-Date) - $started).TotalSeconds) -ForegroundColor Green

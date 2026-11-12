@@ -89,6 +89,8 @@ jobs:
       # real. Cada uno falla si una evidencia no se cumple (claves y TTL de Redis, filas de PostgreSQL, colas
       # de RabbitMQ, correos de Mailpit, métricas, 503 sin risk-engine, adaptador sustituido…).
       - name: Exposición — escenarios de demostración contra el stack real (tools/demo/polymer-demo.ps1)
+        env:
+          POLYMER_DEMO_TRANSCRIPT: ${{ runner.temp }}/polymer-demo-transcript.txt
         run: |
           $compose = Join-Path $env:RUNNER_TEMP 'polymer-delivery/docker-compose.yml'
           $common = @{ ComposeFile = $compose; Project = 'polymer-verify'; NoPause = $true }
@@ -116,6 +118,11 @@ jobs:
       - name: Cleanup ephemeral CI resources
         if: always()
         run: ./tools/polymer.ps1 cleanup -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-delivery')
+      - name: Resumen de los escenarios de la exposición (solo si fallan)
+        if: failure()
+        run: |
+          $file = Join-Path $env:RUNNER_TEMP 'polymer-demo-transcript.txt'
+          if (Test-Path $file) { Get-Content $file -Tail 80 } else { Write-Host 'Sin transcripción de los escenarios.' }
 
   # Lo que se ejecuta en un PC con Windows: lanzador .cmd, scripts en Windows PowerShell 5.1,
   # generación de secretos, generador determinista y tests unitarios de Python y Java.
