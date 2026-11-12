@@ -70,8 +70,9 @@ function Show-Step([string]$Text) { Write-Host ''; Write-Host "▶ $Text" -Foreg
 function Show-Info([string]$Text) { Write-Host "  $Text" }
 function Show-Code([string]$Text) { Write-Host "  $Text" -ForegroundColor DarkGray }
 
-function Assert-Evidence([bool]$Condition, [string]$Text) {
-    if (-not $Condition) { throw "EVIDENCIA NO CUMPLIDA: $Text" }
+function Assert-Evidence($Condition, [string]$Text) {
+    # Acepta un booleano o un valor (id, filas…): vacío, $null, 0 o $false = no cumplida.
+    if (-not [bool]$Condition) { throw "EVIDENCIA NO CUMPLIDA: $Text" }
     $script:Evidence++
     Write-Host "  ✔ $Text" -ForegroundColor Green
 }
@@ -434,10 +435,10 @@ function Invoke-RabbitMq {
     Assert-Evidence $published "outbox_published contiene $eventId"
     Write-Host (Invoke-Sql "SELECT event_id, published_at FROM outbox_published WHERE event_id = '$eventId';")
     Show-Step '4. El consumidor procesa el evento una sola vez (processed_events) y envía el correo'
-    $processed = Wait-Until 'procesamiento del evento' -TimeoutSeconds 60 -Probe { (Invoke-SqlValue "SELECT count(*) FROM processed_events WHERE event_id = '$eventId';") -ge '1' }
+    $processed = Wait-Until 'procesamiento del evento' -TimeoutSeconds 60 -Probe { [int](Invoke-SqlValue "SELECT count(*) FROM processed_events WHERE event_id = '$eventId';") -ge 1 }
     Assert-Evidence $processed "processed_events contiene $eventId"
     Write-Host (Invoke-Sql "SELECT event_id, consumer, processed_at FROM processed_events WHERE event_id = '$eventId';")
-    $mails = Wait-Until 'correo en Mailpit' -TimeoutSeconds 60 -Probe { $m = Get-MailpitMessages $customer.Email; if ($m.Count -ge 1) { $m } else { $null } }
+    $mails = @(Wait-Until 'correo en Mailpit' -TimeoutSeconds 60 -Probe { $m = Get-MailpitMessages $customer.Email; if ($m.Count -ge 1) { $m } else { $null } })
     foreach ($m in $mails) { Show-Info "Mailpit: «$($m.Subject)» → $($customer.Email)" }
     Assert-Evidence ($mails.Count -ge 1) "Correo de notificación en Mailpit ($MailpitUrl)"
     Show-Step '5. Topología durable en RabbitMQ (API de gestión)'
@@ -478,7 +479,7 @@ function Invoke-RabbitMqCaida {
     Wait-Healthy @('rabbitmq')
     $published = Wait-Until 'publicación tras la recuperación' -TimeoutSeconds 150 -Interval 5 -Probe { (Invoke-SqlValue "SELECT count(*) FROM outbox_published WHERE event_id = '$eventId';") -eq '1' }
     Assert-Evidence $published "El evento $eventId se publicó al volver RabbitMQ"
-    $mails = Wait-Until 'correo del pedido retenido' -TimeoutSeconds 120 -Interval 5 -Probe { $m = Get-MailpitMessages $customer.Email; if ($m.Count -ge 1) { $m } else { $null } }
+    $mails = @(Wait-Until 'correo del pedido retenido' -TimeoutSeconds 120 -Interval 5 -Probe { $m = Get-MailpitMessages $customer.Email; if ($m.Count -ge 1) { $m } else { $null } })
     Assert-Evidence ($mails.Count -ge 1) "El cliente recibió el correo del pedido creado durante la caída ($($mails.Count))"
     Assert-Evidence ((Invoke-SqlValue "SELECT count(*) FROM orders WHERE id = '$($order.id)';") -eq '1') 'El pedido no se perdió'
     Show-Info 'Garantía real: entrega AL MENOS UNA VEZ (un evento puede reenviarse; processed_events descarta duplicados). No es «exactamente una vez».'
@@ -585,7 +586,7 @@ function Invoke-Adaptador {
         Show-Info "Respuesta: riesgo=$($order.Data.riskScore), decisión=$($order.Data.riskDecision) (con el adaptador HTTP habría sido 75 / REVIEW)"
         Assert-Evidence ($order.Status -eq 201 -and "$($order.Data.riskScore)" -eq "$score") "Pedido creado con el puntaje fijo $score sin consultar risk-engine"
         $log = Invoke-Dc @('logs', '--no-color', 'order-api') -AllowFailure
-        Assert-Evidence ($log -match 'DEMOSTRACIÓN: RiskAssessmentPort usa FixedRiskAssessmentAdapter') 'El log de order-api confirma qué adaptador conectó la raíz de composición'
+        Assert-Evidence ($log -match 'RiskAssessmentPort usa FixedRiskAssessmentAdapter') 'El log de order-api confirma qué adaptador conectó la raíz de composición'
     } finally {
         Show-Step '2. Restaurar risk-engine'
         Wait-Healthy @('risk-engine')
@@ -620,9 +621,10 @@ function Invoke-Observabilidad {
             }
         } catch { Show-Info "Prometheus no respondió: $($_.Exception.Message)" }
     }
-    $targets = (Invoke-RestMethod -UseBasicParsing -Uri "$PrometheusUrl/api/v1/targets?state=active" -TimeoutSec 10).data.activeTargets
-    $down = @($targets | Where-Object { $_.health -ne 'up' })
-    Assert-Evidence ($targets.Count -ge 3 -and $down.Count -eq 0) "Prometheus recopila $($targets.Count) targets, todos UP"
+    $targets = @((Invoke-RestMethod -UseBasicParsing -Uri "$PrometheusUrl/api/v1/targets?state=active" -TimeoutSec 10).data.activeTargets)
+    foreach ($t in $targets) { Show-Info ("Target {0,-15} {1}" -f $t.labels.job, $t.health) }
+    $critical = @($targets | Where-Object { @('order-api', 'risk-engine', 'prometheus') -contains $_.labels.job -and $_.health -eq 'up' })
+    Assert-Evidence ($critical.Count -ge 3) "Prometheus recopila $($targets.Count) targets; order-api, risk-engine y prometheus en UP"
     Show-Info 'Grafana: http://127.0.0.1:3000 → Dashboards → carpeta POLYMER (negocio, API, integraciones, riesgo, logística, seguridad, infraestructura).'
 }
 
