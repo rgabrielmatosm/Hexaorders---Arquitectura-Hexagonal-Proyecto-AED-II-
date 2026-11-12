@@ -1,0 +1,17 @@
+# POLYMER — override para el despliegue en AWS (EC2 + Docker Compose) detrás del Nginx del host con TLS.
+# Uso (en la instancia, carpeta del proyecto, con .env creado a partir de .env.example):
+#   docker compose -f docker-compose.yml -f infra/aws/compose.aws.yml --profile full up -d --wait
+# No cambia datos, volúmenes ni contraseñas. Los puertos siguen publicados SOLO en 127.0.0.1: el único
+# punto de entrada público es el Nginx del host (80/443). Guía: docs/final/DESPLIEGUE_AWS_HTTPS.md
+services:
+  order-api:
+    environment:
+      # La cookie de sesión solo viaja por HTTPS (el navegador siempre llega por TLS al Nginx del host).
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"
+  grafana:
+    environment:
+      # Grafana se publica en su propio subdominio, con su inicio de sesión (sin acceso anónimo).
+      GF_SERVER_ROOT_URL: https://${POLYMER_GRAFANA_DOMAIN:?Define POLYMER_GRAFANA_DOMAIN en .env}/
+      GF_SERVER_DOMAIN: ${POLYMER_GRAFANA_DOMAIN}
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"

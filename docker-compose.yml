@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 8ff1117b714d1c028834fda4fcdf63b50a97c90ada57c7e95ea98f098921aaff
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 81c4ed6c713d53b0cc3ea57aa141418186e34cf27b4587cc51d81b0c135718b3
 # POLYMER — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -33832,6 +33832,14 @@ services:
             gzip on;
             gzip_types text/css application/javascript image/svg+xml application/json;
         
+            # Esquema original de la petición. En local el cliente llega directo (http). En AWS llega a través del
+            # Nginx del host con TLS, que envía X-Forwarded-Proto: https; se conserva para que order-api genere
+            # canonical/hreflang/sitemap con https://. El puerto 8080 solo escucha en 127.0.0.1 (nadie más lo alcanza).
+            map $$http_x_forwarded_proto $$polymer_forwarded_proto {
+                default $$http_x_forwarded_proto;
+                ''      $$scheme;
+            }
+        
             # DNS interno de Docker: se vuelve a resolver order-api cada 10 s (sobrevive a reinicios).
             resolver 127.0.0.11 valid=10s ipv6=off;
         
@@ -33864,7 +33872,7 @@ services:
                     proxy_set_header Connection "";
                     proxy_set_header Host $$http_host;
                     proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $$scheme;
+                    proxy_set_header X-Forwarded-Proto $$polymer_forwarded_proto;
                     proxy_set_header X-Request-Id $$request_id;
                     proxy_connect_timeout 5s;
                     proxy_read_timeout 60s;
