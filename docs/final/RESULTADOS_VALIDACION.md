@@ -43,6 +43,10 @@ RESULTADOS_CI
   desde Redis. Corregido en `RedisCatalogCache` con prueba de regresión (ver `AUDITORIA_POLYMER.md`, error 6).
 - Dos funciones del script con el mismo nombre (`Invoke-Redis`) provocaban recursión infinita; el
   ayudante se renombró a `Invoke-RedisCli`.
+- El escenario de observabilidad mostraba contadores a 0 justo después del reinicio de `order-api`
+  (escenario E): Prometheus aún no había leído los valores nuevos. Ahora genera un pedido y espera al
+  siguiente *scrape* hasta que Prometheus coincide con `/actuator/prometheus`; no se muestra un cero
+  que no corresponde a la realidad.
 - `infra/frontend/nginx.conf` perdía `https` detrás de un proxy TLS (ver `AUDITORIA_POLYMER.md`, error 1).
 
 ## 4. Pendiente de verificación (no se afirma que funcione)
