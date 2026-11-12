@@ -363,7 +363,7 @@ function Invoke-Redis {
     $newTtl = [int](Invoke-RedisRaw @('TTL', $key))
     Assert-Evidence ($newTtl -gt 0) "Entrada nueva en Redis con TTL completo ($newTtl s)"
 
-    Show-Step '6. Las mismas métricas en Prometheus (y en Grafana: dashboard «POLYMER · Integraciones»)'
+    Show-Step '6. Las mismas métricas en Prometheus (y en Grafana: dashboard «POLYMER — Platform Integrations»)'
     Show-Code 'sum by (result) (polymer_cache_requests_total)'
     try {
         $series = (Invoke-RestMethod -UseBasicParsing -Uri "$PrometheusUrl/api/v1/query?query=sum%20by%20(result)%20(polymer_cache_requests_total)" -TimeoutSec 10).data.result
@@ -446,7 +446,7 @@ function Invoke-RabbitMq {
         Show-Info ("Cola hexaorders.notifications: durable={0}, consumidores={1}, listos={2}, DLX={3}" -f $queue.durable, $queue.consumers, $queue.messages_ready, $queue.arguments.'x-dead-letter-exchange')
         Show-Info ("DLQ hexaorders.notifications.dlq: durable={0}, mensajes={1}" -f $dlq.durable, $dlq.messages)
         Assert-Evidence ($queue.durable -and $queue.consumers -ge 1 -and $exchange.durable -and $exchange.type -eq 'topic') 'Exchange topic durable, cola durable con consumidor y DLQ configurada'
-    } else { Show-Info "Sin secrets\rabbitmq_password.txt junto a $ComposeFile: se omite la API de gestión." }
+    } else { Show-Info "Sin secrets\rabbitmq_password.txt junto a ${ComposeFile}: se omite la API de gestión." }
 }
 
 function Invoke-RabbitMqCaida {
