@@ -94,9 +94,11 @@ function Invoke-Dc {
         if ($InputText) { $output = $InputText | & docker @($base + $Arguments) 2>&1 }
         else { $output = & docker @($base + $Arguments) 2>&1 }
     } finally { $ErrorActionPreference = $previous }
-    $text = (@($output) | ForEach-Object { "$_" }) -join "`n"
-    if ($LASTEXITCODE -ne 0 -and -not $AllowFailure) { throw "docker compose $($Arguments -join ' ') falló:`n$text" }
-    return $text
+    # stdout es el resultado; stderr (avisos de Compose, progreso) solo se muestra si el comando falla.
+    $stdout = @($output | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+    $stderr = @($output | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+    if ($LASTEXITCODE -ne 0 -and -not $AllowFailure) { throw "docker compose $($Arguments -join ' ') falló:`n$(($stdout + $stderr) -join "`n")" }
+    return ($stdout -join "`n")
 }
 
 function Get-RunningServices { return @((Invoke-Dc @('ps', '--status', 'running', '--services')) -split "`n" | Where-Object { $_ }) }
@@ -196,8 +198,9 @@ function New-DemoCustomer {
     $suffix = ([guid]::NewGuid().ToString('N')).Substring(0, 8)
     $username = "demo_$suffix"
     $email = "demo.$suffix@example.test"
-    # Frase de contraseña generada para este cliente ficticio; no se imprime ni se guarda.
-    $password = "faro cobre lluvia norte $suffix"
+    # Frase de contraseña generada para este cliente ficticio (no se imprime ni se guarda). No contiene el
+    # usuario ni el correo: la política del servidor (PasswordPolicy) los rechazaría.
+    $password = "faro cobre lluvia norte $(Get-Random -Minimum 1000 -Maximum 9999)"
     $session = [pscustomobject]@{ Web = New-Object Microsoft.PowerShell.Commands.WebRequestSession; Csrf = $null; CsrfHeader = 'X-CSRF-TOKEN'; Username = $username; Email = $email; Password = $password }
     Update-Csrf $session
     [void](Invoke-Api -Session $session -Method 'POST' -Path '/api/auth/register' -Expect @(201) -Body @{
