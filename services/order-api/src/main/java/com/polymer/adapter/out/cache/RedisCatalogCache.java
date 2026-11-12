@@ -1,5 +1,6 @@
 package com.polymer.adapter.out.cache;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -31,7 +32,10 @@ public final class RedisCatalogCache implements CatalogCache {
     private final StringRedisTemplate redis;
     private final Duration ttl;
     private final Duration backoff;
-    private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+    // Derived accessors (e.g. Category.isMain() → "main") are written but are not record components:
+    // reading must ignore them, and also fields written by other versions of the application.
+    private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final MeterRegistry registry;
     private volatile long skipUntil;
     private volatile boolean invalidationPending;
@@ -89,9 +93,10 @@ public final class RedisCatalogCache implements CatalogCache {
                 String version = Optional.ofNullable(redis.opsForValue().get(VERSION_KEY)).orElse("0");
                 key = "polymer:catalog6:v" + version + ":" + name;
                 String raw = redis.opsForValue().get(key);
-                if (raw != null) {
+                T cachedValue = raw == null ? null : readOrNull(key, raw, type);
+                if (cachedValue != null) {
                     counter("hit").increment();
-                    return json.readValue(raw, type);
+                    return cachedValue;
                 }
                 counter("miss").increment();
             } catch (Exception error) {
@@ -108,6 +113,19 @@ public final class RedisCatalogCache implements CatalogCache {
             }
         }
         return value;
+    }
+
+    /**
+     * An entry that cannot be read is a data problem, not a Redis outage: it counts as a miss and is
+     * overwritten with the value from PostgreSQL, without the back-off.
+     */
+    private <T> T readOrNull(String key, String raw, JavaType type) {
+        try {
+            return json.readValue(raw, type);
+        } catch (Exception error) {
+            LOG.warn("Entrada de caché ilegible en {} ({}); se recarga desde PostgreSQL", key, error.getClass().getSimpleName());
+            return null;
+        }
     }
 
     private boolean unavailable() { return System.currentTimeMillis() < skipUntil; }

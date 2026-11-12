@@ -10,7 +10,7 @@ concretos: [`RESULTADOS_VALIDACION.md`](RESULTADOS_VALIDACION.md).
 | 1 | Compose | Entregable al día y válido (13 servicios, perfiles, `read_only`, secretos como archivos) | `tools/generate_delivery.py --check`, `tools/validate_delivery.py` | `.\polymer.cmd check` | Local, CI (Linux y Windows) |
 | 2 | Compose | `docker compose config` del archivo real | `polymer.ps1 verify` paso 3 | `.\polymer.cmd verify` | CI |
 | 3 | Compilación | Imágenes de los 13 servicios (los Dockerfiles ejecutan las pruebas) | Dockerfiles | `.\polymer.cmd rebuild` | CI |
-| 4 | Unitarias Java | Dominio, casos de uso, adaptadores, seguridad (130) | JUnit 5 + Mockito | `mvn test` | Local, CI (build y Windows) |
+| 4 | Unitarias Java | Dominio, casos de uso, adaptadores, seguridad (131) | JUnit 5 + Mockito | `mvn test` | Local, CI (build y Windows) |
 | 5 | Unitarias Python | Motor de riesgo (62) | pytest | `python -m pytest` | Local, CI |
 | 6 | Arquitectura | 8 reglas ArchUnit + arquitectura Python | `HexagonalArchitectureTest`, `test_architecture.py` | `.\polymer.cmd demo -Scenario arquitectura` | Local, CI |
 | 7 | Arquitectura | Sustitución de adaptador (4) | `AdapterSubstitutionTest` | idem | Local, CI |

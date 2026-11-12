@@ -11,10 +11,11 @@ el stack completo se valida en el CI.
 
 | Prueba | Resultado observado |
 | --- | --- |
-| `mvn package` (order-api) | **130 pruebas, 0 fallos, 0 errores** (122 anteriores + 4 reglas ArchUnit nuevas + 4 de `AdapterSubstitutionTest`) |
+| `mvn package` (order-api) | **131 pruebas, 0 fallos, 0 errores** (122 anteriores + 4 reglas ArchUnit nuevas + 4 de `AdapterSubstitutionTest` + 1 de regresión de la caché) |
 | `HexagonalArchitectureTest` | 8 reglas en verde |
 | Mutación: campo `JdbcTemplate` en `domain/OrderStatus.java` | **Detectada**: `CORE_HAS_NO_FRAMEWORK_OR_INFRASTRUCTURE` falla con `Field <com.polymer.domain.OrderStatus.DEMO> has type <org.springframework.jdbc.core.JdbcTemplate>`; archivo restaurado |
 | Cambio del umbral Java 70 → 80 (análisis) | Fallan 3 pruebas (`OrderDomainTest.riskThresholdIsOwnedByDomain`, `OrderServiceTest.assessesRiskBeforePersistenceAndCountsOnlyPersistedOrders`, `CommerceServiceTest.pricesOnTheServerAsksPythonForRiskBeforePersistingAndRecordsHistory`); restaurado. Además chocaría con la restricción `orders_status_matches_risk` de PostgreSQL |
+| Regresión de la caché (`redisCacheReadsBackWhatItWroteIncludingDerivedAccessors`) | **Falla** con el `RedisCatalogCache` anterior y pasa con la corrección |
 | `pytest` (risk-engine) | **62 passed** |
 | Regla de importe 1000 → 500 solo en `risk.py` | Fallan `test_risk_thresholds[500.00-40-APPROVED]` y `[999.99-40-APPROVED]` (las pruebas protegen la regla) |
 | Parche `tools/demo/regla-revision-desde-500.patch` | Aplicado: 62 passed; revertido (`git apply -R`): 62 passed; `git apply --check` correcto |
@@ -36,6 +37,12 @@ RESULTADOS_CI
   PowerShell interpreta como ámbito (detectado por el análisis con PowerShell 5.1) y una contraseña de
   cliente ficticio que contenía parte de su usuario, que la política de contraseñas del servidor rechazó
   con razón. Ambos corregidos.
+- **Error real de la aplicación** detectado por el escenario `redis` en el CI: la caché contaba un *hit*
+  y a la vez un `error`, y tras la expiración solo había `bypass`. Causa: `Category.isMain()` se
+  serializa como `"main"` y no se podía volver a leer, así que el árbol de categorías nunca se servía
+  desde Redis. Corregido en `RedisCatalogCache` con prueba de regresión (ver `AUDITORIA_POLYMER.md`, error 6).
+- Dos funciones del script con el mismo nombre (`Invoke-Redis`) provocaban recursión infinita; el
+  ayudante se renombró a `Invoke-RedisCli`.
 - `infra/frontend/nginx.conf` perdía `https` detrás de un proxy TLS (ver `AUDITORIA_POLYMER.md`, error 1).
 
 ## 4. Pendiente de verificación (no se afirma que funcione)

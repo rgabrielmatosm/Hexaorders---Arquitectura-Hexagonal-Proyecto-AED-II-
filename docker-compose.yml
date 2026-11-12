@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 81c4ed6c713d53b0cc3ea57aa141418186e34cf27b4587cc51d81b0c135718b3
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 3f574d8e54482b193627b4fa8b7fe7b7463df8c0f41e1bedfd9f8ec507453c39
 # POLYMER — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -2425,6 +2425,7 @@ services:
         COPY <<'RedisCatalogCache.java' src/main/java/com/polymer/adapter/out/cache/
         package com.polymer.adapter.out.cache;
         
+        import com.fasterxml.jackson.databind.DeserializationFeature;
         import com.fasterxml.jackson.databind.JavaType;
         import com.fasterxml.jackson.databind.ObjectMapper;
         import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -2456,7 +2457,10 @@ services:
             private final StringRedisTemplate redis;
             private final Duration ttl;
             private final Duration backoff;
-            private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+            // Derived accessors (e.g. Category.isMain() → "main") are written but are not record components:
+            // reading must ignore them, and also fields written by other versions of the application.
+            private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
+                    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             private final MeterRegistry registry;
             private volatile long skipUntil;
             private volatile boolean invalidationPending;
@@ -2514,9 +2518,10 @@ services:
                         String version = Optional.ofNullable(redis.opsForValue().get(VERSION_KEY)).orElse("0");
                         key = "polymer:catalog6:v" + version + ":" + name;
                         String raw = redis.opsForValue().get(key);
-                        if (raw != null) {
+                        T cachedValue = raw == null ? null : readOrNull(key, raw, type);
+                        if (cachedValue != null) {
                             counter("hit").increment();
-                            return json.readValue(raw, type);
+                            return cachedValue;
                         }
                         counter("miss").increment();
                     } catch (Exception error) {
@@ -2533,6 +2538,19 @@ services:
                     }
                 }
                 return value;
+            }
+        
+            /**
+             * An entry that cannot be read is a data problem, not a Redis outage: it counts as a miss and is
+             * overwritten with the value from PostgreSQL, without the back-off.
+             */
+            private <T> T readOrNull(String key, String raw, JavaType type) {
+                try {
+                    return json.readValue(raw, type);
+                } catch (Exception error) {
+                    LOG.warn("Entrada de caché ilegible en {} ({}); se recarga desde PostgreSQL", key, error.getClass().getSimpleName());
+                    return null;
+                }
             }
         
             private boolean unavailable() { return System.currentTimeMillis() < skipUntil; }
@@ -28625,6 +28643,38 @@ services:
                 verify(values).increment(RedisCatalogCache_VERSION());
                 assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "hit").count()).isEqualTo(1);
                 assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "miss").count()).isEqualTo(1);
+            }
+        
+            @Test
+            @SuppressWarnings("unchecked")
+            void redisCacheReadsBackWhatItWroteIncludingDerivedAccessors() {
+                // Regresión: Category.isMain() se serializa como "main"; antes, cada hit fallaba al leerlo,
+                // contaba un error y activaba el back-off, así que la caché nunca servía las categorías.
+                StringRedisTemplate redis = mock(StringRedisTemplate.class);
+                ValueOperations<String, String> values = mock(ValueOperations.class);
+                when(redis.opsForValue()).thenReturn(values);
+                java.util.Map<String, String> store = new java.util.HashMap<>(java.util.Map.of(RedisCatalogCache_VERSION(), "7"));
+                when(values.get(anyString())).thenAnswer(call -> store.get(call.<String>getArgument(0)));
+                doAnswer(call -> { store.put(call.getArgument(0), call.getArgument(1)); return null; })
+                        .when(values).set(anyString(), anyString(), any(Duration.class));
+                var registry = new SimpleMeterRegistry();
+                var cache = new RedisCatalogCache(redis, Duration.ofSeconds(60), Duration.ofSeconds(30), registry);
+                List<Category> tree = List.of(new Category(1, "tecnologia", "Tecnología"), new Category(2, "portatiles", "Portátiles", 1L, 3, true));
+                AtomicInteger loads = new AtomicInteger();
+                assertThat(cache.categories(() -> { loads.incrementAndGet(); return tree; })).isEqualTo(tree);
+                assertThat(store.get("polymer:catalog6:v7:categories")).contains("\"main\"");
+                assertThat(cache.categories(() -> { loads.incrementAndGet(); return List.of(); })).isEqualTo(tree);
+                assertThat(loads).hasValue(1);
+                assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "hit").count()).isEqualTo(1);
+                assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "error").count()).isZero();
+        
+                // Una entrada ilegible cuenta como miss, se reemplaza desde PostgreSQL y no activa el back-off.
+                store.put("polymer:catalog6:v7:categories", "{no es json");
+                assertThat(cache.categories(() -> { loads.incrementAndGet(); return tree; })).isEqualTo(tree);
+                assertThat(cache.categories(() -> { loads.incrementAndGet(); return List.of(); })).isEqualTo(tree);
+                assertThat(loads).hasValue(2);
+                assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "bypass").count()).isZero();
+                assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "hit").count()).isEqualTo(2);
             }
         
             private static String RedisCatalogCache_VERSION() { return "polymer:catalog:version"; }

@@ -334,7 +334,7 @@ Los permisos se comprueban en el servidor, en Spring Security y en el dominio. O
 
 | Tipo | Herramienta | Qué comprueba |
 | --- | --- | --- |
-| Dominio y casos de uso | JUnit 5 + Mockito (122 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
+| Dominio y casos de uso | JUnit 5 + Mockito (131 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
 | **Arquitectura** | ArchUnit (`HexagonalArchitectureTest`) y `test_architecture.py` | El núcleo no depende de frameworks; los adaptadores de entrada solo usan puertos de entrada |
 | Motor de riesgo | pytest (62 pruebas) | Reglas, decimales exactos, validación y métricas |
 | API real | `smoke.py`, `platform_smoke.py`, `store_smoke.py`, `integration_smoke.py` | Pedidos, roles, tienda, carrito, checkout, Redis, RabbitMQ, Mailpit, Loki, Tempo y Grafana |

@@ -37,7 +37,7 @@ PowerShell 5.1). Ninguna funcionalidad se marca como verificada solo porque exis
 | Sustitución de adaptadores (`RiskAssessmentPort`, `CatalogCache`) | ✅ | `AdapterSubstitutionTest` (4); modo `basic` usa `CatalogCache.NONE` (CI `compose-basic`) |
 | Motor de riesgo Python y comunicación Java → Python | ✅ | pytest (62), `integration_smoke.py` (traza con spans de ambos servicios en Tempo) |
 | 503 si `risk-engine` cae; recuperación | ✅ | `polymer.ps1 verify` pasos 9 y 10 (CI) |
-| Redis: caché del catálogo con TTL e invalidación por versión | ✅ | `integration_smoke.py` (aciertos en Prometheus); degradación y recuperación (paso 7b) |
+| Redis: caché del catálogo con TTL e invalidación por versión | ✅ | `integration_smoke.py` (aciertos en Prometheus); escenario `redis` (miss → hit → TTL → expiración → miss) tras corregir el error 6; degradación y recuperación (paso 7b) |
 | RabbitMQ: outbox, publisher confirms, cola durable, DLQ, consumidor idempotente, Mailpit | ✅ | `integration_smoke.py` (correos, `ack`, DLQ vacía, outbox vacío; caída y recuperación sin pérdidas) |
 | Persistencia PostgreSQL tras reinicios | ✅ | `polymer.ps1 verify` paso 8; `migrate-from-v6` (recuentos idénticos) |
 | Migración segura desde HexaOrders v6 (secretos y volúmenes) | ✅ | Job `migrate-from-v6` |
@@ -65,7 +65,8 @@ PowerShell 5.1). Ninguna funcionalidad se marca como verificada solo porque exis
 | 3 | La API original `POST /api/orders` es pública sin sesión (compatibilidad v1) | Media en un despliegue público | **Mitigado en AWS**: el Nginx del host solo la permite desde la IP de administración (probado: 403). En local se mantiene por compatibilidad |
 | 4 | El umbral de revisión 70 está duplicado en el dominio Java y en la restricción `orders_status_matches_risk` de PostgreSQL | Baja (defensa en profundidad), pero cambiar solo uno rompe las inserciones | Documentado; la demo de cambio de regla usa el umbral de importe del dominio Python |
 | 5 | Ventana de duplicado en el consumidor: correo enviado y caída antes de registrar `processed_events` | Baja (entrega al menos una vez) | Documentado (ya lo estaba en `ASYNCHRONOUS_EVENTS.md`) |
-| 6 | Errores en el script de escenarios nuevo detectados por el CI (referencia `$ComposeFile:` y contraseña del cliente ficticio con su usuario) | — | **Corregidos** antes de la verificación final |
+| 6 | **La caché Redis nunca servía el árbol de categorías**: `Category.isMain()` se escribe como `"main"` y el mismo `ObjectMapper` lo rechazaba al leer; cada *hit* contaba un `error` y activaba 30 s de *back-off* (`bypass`). Los productos no estaban afectados, por eso `integration_smoke.py` veía aciertos | Media (rendimiento: el catálogo iba siempre a PostgreSQL) | 🔴 → **corregido** en `RedisCatalogCache` (ignora propiedades desconocidas al leer; `hit` solo tras leer bien; entrada ilegible = `miss` que se sobrescribe, sin *back-off*) y prueba de regresión `redisCacheReadsBackWhatItWroteIncludingDerivedAccessors` (falla sin la corrección). Lo detectó el escenario `redis` en el CI |
+| 7 | Errores en el script de escenarios nuevo detectados por el CI (referencia `$ComposeFile:` y contraseña del cliente ficticio con su usuario) | — | **Corregidos** antes de la verificación final |
 
 ## 3. Servicios y su integración
 

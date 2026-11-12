@@ -129,3 +129,19 @@ por `polymer_cache_requests_total`. Usuario `admin`; contraseña en `secrets\gra
 | Siempre `bypass` | Hubo un error hace menos de 30 s | Espera 30 s (back-off) |
 | La clave no aparece | La versión cambió (un administrador editó el catálogo) | Repite el escenario: recalcula la clave |
 | La espera del TTL es larga | TTL normal de 60 s | `.\polymer.cmd demo-on -DemoTtl 20` |
+
+## 7. Error real que encontró esta demostración
+
+La primera ejecución del escenario en el CI mostró `hit=1 error=1` tras la segunda consulta y `bypass`
+en lugar de `miss` tras la expiración. Causa: `Category.isMain()` se serializa como `"main"`, que no es
+un componente del *record*, y el `ObjectMapper` del adaptador lo rechazaba al leer. Cada acierto se
+convertía en un error y en 30 s de *back-off*: el árbol de categorías nunca se servía desde Redis (los
+productos sí). Corrección en `RedisCatalogCache`:
+
+- la lectura ignora propiedades desconocidas (`FAIL_ON_UNKNOWN_PROPERTIES = false`);
+- `hit` se cuenta solo después de leer la entrada correctamente;
+- una entrada ilegible es un **dato** defectuoso, no una caída de Redis: cuenta como `miss`, se
+  sobrescribe con el valor de PostgreSQL y no activa el *back-off*.
+
+Prueba de regresión: `InfrastructureAdaptersTest.redisCacheReadsBackWhatItWroteIncludingDerivedAccessors`
+(guarda en un Redis simulado lo que el adaptador escribe de verdad y lo vuelve a leer; falla sin la corrección).

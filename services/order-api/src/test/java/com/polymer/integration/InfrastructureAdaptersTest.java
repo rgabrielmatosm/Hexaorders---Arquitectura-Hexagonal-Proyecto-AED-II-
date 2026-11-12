@@ -99,6 +99,38 @@ class InfrastructureAdaptersTest {
         assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "miss").count()).isEqualTo(1);
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisCacheReadsBackWhatItWroteIncludingDerivedAccessors() {
+        // Regresión: Category.isMain() se serializa como "main"; antes, cada hit fallaba al leerlo,
+        // contaba un error y activaba el back-off, así que la caché nunca servía las categorías.
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> values = mock(ValueOperations.class);
+        when(redis.opsForValue()).thenReturn(values);
+        java.util.Map<String, String> store = new java.util.HashMap<>(java.util.Map.of(RedisCatalogCache_VERSION(), "7"));
+        when(values.get(anyString())).thenAnswer(call -> store.get(call.<String>getArgument(0)));
+        doAnswer(call -> { store.put(call.getArgument(0), call.getArgument(1)); return null; })
+                .when(values).set(anyString(), anyString(), any(Duration.class));
+        var registry = new SimpleMeterRegistry();
+        var cache = new RedisCatalogCache(redis, Duration.ofSeconds(60), Duration.ofSeconds(30), registry);
+        List<Category> tree = List.of(new Category(1, "tecnologia", "Tecnología"), new Category(2, "portatiles", "Portátiles", 1L, 3, true));
+        AtomicInteger loads = new AtomicInteger();
+        assertThat(cache.categories(() -> { loads.incrementAndGet(); return tree; })).isEqualTo(tree);
+        assertThat(store.get("polymer:catalog6:v7:categories")).contains("\"main\"");
+        assertThat(cache.categories(() -> { loads.incrementAndGet(); return List.of(); })).isEqualTo(tree);
+        assertThat(loads).hasValue(1);
+        assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "hit").count()).isEqualTo(1);
+        assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "error").count()).isZero();
+
+        // Una entrada ilegible cuenta como miss, se reemplaza desde PostgreSQL y no activa el back-off.
+        store.put("polymer:catalog6:v7:categories", "{no es json");
+        assertThat(cache.categories(() -> { loads.incrementAndGet(); return tree; })).isEqualTo(tree);
+        assertThat(cache.categories(() -> { loads.incrementAndGet(); return List.of(); })).isEqualTo(tree);
+        assertThat(loads).hasValue(2);
+        assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "bypass").count()).isZero();
+        assertThat(registry.counter("polymer_cache_requests", "cache", "catalog", "result", "hit").count()).isEqualTo(2);
+    }
+
     private static String RedisCatalogCache_VERSION() { return "polymer:catalog:version"; }
 
     @Test
