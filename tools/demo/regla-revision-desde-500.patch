@@ -1,0 +1,26 @@
+diff --git a/services/risk-engine/risk_engine/domain/risk.py b/services/risk-engine/risk_engine/domain/risk.py
+index 9f8c345..bb09831 100644
+--- a/services/risk-engine/risk_engine/domain/risk.py
++++ b/services/risk-engine/risk_engine/domain/risk.py
+@@ -38,5 +38,5 @@ class RiskResult:
+ def assess(evaluation: Evaluation) -> RiskResult:
+     """Demo rules, deliberately transparent for the university presentation."""
+     amount = evaluation.amount
+-    score = 75 if amount >= Decimal("1000") else 40 if amount >= Decimal("500") else 10
++    score = 75 if amount >= Decimal("500") else 10  # DEMO: revisión desde S/ 500 (antes: 1000)
+     return RiskResult(score, Decision.REVIEW if score >= 70 else Decision.APPROVED)
+diff --git a/services/risk-engine/tests/test_domain.py b/services/risk-engine/tests/test_domain.py
+index 2aaf144..55690a5 100644
+--- a/services/risk-engine/tests/test_domain.py
++++ b/services/risk-engine/tests/test_domain.py
+@@ -11,8 +11,8 @@ from risk_engine.domain.risk import Decision, Evaluation
+     [
+         ("0.01", 10, Decision.APPROVED),
+         ("499.99", 10, Decision.APPROVED),
+-        ("500.00", 40, Decision.APPROVED),
+-        ("999.99", 40, Decision.APPROVED),
++        ("500.00", 75, Decision.REVIEW),
++        ("999.99", 75, Decision.REVIEW),
+         ("1000.00", 75, Decision.REVIEW),
+         ("1000000", 75, Decision.REVIEW),
+     ],

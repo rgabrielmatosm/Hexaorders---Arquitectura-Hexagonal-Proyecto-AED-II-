@@ -10,7 +10,7 @@ jobs:
   # ejecuta EXACTAMENTE el mismo script PowerShell que usas en Windows: tools/polymer.ps1.
   compose:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     defaults:
       run:
         shell: pwsh
@@ -85,6 +85,23 @@ jobs:
         env:
           SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
         run: node i18n-e2e.js
+      # Exposición: los MISMOS escenarios que se ejecutan en Windows con «.\polymer.cmd demo», contra el stack
+      # real. Cada uno falla si una evidencia no se cumple (claves y TTL de Redis, filas de PostgreSQL, colas
+      # de RabbitMQ, correos de Mailpit, métricas, 503 sin risk-engine, adaptador sustituido…).
+      - name: Exposición — escenarios de demostración contra el stack real (tools/demo/polymer-demo.ps1)
+        run: |
+          $compose = Join-Path $env:RUNNER_TEMP 'polymer-delivery/docker-compose.yml'
+          $common = @{ ComposeFile = $compose; Project = 'polymer-verify'; NoPause = $true }
+          foreach ($scenario in 'preparar', 'arquitectura', 'rabbitmq', 'postgres', 'riesgo', 'observabilidad',
+                                'redis-caida', 'rabbitmq-caida', 'riesgo-caida') {
+            ./tools/demo/polymer-demo.ps1 -Scenario $scenario @common
+          }
+          # Modo demostración: TTL de 15 s y adaptador de riesgo fijo; después, vuelta a la configuración normal.
+          ./tools/demo/polymer-demo.ps1 -Scenario activar-demo -DemoTtl 15 -FixedRisk -FixedScore 10 @common
+          ./tools/demo/polymer-demo.ps1 -Scenario redis @common
+          ./tools/demo/polymer-demo.ps1 -Scenario adaptador @common
+          ./tools/demo/polymer-demo.ps1 -Scenario desactivar-demo @common
+          ./tools/demo/polymer-demo.ps1 -Scenario preparar @common
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -121,7 +138,7 @@ jobs:
       - name: Parse PowerShell scripts with Windows PowerShell 5.1
         run: |
           $failed = $false
-          Get-ChildItem tools -Filter *.ps1 | ForEach-Object {
+          Get-ChildItem tools -Recurse -Filter *.ps1 | ForEach-Object {
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors)
             if ($errors) { $failed = $true; $errors | ForEach-Object { Write-Host "::error file=tools/$($_.Extent.File | Split-Path -Leaf),line=$($_.Extent.StartLineNumber)::$($_.Message)" } }

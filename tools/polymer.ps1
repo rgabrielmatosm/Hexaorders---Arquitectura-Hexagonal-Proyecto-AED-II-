@@ -26,6 +26,16 @@
       migrate      Solo copia y verifica los volúmenes hexaorders_* → polymer_* (lo hace start).
                    Idempotente; los volúmenes originales nunca se borran.
       status       Estado de los contenedores.
+      health       Salud real: estado y healthcheck de cada contenedor y respuesta HTTP de la tienda,
+                   la API, Grafana, Prometheus, Mailpit y RabbitMQ. Falla si algo no está sano.
+      rebuild      Reconstruye imágenes (con sus tests) y recrea solo esos servicios, sin tocar datos:
+                   .\polymer.cmd rebuild -Services risk-engine   (sin -Services: todos).
+      restart      Reinicia servicios conservando los datos: .\polymer.cmd restart -Services order-api
+      demo         Escenarios de la exposición contra tu entorno en marcha (docs/final/GUIA_EXPOSICION_PROFESOR.md):
+                   .\polymer.cmd demo -Scenario preparar|arquitectura|redis|redis-caida|rabbitmq|rabbitmq-caida|
+                   postgres|riesgo|riesgo-caida|adaptador|observabilidad|todo   [-NoPause]
+      demo-on      Modo demostración (solo configuración de order-api): TTL corto de la caché
+                   (-DemoTtl 20) y, con -FixedRisk, el adaptador de riesgo fijo. demo-off lo desactiva.
       logs         Últimas 100 líneas de log de cada servicio.
       stop         Detiene los servicios conservando los datos (-RemoveData los elimina).
       secrets      Solo crea en secrets\ las contraseñas que falten (aleatorias). Nunca sobrescribe.
@@ -69,7 +79,8 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet('help', 'start', 'status', 'logs', 'stop', 'secrets', 'k8s-secrets', 'repair-db-password',
-                 'import-secrets', 'migrate', 'change-password', 'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup')]
+                 'import-secrets', 'migrate', 'change-password', 'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup',
+                 'health', 'rebuild', 'restart', 'demo', 'demo-on', 'demo-off')]
     [string]$Command = 'help',
 
     # v5: full = 13 contenedores (perfil "full" de Compose); basic = 6 contenedores esenciales.
@@ -105,7 +116,22 @@ param(
     [string]$Service,
 
     # change-password: archivo con la nueva contraseña (automatización). Sin él se pide de forma oculta.
-    [string]$NewPasswordFile
+    [string]$NewPasswordFile,
+
+    # rebuild / restart: servicios de Compose (por ejemplo -Services risk-engine o -Services order-api,frontend).
+    [string[]]$Services,
+
+    # demo: escenario de la exposición (preparar, arquitectura, redis, redis-caida, rabbitmq, rabbitmq-caida,
+    # postgres, riesgo, riesgo-caida, adaptador, observabilidad, todo). Ver tools/demo/polymer-demo.ps1.
+    [string]$Scenario = 'preparar',
+
+    # demo: sin pausas entre pasos.
+    [switch]$NoPause,
+
+    # demo-on: TTL corto (segundos) de la caché del catálogo y, con -FixedRisk, adaptador de riesgo fijo.
+    [int]$DemoTtl = 20,
+    [switch]$FixedRisk,
+    [int]$FixedScore = 10
 )
 
 $ErrorActionPreference = 'Stop'
@@ -772,6 +798,95 @@ function Invoke-Smoke {
 
 function Invoke-Status { Assert-Docker; [void](Invoke-Compose @('ps', '-a')) }
 
+function Get-ComposeServiceNames {
+    $previous = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { $names = & docker compose -f $ComposeFile config --services 2>$null } finally { $ErrorActionPreference = $previous }
+    return @($names | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+}
+
+function Assert-ServiceNames([string[]]$Names) {
+    $known = Get-ComposeServiceNames
+    foreach ($name in $Names) {
+        if ($known -notcontains $name) { throw "Servicio desconocido: $name. Servicios: $($known -join ', ')" }
+    }
+}
+
+function Get-HttpGetStatus([string]$Uri) {
+    # GET que devuelve el código HTTP (0 si no hay respuesta) en PowerShell 5.1 y 7.
+    try {
+        return [int](Invoke-WebRequest -Uri $Uri -Method Get -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop).StatusCode
+    } catch {
+        $exception = $_.Exception
+        if ($exception.PSObject.Properties['Response'] -and $exception.Response) { return [int]$exception.Response.StatusCode }
+        return 0
+    }
+}
+
+function Invoke-Health {
+    # Salud real: estado y healthcheck de cada contenedor + respuesta HTTP de las interfaces publicadas.
+    Assert-Docker
+    $previous = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { $rows = & docker compose -f $ComposeFile ps -a --format '{{.Service}}|{{.State}}|{{.Health}}' 2>$null } finally { $ErrorActionPreference = $previous }
+    $problems = @()
+    Write-Host ''
+    Write-Host ('{0,-16} {1,-10} {2}' -f 'SERVICIO', 'ESTADO', 'SALUD') -ForegroundColor Cyan
+    $expected = if ($FullMode) { 13 } else { 6 }
+    $count = 0
+    foreach ($row in @($rows)) {
+        $parts = "$row".Split('|')
+        if ($parts.Count -lt 3) { continue }
+        $count++
+        $ok = $parts[1] -eq 'running' -and $parts[2] -ne 'unhealthy' -and $parts[2] -ne 'starting'
+        Write-Host ('{0,-16} {1,-10} {2}' -f $parts[0], $parts[1], $parts[2]) -ForegroundColor $(if ($ok) { 'Green' } else { 'Red' })
+        if (-not $ok) { $problems += "$($parts[0]): $($parts[1]) $($parts[2])" }
+    }
+    if ($count -lt $expected) { $problems += "Hay $count contenedores; se esperaban $expected (modo $Mode)" }
+    Write-Host ''
+    $checks = [ordered]@{ 'Tienda (gateway)' = 'http://127.0.0.1:8080/'; 'API (gateway)' = 'http://127.0.0.1:8080/api/catalog/categories';
+                          'Grafana' = 'http://127.0.0.1:3000/api/health'; 'Prometheus' = 'http://127.0.0.1:9091/-/ready' }
+    if ($FullMode) { $checks['Mailpit'] = 'http://127.0.0.1:8025/'; $checks['RabbitMQ (consola)'] = 'http://127.0.0.1:15672/' }
+    foreach ($name in $checks.Keys) {
+        $code = Get-HttpGetStatus $checks[$name]
+        $ok = $code -ge 200 -and $code -lt 400
+        Write-Host ('{0,-20} {1,-45} HTTP {2}' -f $name, $checks[$name], $code) -ForegroundColor $(if ($ok) { 'Green' } else { 'Red' })
+        if (-not $ok) { $problems += "$name respondió HTTP $code" }
+    }
+    if ($problems) { throw "Servicios con problemas:`n  - $($problems -join "`n  - ")`nDiagnóstico: .\polymer.cmd logs" }
+    Write-Host "`nTodo sano: $count contenedores y las interfaces responden." -ForegroundColor Green
+}
+
+function Invoke-Rebuild {
+    # Reconstruye las imágenes (los Dockerfiles ejecutan los tests) y recrea SOLO esos servicios.
+    # Nunca borra volúmenes: los datos de PostgreSQL, RabbitMQ, Grafana… se conservan.
+    Assert-Docker
+    Assert-DatabaseSecretMatchesVolume
+    $targets = @($Services | Where-Object { $_ })
+    if ($targets) { Assert-ServiceNames $targets }
+    Write-Step "Reconstruir $(if ($targets) { $targets -join ', ' } else { 'todas las imágenes' }) (incluye los tests de la imagen)"
+    [void](Invoke-Compose (@('build') + $targets))
+    Write-Step 'Recrear los servicios reconstruidos y esperar a que estén sanos (los volúmenes se conservan)'
+    [void](Invoke-Compose (@('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout") + $targets))
+    [void](Invoke-Compose @('ps'))
+}
+
+function Invoke-Restart {
+    Assert-Docker
+    $targets = @($Services | Where-Object { $_ })
+    if (-not $targets) { throw 'Indica qué reiniciar, por ejemplo: .\polymer.cmd restart -Services order-api' }
+    Assert-ServiceNames $targets
+    Write-Step "Reiniciar $($targets -join ', ') (sin borrar datos)"
+    [void](Invoke-Compose (@('restart') + $targets))
+    [void](Invoke-Compose (@('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout") + $targets))
+    [void](Invoke-Compose @('ps'))
+}
+
+function Invoke-DemoScript([string]$Name, [hashtable]$Extra = @{}) {
+    Assert-Docker
+    $arguments = @{ Scenario = $Name; ComposeFile = $ComposeFile; NoPause = [bool]$NoPause }
+    foreach ($key in $Extra.Keys) { $arguments[$key] = $Extra[$key] }
+    & (Join-Path (Join-Path $PSScriptRoot 'demo') 'polymer-demo.ps1') @arguments
+}
+
 function Invoke-Logs { Assert-Docker; [void](Invoke-Compose @('logs', '--no-color', '--tail=100')) }
 
 function Invoke-Stop {
@@ -975,6 +1090,12 @@ try {
         'verify'      { Invoke-Verify }
         'diagnose'    { Invoke-Diagnose }
         'cleanup'     { Invoke-Cleanup }
+        'health'      { Invoke-Health }
+        'rebuild'     { Invoke-Rebuild }
+        'restart'     { Invoke-Restart }
+        'demo'        { Invoke-DemoScript $Scenario }
+        'demo-on'     { Invoke-DemoScript 'activar-demo' @{ DemoTtl = $DemoTtl; FixedRisk = [bool]$FixedRisk; FixedScore = $FixedScore } }
+        'demo-off'    { Invoke-DemoScript 'desactivar-demo' }
     }
     if ($InGitHub -and $Command -ne 'verify') { Write-Host '::endgroup::' }
     exit 0

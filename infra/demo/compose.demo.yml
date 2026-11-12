@@ -1,0 +1,16 @@
+# POLYMER — override de DEMOSTRACIÓN (exposición). NUNCA se usa en producción ni en AWS.
+#
+# Solo cambia la CONFIGURACIÓN de order-api; no toca datos, volúmenes ni contraseñas:
+#   - TTL corto de la caché Redis del catálogo (por defecto 60 s en docker-compose.yml);
+#   - adaptador de riesgo: «http» (real, por defecto) o «fixed» (FixedRiskAssessmentAdapter, para
+#     demostrar la inversión de dependencias sin el microservicio Python).
+#
+# No se aplica a mano: .\polymer.cmd demo-on [-DemoTtl 20] [-FixedRisk [-FixedScore 10]]
+# lo combina con docker-compose.yml y recrea SOLO order-api; .\polymer.cmd demo-off vuelve a la
+# configuración normal. Guía: docs/final/GUIA_EXPOSICION_PROFESOR.md
+services:
+  order-api:
+    environment:
+      POLYMER_CACHE_CATALOG_TTL: ${POLYMER_DEMO_CACHE_TTL:-60s}
+      POLYMER_RISK_ADAPTER: ${POLYMER_DEMO_RISK_ADAPTER:-http}
+      POLYMER_RISK_FIXED_SCORE: ${POLYMER_DEMO_FIXED_SCORE:-10}
