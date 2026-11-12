@@ -35,6 +35,7 @@ Tienda de tecnología y plataforma de gestión de pedidos con **arquitectura hex
 15. [Solución de errores frecuentes](#15-solución-de-errores-frecuentes)
 16. [Idiomas](#16-idiomas)
 17. [Seguridad de contraseñas](#17-seguridad-de-contraseñas)
+18. [Exposición, demostraciones y documentación final](#18-exposición-demostraciones-y-documentación-final)
 
 Anexos: [API](#anexo-a-api) · [Documentación técnica](#anexo-b-documentación-técnica) · [Historial y migración](#anexo-c-historial-y-migración)
 
@@ -276,6 +277,11 @@ Arranca la **plataforma completa con los 13 contenedores**: genera o recupera lo
 | `.\polymer.cmd start` | Arranca la plataforma completa (13 contenedores) |
 | `.\polymer.cmd start -Mode basic` | Solo los 6 servicios esenciales (equipos con poca RAM) |
 | `.\polymer.cmd status` | Estado de los contenedores |
+| `.\polymer.cmd health` | Salud real de cada contenedor y de las interfaces (tienda, API, Grafana, Prometheus, Mailpit, RabbitMQ) |
+| `.\polymer.cmd rebuild -Services risk-engine` | Reconstruye solo esos servicios (con sus pruebas) y los recrea **sin tocar datos** |
+| `.\polymer.cmd restart -Services order-api` | Reinicia servicios concretos conservando los datos |
+| `.\polymer.cmd demo -Scenario preparar` | Escenarios de la exposición con evidencias (sección 18) |
+| `.\polymer.cmd demo-on` / `demo-off` | Modo demostración: TTL corto de la caché y adaptador de riesgo fijo; y vuelta a la normalidad |
 | `.\polymer.cmd logs` | Últimas 100 líneas de cada servicio |
 | `.\polymer.cmd stop` | Detiene todo **conservando los datos** |
 | `.\polymer.cmd smoke` | Pruebas HTTP contra tu entorno en marcha |
@@ -447,6 +453,41 @@ Al registrarse y al cambiar la contraseña:
 | Servidor | **Todas las reglas se validan en el servidor** (`PasswordPolicy`, en el dominio): saltarse la interfaz no sirve. Respuesta `400` con `code: WEAK_PASSWORD` y el motivo |
 
 **Las cuentas existentes no cambian:** conservan su contraseña y su hash BCrypt. La política solo se aplica a contraseñas nuevas. Detalle técnico en [`docs/SECRETOS.md`](docs/SECRETOS.md#6-contraseñas-de-los-clientes-de-la-tienda).
+
+## 18. Exposición, demostraciones y documentación final
+
+Escenarios ejecutables contra tu entorno en marcha. Cada uno muestra y **comprueba** sus evidencias
+(claves y TTL de Redis, filas de PostgreSQL, colas de RabbitMQ, correos de Mailpit, métricas); el mismo
+script se ejecuta en el CI contra Docker real. Solo crean datos ficticios (`@example.test`) y nunca borran
+nada.
+
+| Escenario | Comando |
+| --- | --- |
+| Preparación (13 contenedores sanos y accesos) | `.\polymer.cmd demo -Scenario preparar` |
+| A · Arquitectura hexagonal (mapa + ArchUnit) | `.\polymer.cmd demo -Scenario arquitectura` |
+| B · Cambio de regla de negocio | `git apply tools/demo/regla-revision-desde-500.patch` + `.\polymer.cmd rebuild -Services risk-engine` |
+| B2 · Sustitución de adaptador | `.\polymer.cmd demo-on -FixedRisk` + `.\polymer.cmd demo -Scenario adaptador` + `.\polymer.cmd demo-off` |
+| C · Redis: miss, hit, TTL, expiración | `.\polymer.cmd demo -Scenario redis` (opcional: `demo-on -DemoTtl 20`) |
+| D · RabbitMQ: outbox → cola → Mailpit | `.\polymer.cmd demo -Scenario rabbitmq` |
+| E · PostgreSQL y persistencia tras reinicio | `.\polymer.cmd demo -Scenario postgres` |
+| F · Microservicios Java ↔ Python | `.\polymer.cmd demo -Scenario riesgo` |
+| G · Métricas | `.\polymer.cmd demo -Scenario observabilidad` |
+| H · Resiliencia | `demo -Scenario redis-caida`, `rabbitmq-caida`, `riesgo-caida` |
+
+Documentos en [`docs/final/`](docs/final/):
+
+| Documento | Contenido |
+| --- | --- |
+| [`AUDITORIA_POLYMER.md`](docs/final/AUDITORIA_POLYMER.md) | Estado real de cada funcionalidad, errores encontrados, riesgos, credenciales, métricas → paneles |
+| [`ARQUITECTURA_HEXAGONAL.md`](docs/final/ARQUITECTURA_HEXAGONAL.md) | Puertos y adaptadores con el código real |
+| [`DEMOSTRACION_HEXAGONAL.md`](docs/final/DEMOSTRACION_HEXAGONAL.md) | Recorrido, cambio de regla reversible y sustitución de adaptadores |
+| [`DEMOSTRACION_REDIS_TTL.md`](docs/final/DEMOSTRACION_REDIS_TTL.md) · [`DEMOSTRACION_RABBITMQ.md`](docs/final/DEMOSTRACION_RABBITMQ.md) · [`DEMOSTRACION_POSTGRESQL.md`](docs/final/DEMOSTRACION_POSTGRESQL.md) · [`DEMOSTRACION_MICROSERVICIOS.md`](docs/final/DEMOSTRACION_MICROSERVICIOS.md) | Una demostración por tecnología |
+| [`GUIA_EXPOSICION_PROFESOR.md`](docs/final/GUIA_EXPOSICION_PROFESOR.md) | Guion de la exposición (escenarios A–H) |
+| [`GUIA_DOCKER_WINDOWS.md`](docs/final/GUIA_DOCKER_WINDOWS.md) | Contenedores, comandos, reconstrucción, restauración y errores |
+| [`MAPA_SLICES_FUNCIONALES.md`](docs/final/MAPA_SLICES_FUNCIONALES.md) | Rol → página → endpoint → caso de uso → puertos → tablas → métricas |
+| [`GUIA_GITHUB.md`](docs/final/GUIA_GITHUB.md) | Revisión de seguridad y publicación en un repositorio nuevo |
+| [`DESPLIEGUE_AWS_HTTPS.md`](docs/final/DESPLIEGUE_AWS_HTTPS.md) | EC2 + Docker Compose + Nginx con Let's Encrypt; costos, seguridad, copias, actualización y rollback |
+| [`MATRIZ_PRUEBAS.md`](docs/final/MATRIZ_PRUEBAS.md) · [`RESULTADOS_VALIDACION.md`](docs/final/RESULTADOS_VALIDACION.md) | Qué se prueba, dónde y con qué resultado real |
 
 ---
 
