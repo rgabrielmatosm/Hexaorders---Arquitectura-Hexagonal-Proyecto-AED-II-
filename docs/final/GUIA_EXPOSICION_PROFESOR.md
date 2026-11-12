@@ -168,7 +168,7 @@ Orden recomendado (≈ 40 min): A → B → C → D → E → F → G → H. Los
   .\polymer.cmd demo -Scenario observabilidad
   ```
 
-- **Resultado esperado:** valores reales de Prometheus: pedidos por decisión, peticiones HTTP, latencia p95,
+- **Resultado esperado:** crea un pedido ficticio, espera al siguiente *scrape* (10 s) y comprueba que Prometheus muestra el mismo número de pedidos que expone `order-api`; después, valores reales de Prometheus: pedidos por decisión, peticiones HTTP, latencia p95,
   caché, eventos publicados y pendientes, correos, *targets* UP.
 - **Web:** Grafana → dashboards **POLYMER — Business Operations**, **POLYMER — API Performance**, **POLYMER — Platform Integrations**, **POLYMER — Risk Engine** y **POLYMER · Puertos, adaptadores y métricas**;
   Explore → Loki `{service="order-api"}` y Tempo con el `X-Trace-Id` del escenario F.

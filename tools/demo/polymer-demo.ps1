@@ -136,6 +136,7 @@ function Get-ApiMetrics {
         if ($line -match '^(polymer_cache_requests_total)\{[^}]*result="(\w+)"[^}]*\}\s+([0-9.eE+-]+)') { $values["cache_$($Matches[2])"] = [double]$Matches[3] }
         elseif ($line -match '^(polymer_outbox_pending)(\{[^}]*\})?\s+([0-9.eE+-]+|NaN)') { $values['outbox_pending'] = $Matches[3] }
         elseif ($line -match '^(polymer_events_published_total)(\{[^}]*\})?\s+([0-9.eE+-]+)') { $values['events_published'] = [double]$values['events_published'] + [double]$Matches[3] }
+        elseif ($line -match '^(polymer_shop_orders_placed_total)(\{[^}]*\})?\s+([0-9.eE+-]+)') { $values['orders_placed'] = [double]$values['orders_placed'] + [double]$Matches[3] }
     }
     foreach ($key in 'cache_hit', 'cache_miss', 'cache_error', 'cache_bypass') { if (-not $values.ContainsKey($key)) { $values[$key] = 0.0 } }
     return $values
@@ -597,6 +598,17 @@ function Invoke-Adaptador {
 function Invoke-Observabilidad {
     Show-Title 'Escenario G — Métricas reales en Prometheus y Grafana'
     Assert-Running @('prometheus', 'grafana', 'order-api')
+    Show-Step 'Tráfico real: un pedido de un cliente ficticio (los contadores se reinician si order-api se reinició)'
+    $customer = New-DemoCustomer
+    [void](New-DemoOrder $customer (Get-Product 20 450))
+    $api = Get-ApiMetrics
+    Show-Info ("order-api expone ahora polymer_shop_orders_placed_total = {0}" -f $api.orders_placed)
+    Show-Code 'Prometheus lee /actuator/prometheus cada 10 s: se espera al siguiente scrape para no mostrar valores viejos'
+    $scraped = Wait-Until 'Prometheus recoge el valor actual de order-api' -TimeoutSeconds 60 -Probe {
+        $r = (Invoke-RestMethod -UseBasicParsing -Uri ("$PrometheusUrl/api/v1/query?query=" + [uri]::EscapeDataString('sum(polymer_shop_orders_placed_total)')) -TimeoutSec 10).data.result
+        if ($r -and [double]$r[0].value[1] -ge $api.orders_placed) { [double]$r[0].value[1] } else { $null }
+    }
+    Assert-Evidence ($api.orders_placed -ge 1 -and $scraped -ge $api.orders_placed) "Prometheus muestra $scraped pedidos de la tienda, igual que order-api ($($api.orders_placed))"
     $queries = [ordered]@{
         'Pedidos de la tienda por decisión'   = 'sum by (risk_decision) (polymer_shop_orders_placed_total)'
         'Pedidos del laboratorio por estado'  = 'sum by (status) (orders_created_total)'
