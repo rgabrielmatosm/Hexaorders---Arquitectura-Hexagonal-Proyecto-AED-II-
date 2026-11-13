@@ -47,6 +47,33 @@ ni Grafana (por eso el correo de la boleta y los pasos de monitoreo se validan e
 | Validaciones estáticas | `generate_pages --check` (47 páginas), `check_frontend`, `check_i18n` (2663 textos × 5 idiomas), `check_observability` (8 dashboards, 2 paneles nuevos), `generate_delivery --check`, `validate_delivery` |
 | Entregable autosuficiente | Restauración simulada de los heredocs: `services/order-api/src` y el video idénticos byte a byte |
 
+## 1 quáter. v8 · Enlaces por slice y Google con `secrets/google-oauth.json` (13/11/2026)
+
+**CI con Docker real:** ejecución [43459503346](https://github.com/rgabrielmatosm/Polymer-Tech-Proyecto-AED-II/actions/runs/43459503346) (commit `1d6dc31`, enlaces y asistente) y ejecución **[43464846107](https://github.com/rgabrielmatosm/Polymer-Tech-Proyecto-AED-II/actions/runs/43464846107)**
+(commit `a1a23e2`, JSON de Google): **los 4 jobs en verde** en ambas. Además de todo lo de la sección 1 ter, el job
+`compose` ejecutó:
+
+| Paso | Qué comprobó |
+| --- | --- |
+| `generate_links.py --check` + `polymer.ps1 enlaces` | Los 9 enlaces publicados responden (tienda 8080, `order-api` 8081, `risk-engine` 8000, Grafana, Prometheus, RabbitMQ, Mailpit, OpenTelemetry, Alloy); `order-api` directo devuelve el catálogo y `risk-engine` abre `/docs` |
+| `polymer.ps1 google -GoogleJsonFile` (JSON **ficticio** con el formato de Google Cloud) | Lo copia a `secrets/google-oauth.json`, reinicia `order-api`, el botón se activa y redirige a `accounts.google.com` con ese cliente; el secreto **no** aparece en la salida del asistente ni en los logs; el log indica `credenciales: secrets/google-oauth.json` |
+| Job `windows` | `polymer.ps1` (con `enlaces` y `google`) analizado por Windows PowerShell 5.1 |
+
+**Pruebas locales con las credenciales REALES del usuario** (sin imprimir valores; el archivo no está en Git):
+
+| Prueba | Resultado |
+| --- | --- |
+| `order-api` con `GOOGLE_OAUTH_JSON_FILE` | `/api/auth/providers` → `google: true`; log «activado (credenciales: secrets/google-oauth.json; 2 URI de retorno registradas)»; el secreto no aparece en el log |
+| `/oauth2/authorization/google` con `localhost:8080` y con `127.0.0.1:8080` | 302 a `accounts.google.com` con el `client_id` del JSON, `scope=openid profile email` y `redirect_uri` registrada en el JSON |
+| Seguir esa redirección en Google | **HTTP 200, pantalla de inicio de sesión** (`/v3/signin/identifier`) para ambas URI: sin `redirect_uri_mismatch` ni `invalid_client` |
+| Endpoint de tokens de Google con un código ficticio | Con el secreto real: `invalid_grant` (Google aceptó ID y secreto); control con un secreto falso: `invalid_client` |
+| `v7-e2e.js` (proveedor OIDC de pruebas, con el JSON montado) | **34 comprobaciones**: cuenta creada con Google, código de 6 dígitos, sesión, vinculación, dispositivo de confianza; las variables explícitas tienen prioridad sobre el JSON |
+| `mvn test` | **168 pruebas, 0 fallos** (5 nuevas en `GoogleOAuthCredentialsTest`); pytest 63 |
+| Búsqueda en archivos versionables | Ni el ID ni el secreto aparecen en ningún archivo de Git; `git check-ignore secrets/google-oauth.json` = ignorado |
+
+**No verificado:** completar el inicio de sesión con una cuenta de Google real (requiere la contraseña del
+usuario en su navegador). Se hace en `http://localhost:8080/login.html` con un Gmail añadido como *usuario de prueba*.
+
 ## 1 ter. v7 · CI con Docker real (13/11/2026)
 
 Ejecución **[43384929823](https://github.com/rgabrielmatosm/Polymer-Tech-Proyecto-AED-II/actions/runs/43384929823)** del workflow `Verify POLYMER` sobre el commit `c6da401` (rama
