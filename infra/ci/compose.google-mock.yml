@@ -1,0 +1,28 @@
+# SOLO PARA EL CI (y pruebas locales): proveedor OpenID Connect de PRUEBAS en lugar de Google, para
+# probar «Continuar con Google» de extremo a extremo sin credenciales reales ni salida a Internet.
+# Uso (además de docker-compose.yml):
+#   docker compose -p polymer-verify -f <entrega>/docker-compose.yml -f infra/ci/compose.google-mock.yml up -d --wait mock-oauth2 order-api
+# El navegador va a http://127.0.0.1:8099 (autorización) y order-api canjea el código por la red interna
+# (http://mock-oauth2:8080). Con Google real no se usa este archivo: ver docs/final/GUIA_GOOGLE_Y_PAGOS.md.
+services:
+  mock-oauth2:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    environment:
+      SERVER_PORT: '8080'
+      # Sin formulario: autoriza al instante con una identidad fija y un correo verificado (dominio reservado).
+      JSON_CONFIG: >-
+        {"interactiveLogin":false,"tokenCallbacks":[{"issuerId":"google","tokenExpiry":300,"requestMappings":[{"requestParam":"grant_type","match":"*","claims":{"sub":"ci-google-subject-0001","email":"cliente.google@example.test","email_verified":true,"name":"Cliente Google","aud":["polymer-ci-client"]}}]}]}
+    ports:
+      - '127.0.0.1:8099:8080'
+    networks: [edge, gateway]
+    mem_limit: 256m
+  order-api:
+    environment:
+      GOOGLE_CLIENT_ID: polymer-ci-client
+      GOOGLE_CLIENT_SECRET: ci-only-mock-client-secret
+      POLYMER_GOOGLE_AUTHORIZATION_URI: http://127.0.0.1:8099/google/authorize
+      POLYMER_GOOGLE_TOKEN_URI: http://mock-oauth2:8080/google/token
+      POLYMER_GOOGLE_JWK_SET_URI: http://mock-oauth2:8080/google/jwks
+      # Vacíos: el emisor del token es el del contenedor (no se compara con accounts.google.com) y no hay userinfo.
+      POLYMER_GOOGLE_ISSUER_URI: ''
+      POLYMER_GOOGLE_USER_INFO_URI: ''

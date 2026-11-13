@@ -10,6 +10,7 @@ import { field, formError, icon, submitting } from '../components.js';
 import { route } from '../router.js';
 import { session } from '../session.js';
 import { el } from '../ui.js';
+import { hoursCard, mapCard } from '../store-info.js';
 import { t } from '../i18n.js';
 
 const view = (...children) => el('section', { class: 'view view--store' }, ...children);
@@ -38,16 +39,19 @@ route('/empresa', async (root) => {
         demoNote(t('Los teléfonos y correos son datos de ejemplo (dominio reservado example.com): no corresponden a líneas reales.'))),
       block('compra-segura', t('Compra fácil y segura'),
         list([t('Precios en soles con IGV incluido: lo que ves en el carrito es lo que pagas.'), t('Tu carrito se guarda en tu cuenta y lo recuperas en cualquier dispositivo.'),
-          t('Cada pedido recibe un número (HX-…) y puedes seguir su estado paso a paso.'), t('No pedimos ni guardamos datos de tarjetas en la web.'),
+          t('Cada pedido recibe un número (HX-…) y puedes seguir su estado paso a paso.'), t('No guardamos los datos de tu tarjeta: solo la marca y los 4 últimos dígitos.'),
+          t('Tu cuenta se protege con un código de 6 dígitos enviado a tu correo y puedes entrar con Google.'),
           t('Las sesiones están protegidas y cada compra se registra una sola vez aunque pulses dos veces «Confirmar».')])),
       block('metodos-pago', t('Métodos de pago'),
         p(t('Disponibles en el checkout:')), list(PAYMENTS.available),
-        p(t('Aún no integrados (no se aceptan por ahora):')), list(PAYMENTS.notIntegrated),
-        p(t('El pago contra entrega no está disponible con recojo en tienda, y el pago en tienda solo se ofrece con recojo.'))),
+        list([t('Tarjeta: el pago se aprueba al instante y recibes la boleta en tu correo.'),
+          t('Yape y Plin: generas un código QR que vence en 60 segundos y lo apruebas desde tu app.')]),
+        p(t('El pago contra entrega no está disponible con recojo en tienda, y el pago en tienda solo se ofrece con recojo.')),
+        demoNote(t('Las pasarelas de tarjeta, Yape y Plin de esta demostración son de pruebas: no se realiza ningún cobro real.'))),
       block('tiendas', t('Nuestras tiendas'),
-        p(t('Tienda principal y punto de recojo: {0}. Horario: {1}.', CONTACT.city, CONTACT.hours.toLowerCase())),
         p(t('Al elegir «Recojo en tienda» en el checkout te avisamos por correo cuando tu pedido esté listo (normalmente en 24 horas hábiles).')),
-        demoNote(t('La dirección exacta de la tienda no se publica en esta demostración.'))),
+        el('div', { class: 'visit__grid' }, mapCard(), hoursCard({ withCalendar: false })),
+        demoNote(t('Ubicación de demostración configurable (variables POLYMER_STORE_*): la tienda no existe físicamente.'))),
       block('cobertura', t('Cobertura de delivery'),
         list([t('Lima Metropolitana: envío estándar de 2 a 4 días hábiles (S/ 15.00, gratis desde S/ 299).'), t('Envío express en 24 a 48 horas (S/ 29.90).'),
           t('Provincias: envío estándar a todo el Perú; el plazo depende del destino.'), t('Programamos una ventana de entrega y te la enviamos por correo.')])),

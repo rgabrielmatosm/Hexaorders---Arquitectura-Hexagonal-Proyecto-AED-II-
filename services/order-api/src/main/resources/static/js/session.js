@@ -44,13 +44,27 @@ export const session = {
     return current;
   },
 
-  async login(username, password) {
+  /**
+   * v7: devuelve el usuario si la sesión quedó abierta, o { verificationRequired, challenge } si falta el
+   * código de 6 dígitos enviado por correo (luego session.verify).
+   */
+  async login(username, password, { rememberMe = false, next = null } = {}) {
     await refreshCsrf();
-    const result = await authApi.login(username, password);
+    const result = await authApi.login(username, password, rememberMe, next);
+    if (result.verificationRequired) return result;
     current = result.user;
     await refreshCsrf(); // el token puede cambiar con la nueva sesión
     emit();
     return current;
+  },
+
+  /** v7: segundo paso (código por correo). Devuelve { user, next }. */
+  async verify(code, rememberMe) {
+    const result = await authApi.verify(code, rememberMe);
+    current = result.user;
+    await refreshCsrf();
+    emit();
+    return result;
   },
 
   async logout() {

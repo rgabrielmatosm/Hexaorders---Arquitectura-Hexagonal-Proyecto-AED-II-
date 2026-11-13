@@ -33,7 +33,7 @@
       restart      Reinicia servicios conservando los datos: .\polymer.cmd restart -Services order-api
       demo         Escenarios de la exposición contra tu entorno en marcha (docs/final/GUIA_EXPOSICION_PROFESOR.md):
                    .\polymer.cmd demo -Scenario preparar|arquitectura|redis|redis-caida|rabbitmq|rabbitmq-caida|
-                   postgres|riesgo|riesgo-caida|adaptador|observabilidad|todo   [-NoPause]
+                   postgres|riesgo|riesgo-caida|adaptador|observabilidad|pagos|todo   [-NoPause]
       demo-on      Modo demostración (solo configuración de order-api): TTL corto de la caché
                    (-DemoTtl 20) y, con -FixedRisk, el adaptador de riesgo fijo. demo-off lo desactiva.
       logs         Últimas 100 líneas de log de cada servicio.

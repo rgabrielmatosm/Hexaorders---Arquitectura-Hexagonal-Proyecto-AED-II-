@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('preparar', 'arquitectura', 'redis', 'redis-caida', 'rabbitmq', 'rabbitmq-caida', 'postgres',
-                 'riesgo', 'riesgo-caida', 'adaptador', 'observabilidad', 'todo', 'activar-demo', 'desactivar-demo')]
+                 'riesgo', 'riesgo-caida', 'adaptador', 'observabilidad', 'pagos', 'todo', 'activar-demo', 'desactivar-demo')]
     [string]$Scenario = 'preparar',
     # docker-compose.yml del entorno (por defecto, el de la carpeta del proyecto).
     [string]$ComposeFile,
@@ -214,7 +214,17 @@ function New-DemoCustomer {
 function Connect-DemoCustomer($Session) {
     $Session.Web = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     Update-Csrf $Session
-    [void](Invoke-Api -Session $Session -Method 'POST' -Path '/api/auth/login' -Body @{ username = $Session.Username; password = $Session.Password })
+    $since = (Get-Date).ToUniversalTime().AddSeconds(-5)
+    $login = Invoke-Api -Session $Session -Method 'POST' -Path '/api/auth/login' -Expect @(200, 202) -Body @{ username = $Session.Username; password = $Session.Password }
+    if ($login.Status -eq 202) {
+        # v7: cuenta nueva → el servidor envía un código de 6 dígitos al correo (Mailpit) y lo pide antes de abrir la sesión.
+        $code = Wait-Until 'el código de verificación en Mailpit' -TimeoutSeconds 45 -Probe {
+            $mail = @(Get-MailpitMessages $Session.Email | Where-Object { $_.Subject -match '^\d{6} ' -and ([datetime]$_.Created).ToUniversalTime() -ge $since } |
+                Sort-Object { [datetime]$_.Created } -Descending) | Select-Object -First 1
+            if ($mail) { ([regex]::Match($mail.Subject, '^\d{6}')).Value } else { $null }
+        }
+        [void](Invoke-Api -Session $Session -Method 'POST' -Path '/api/auth/verify' -Body @{ code = $code })
+    }
     Update-Csrf $Session
 }
 
@@ -667,8 +677,74 @@ $started = Get-Date
 # POLYMER_DEMO_TRANSCRIPT: guarda toda la salida (el CI la muestra si un escenario falla).
 if ($env:POLYMER_DEMO_TRANSCRIPT) { Start-Transcript -Path $env:POLYMER_DEMO_TRANSCRIPT -Append | Out-Null }
 try {
+function Invoke-Pagos {
+    Show-Title 'Escenario I — Pagos: tarjeta al instante y Yape con TTL de 60 s en Redis; boleta por correo'
+    Assert-Running @('order-api', 'redis', 'db')
+    Show-Code 'Dominio: domain/payment/PaymentPolicy.WALLET_TTL = 60 s · Puerto: application/port/out/PaymentWindow'
+    Show-Code 'Adaptadores: adapter/out/cache/RedisPaymentWindow (clave con TTL) · adapter/out/payment/ClockPaymentWindow (sin Redis)'
+    Show-Code 'Pasarelas de PRUEBAS (no cobran): SandboxCardGateway, SandboxWalletGateway · Boleta: domain/payment/Receipt (IGV 18 %)'
+    $customer = New-DemoCustomer
+    $product = Get-Product 20 450
+
+    Show-Step '1. Pedido con Yape: se genera una solicitud de cobro con QR que vive 60 s'
+    $key = 'demo-' + ([guid]::NewGuid().ToString('N')).Substring(0, 24)
+    $order = (Invoke-Api -Session $customer -Method 'POST' -Path '/api/shop/orders' -Expect @(201) -Headers @{ 'Idempotency-Key' = $key } -Body @{
+        items = @(@{ productId = $product.id; quantity = 1 }); deliveryMethod = 'PICKUP'; paymentMethod = 'YAPE' }).Data
+    $qr = (Invoke-Api -Session $customer -Method 'POST' -Path "/api/shop/orders/$($order.id)/payment/wallet" -Expect @(201) -Body @{ method = 'YAPE' }).Data
+    $redisKey = "polymer:payment:window:$($qr.paymentId)"
+    Show-Info ("Pedido {0} · S/ {1} · solicitud {2}" -f $order.id.Substring(0, 8), $order.amount, $qr.paymentId.Substring(0, 8))
+    Show-Code "docker compose exec redis redis-cli TTL $redisKey"
+    $ttl = [int](Invoke-RedisRaw @('TTL', $redisKey))
+    Show-Info "TTL de la clave en Redis: $ttl s · el servidor informa $($qr.remainingSeconds) s restantes"
+    Assert-Evidence ($ttl -gt 50 -and $ttl -le 60) "Redis guarda la ventana de pago con TTL de 60 s ($ttl s)"
+    Wait-Presenter
+
+    Show-Step '2. Nadie aprueba el pago: Redis elimina la clave al vencer y el servidor rechaza la confirmación'
+    $left = $ttl
+    while ($left -gt 0) {
+        Start-Sleep -Seconds ([Math]::Min(10, $left + 1))
+        $left = [int](Invoke-RedisRaw @('TTL', $redisKey))
+        Show-Info "TTL restante: $left s"
+    }
+    Assert-Evidence ($left -eq -2) 'TTL = -2: la clave ya no existe en Redis (la solicitud venció)'
+    $late = Invoke-Api -Session $customer -Method 'POST' -Path "/api/shop/orders/$($order.id)/payment/wallet/$($qr.paymentId)/confirm" -Expect @(409) -Body @{ phone = '987654321'; approvalCode = '123456' }
+    Assert-Evidence ($late.Status -eq 409) 'Confirmar después de 60 s → 409 PAYMENT_EXPIRED (no se cobra)'
+    $state = (Invoke-Api -Session $customer -Path "/api/shop/orders/$($order.id)/payment").Data
+    Assert-Evidence ($state.status -eq 'EXPIRED') "El pago quedó EXPIRED en PostgreSQL"
+    Wait-Presenter
+
+    Show-Step '3. QR nuevo, aprobado dentro de los 60 s → PAID y boleta B001'
+    $qr2 = (Invoke-Api -Session $customer -Method 'POST' -Path "/api/shop/orders/$($order.id)/payment/wallet" -Expect @(201) -Body @{ method = 'YAPE' }).Data
+    $paid = (Invoke-Api -Session $customer -Method 'POST' -Path "/api/shop/orders/$($order.id)/payment/wallet/$($qr2.paymentId)/confirm" -Body @{ phone = '987654321'; approvalCode = '482913' }).Data
+    Show-Info ("Estado: {0} · operación {1} · boleta {2}" -f $paid.status, $paid.reference, $paid.receipt)
+    Assert-Evidence ($paid.status -eq 'PAID' -and $paid.receipt -like 'B001-*') "Pago aprobado con la boleta $($paid.receipt)"
+    $exists = Invoke-RedisRaw @('EXISTS', "polymer:payment:window:$($qr2.paymentId)")
+    Assert-Evidence ($exists -eq '0') 'Al aprobarse, la ventana se cierra en Redis (DEL)'
+    Write-Host (Invoke-Sql "SELECT method, status, receipt_series || '-' || lpad(receipt_number::text, 8, '0') AS boleta, amount, receipt_base AS base, receipt_igv AS igv FROM payments WHERE order_id = '$($order.id)' ORDER BY created_at;")
+    Wait-Presenter
+
+    Show-Step '4. Tarjeta: aprobación inmediata (y un rechazo de prueba)'
+    $key2 = 'demo-' + ([guid]::NewGuid().ToString('N')).Substring(0, 24)
+    $cardOrder = (Invoke-Api -Session $customer -Method 'POST' -Path '/api/shop/orders' -Expect @(201) -Headers @{ 'Idempotency-Key' = $key2 } -Body @{
+        items = @(@{ productId = $product.id; quantity = 1 }); deliveryMethod = 'PICKUP'; paymentMethod = 'CARD' }).Data
+    $card = @{ holder = 'Cliente de demostración'; expMonth = 12; expYear = 2030; cvv = '123' }
+    $declined = Invoke-Api -Session $customer -Method 'POST' -Path "/api/shop/orders/$($cardOrder.id)/payment/card" -Expect @(402) -Body ($card + @{ number = '4000 0000 0000 0002' })
+    Assert-Evidence ($declined.Status -eq 402) 'Tarjeta de prueba 4000…0002 → 402 (fondos insuficientes)'
+    $approved = (Invoke-Api -Session $customer -Method 'POST' -Path "/api/shop/orders/$($cardOrder.id)/payment/card" -Body ($card + @{ number = '4111 1111 1111 1111' })).Data
+    Assert-Evidence ($approved.status -eq 'PAID' -and $approved.cardLast4 -eq '1111') "Tarjeta 4111…1111 aprobada al instante (boleta $($approved.receipt)); solo se guardan la marca y los 4 últimos dígitos"
+
+    if ((Get-RunningServices) -contains 'mailpit') {
+        Show-Step '5. La boleta llega por correo (outbox → RabbitMQ → consumidor → SMTP)'
+        $mail = Wait-Until 'el correo con la boleta en Mailpit' -TimeoutSeconds 90 -Probe {
+            @(Get-MailpitMessages $customer.Email | Where-Object { $_.Subject -like "Boleta $($approved.receipt)*" }) | Select-Object -First 1
+        }
+        Assert-Evidence $mail "Correo «$($mail.Subject)» en Mailpit ($MailpitUrl)"
+    }
+}
+
 switch ($Scenario) {
     'preparar'       { Invoke-Preparar }
+    'pagos'          { Invoke-Pagos }
     'arquitectura'   { Invoke-Arquitectura }
     'redis'          { Invoke-Redis }
     'redis-caida'    { Invoke-RedisCaida }
@@ -683,7 +759,7 @@ switch ($Scenario) {
     'desactivar-demo' { Set-DemoMode $false }
     'todo' {
         Invoke-Preparar; Invoke-Arquitectura; Invoke-Redis; Invoke-RabbitMq; Invoke-Postgres; Invoke-Riesgo
-        Invoke-Observabilidad; Invoke-RedisCaida; Invoke-RabbitMqCaida; Invoke-RiesgoCaida
+        Invoke-Observabilidad; Invoke-Pagos; Invoke-RedisCaida; Invoke-RabbitMqCaida; Invoke-RiesgoCaida
     }
 }
 } catch {

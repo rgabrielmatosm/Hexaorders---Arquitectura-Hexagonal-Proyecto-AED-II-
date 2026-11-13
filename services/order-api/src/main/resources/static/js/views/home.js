@@ -7,7 +7,8 @@ import { MAIN_CATEGORY_ICONS, emptyState, errorMessage, field, formError, icon, 
 import { categoryTree, storeCategories } from '../layout.js';
 import { route } from '../router.js';
 import { homeFor, session } from '../session.js';
-import { el, formatDateTime } from '../ui.js';
+import { el, formatDateTime, reducedMotion } from '../ui.js';
+import { visitSection } from '../store-info.js';
 import { productCard, productRail, skeletonCards } from '../store-ui.js';
 import { t } from '../i18n.js';
 
@@ -27,6 +28,28 @@ function liveRail(title, params, moreHref, lead) {
   return holder;
 }
 
+/**
+ * v7: video de fondo de la portada (pieza original de la marca, sin audio, en bucle). Con «reducir
+ * movimiento» no se reproduce (se ve el póster) y siempre hay un botón para pausarlo (WCAG 2.2.2).
+ */
+function heroVideo() {
+  const video = el('video', { class: 'hero-video__media', muted: true, loop: true, playsinline: true, preload: 'metadata',
+    poster: '/media/polymer-hero.jpg', 'aria-hidden': 'true', 'data-testid': 'hero-video' },
+  el('source', { src: '/media/polymer-hero.mp4', type: 'video/mp4' }));
+  video.muted = true; // requisito de la reproducción automática en los navegadores
+  const toggle = el('button', { type: 'button', class: 'hero-video__toggle', 'aria-pressed': 'false' });
+  const label = () => {
+    toggle.textContent = video.paused ? t('▶ Reproducir video') : t('❚❚ Pausar video');
+    toggle.setAttribute('aria-pressed', String(video.paused));
+  };
+  toggle.addEventListener('click', () => { if (video.paused) video.play().catch(() => {}); else video.pause(); });
+  video.addEventListener('play', label);
+  video.addEventListener('pause', label);
+  if (!reducedMotion()) video.play().catch(() => label());
+  label();
+  return el('div', { class: 'hero-video' }, video, el('div', { class: 'hero-video__shade', 'aria-hidden': 'true' }), toggle);
+}
+
 // ---- Portada ------------------------------------------------------------------------------------
 route('/inicio', async (root) => {
   const categories = await storeCategories();
@@ -35,7 +58,8 @@ route('/inicio', async (root) => {
   const promotions = await catalogApi.promotions().catch(() => []);
   const top = promotions[0];
 
-  const hero = el('section', { class: 'hero-store' },
+  const hero = el('section', { class: 'hero-store hero-store--video' },
+    heroVideo(),
     el('div', { class: 'hero-store__main' },
       el('p', { class: 'hero-store__eyebrow' }, icon('sparkle'), top ? t('{0} campañas activas · hasta {1}% de descuento', promotions.length, Math.max(...promotions.map((p) => p.discountPercent))) : t('Tecnología para trabajar, jugar y crear')),
       el('h1', { class: 'hero-store__title', text: t('La tecnología que buscas, al mejor precio') }),
@@ -66,6 +90,7 @@ route('/inicio', async (root) => {
     liveRail(t('Laptops'), { category: id('computadoras') }, '/catalogo.html?categoria=computadoras'),
     liveRail(t('Smartphones y tablets'), { category: id('smartphones-tablets') }, '/catalogo.html?categoria=smartphones-tablets'),
     liveRail(t('Dispositivos inteligentes'), { category: id('smart-home') }, '/catalogo.html?categoria=smart-home', t('Focos, enchufes, cámaras y asistentes para tu hogar.')),
+    visitSection(),
     el('section', { class: 'help-banner' },
       el('div', {}, el('h2', { text: t('¿Necesitas ayuda para elegir?') }),
         el('p', { text: t('Nuestro equipo te asesora con compatibilidad de componentes, cotizaciones para empresas y garantías.') })),
@@ -108,7 +133,8 @@ const FAQ = [
     [t('¿Cómo sigo mi pedido?'), t('En «Mi cuenta → Mis pedidos» verás el número de pedido (HX-…), su estado actualizado y la ventana de entrega programada.')],
   ]],
   ['pagos', t('Métodos de pago'), 'card', [
-    [t('¿Qué métodos de pago aceptan?'), t('Pago contra entrega (en efectivo al recibir), transferencia bancaria y pago en tienda al recoger. Los pagos con tarjeta y billeteras digitales todavía no están disponibles: no solicitamos datos de tarjeta en la web.')],
+    [t('¿Qué métodos de pago aceptan?'), t('En línea: tarjeta de crédito o débito (aprobación inmediata), Yape y Plin (código QR que vence en 60 segundos). Al recibir: pago contra entrega, transferencia bancaria o pago en tienda al recoger. Al pagar en línea recibes la boleta en tu correo.')],
+    [t('¿Es seguro pagar con tarjeta?'), t('No guardamos el número ni el CVV de tu tarjeta: solo la marca y los 4 últimos dígitos. En esta tienda de demostración las pasarelas son de prueba y no se cobra nada.')],
     [t('¿Cuándo se despacha si pago por transferencia?'), t('Te enviamos los datos de la cuenta por correo y despachamos cuando se confirma el abono.')],
     [t('¿Los precios incluyen IGV?'), t('Sí. Todos los precios están en soles (S/) e incluyen IGV. El precio que ves en el carrito es el que pagas.')],
   ]],
@@ -201,7 +227,9 @@ route('/contacto', async (root, { query }) => {
           el('p', { class: 'muted small', text: t('Revisa el centro de ayuda: allí respondemos las dudas más frecuentes sobre envíos, pagos y garantías.') }),
           el('a', { class: 'btn btn--ghost btn--sm', href: '/ayuda.html', text: t('Centro de ayuda') })),
         el('article', { class: 'card' }, el('h3', { class: 'card__title', text: t('Privacidad') }),
-          el('p', { class: 'muted small', text: t('Solo usamos tus datos para responder a tu consulta.') }))))));
+          el('p', { class: 'muted small', text: t('Solo usamos tus datos para responder a tu consulta.') })))),
+    visitSection({ title: t('Nuestra tienda'), lead: t('Visítanos, recoge tu pedido o prueba los equipos antes de comprar.') })));
+  if (window.location.hash === '#visitanos') window.setTimeout(() => document.getElementById('visitanos')?.scrollIntoView(), 300);
 }, { title: t('Contacto') });
 
 // ---- Errores ------------------------------------------------------------------------------------

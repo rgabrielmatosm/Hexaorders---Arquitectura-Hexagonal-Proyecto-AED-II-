@@ -10,7 +10,7 @@ jobs:
   # ejecuta EXACTAMENTE el mismo script PowerShell que usas en Windows: tools/polymer.ps1.
   compose:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 55
     defaults:
       run:
         shell: pwsh
@@ -85,6 +85,23 @@ jobs:
         env:
           SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
         run: node i18n-e2e.js
+      # v7: «Continuar con Google» contra un proveedor OpenID Connect de PRUEBAS (infra/ci/compose.google-mock.yml),
+      # código de 6 dígitos leído de Mailpit, «Recordarme 30 días», pagos con tarjeta/Yape (vencimiento a los 60 s),
+      # boleta y su correo, video de portada, mapa de Google Maps, horario de hoy y Google Calendar.
+      - name: v7 · Google, código por correo, pagos (tarjeta, Yape 60 s), boleta, video, mapa y horario
+        shell: bash
+        working-directory: tools/ui-e2e
+        env:
+          SCREENSHOTS_DIR: ${{ runner.temp }}/ui-screenshots
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/polymer-delivery/docker-compose.yml"
+          mock="$GITHUB_WORKSPACE/infra/ci/compose.google-mock.yml"
+          docker compose -p polymer-verify -f "$base" -f "$mock" up -d --no-build --wait --wait-timeout 240 mock-oauth2 order-api
+          node v7-e2e.js
+          # Vuelta a la configuración normal (13 contenedores) para los escenarios de la exposición.
+          docker compose -p polymer-verify -f "$base" -f "$mock" rm -sf mock-oauth2
+          docker compose -p polymer-verify -f "$base" up -d --no-build --wait --wait-timeout 240 order-api
       # Exposición: los MISMOS escenarios que se ejecutan en Windows con «.\polymer.cmd demo», contra el stack
       # real. Cada uno falla si una evidencia no se cumple (claves y TTL de Redis, filas de PostgreSQL, colas
       # de RabbitMQ, correos de Mailpit, métricas, 503 sin risk-engine, adaptador sustituido…).
@@ -94,7 +111,7 @@ jobs:
         run: |
           $compose = Join-Path $env:RUNNER_TEMP 'polymer-delivery/docker-compose.yml'
           $common = @{ ComposeFile = $compose; Project = 'polymer-verify'; NoPause = $true }
-          foreach ($scenario in 'preparar', 'arquitectura', 'rabbitmq', 'postgres', 'riesgo', 'observabilidad',
+          foreach ($scenario in 'preparar', 'arquitectura', 'rabbitmq', 'postgres', 'riesgo', 'observabilidad', 'pagos',
                                 'redis-caida', 'rabbitmq-caida', 'riesgo-caida') {
             ./tools/demo/polymer-demo.ps1 -Scenario $scenario @common
           }

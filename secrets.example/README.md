@@ -13,5 +13,11 @@ Los archivos de esta carpeta son **ejemplos**: muestran el nombre y el formato e
 | `grafana_password.txt` | Grafana (usuario `admin`) | Al crear el volumen de Grafana |
 | `rabbitmq_password.txt` | RabbitMQ (usuario heredado `hexaorders`) | Al crear el volumen de RabbitMQ y en cada conexión de `order-api` |
 | `demo_password.txt` | Las seis cuentas de demostración de la tienda | Solo la primera vez, al crear esas cuentas |
+| `google_client_id.txt` *(v7, opcional)* | «Continuar con Google» (OpenID Connect) | En cada arranque de `order-api`. Vacío = botón oculto |
+| `google_client_secret.txt` *(v7, opcional)* | «Continuar con Google» | Igual que el anterior; nunca se muestra en la interfaz ni en los logs |
+| `smtp_password.txt` *(v7, opcional)* | Relé SMTP real (p. ej. contraseña de aplicación de Gmail) | Vacío = Mailpit (los correos se ven en http://127.0.0.1:8025) |
+
+Los tres archivos opcionales se crean **vacíos** automáticamente (vacío = integración desactivada) y nunca se
+sobrescriben. Cómo obtener sus valores: [`docs/final/GUIA_GOOGLE_Y_PAGOS.md`](../docs/final/GUIA_GOOGLE_Y_PAGOS.md).
 
 Cómo crearlas, verlas, recuperarlas o cambiarlas: [`docs/SECRETOS.md`](../docs/SECRETOS.md).

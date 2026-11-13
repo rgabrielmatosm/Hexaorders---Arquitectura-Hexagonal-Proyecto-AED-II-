@@ -41,6 +41,9 @@ const PAGE_URLS = [
   [/^\/mis-pedidos$/, () => '/cliente/pedidos.html'],
   [/^\/mis-pedidos\/([^/]+)$/, (id) => `/cliente/pedido-detalle.html?id=${encodeURIComponent(id)}`],
   [/^\/seguimiento\/([^/]+)$/, (id) => `/cliente/seguimiento.html?id=${encodeURIComponent(id)}`],
+  // v7: pago en línea del pedido y su boleta.
+  [/^\/pago\/([^/]+)$/, (id) => `/cliente/pago.html?id=${encodeURIComponent(id)}`],
+  [/^\/boleta\/([^/]+)$/, (id) => `/cliente/boleta.html?id=${encodeURIComponent(id)}`],
   [/^\/perfil$/, () => '/cliente/perfil.html'],
   [/^\/admin$/, () => '/admin/dashboard.html'],
   [/^\/admin\/([a-z-]+)$/, (tab) => `/admin/${ADMIN_TAB(tab)}.html`],

@@ -10,6 +10,7 @@ import { cart } from './cart.js';
 import { MAIN_CATEGORY_ICONS, icon } from './components.js';
 import { ROLE_LABELS, session } from './session.js';
 import { $, $$, el, toast } from './ui.js';
+import { todayBadge } from './store-info.js';
 import { LANGUAGES, equivalentUrl, lang, localizeHref, switchLanguage, t } from './i18n.js';
 
 /** Accesos rápidos de la tienda (debajo del buscador). */
@@ -280,7 +281,7 @@ function renderHeader() {
     el('div', { class: 'store-strip' },
       el('span', {}, icon('truck'), t(' Envío gratis desde S/ 299 en Lima Metropolitana')),
       el('span', { class: 'hide-sm' }, icon('shield'), t(' Garantía oficial de marca')),
-      el('span', { class: 'hide-sm' }, icon('card'), t(' Pago contra entrega, transferencia o en tienda')),
+      el('span', { class: 'hide-sm' }, icon('card'), t(' Tarjeta, Yape, Plin o contra entrega')),
       el('a', { href: '/cliente/pedidos.html' }, t('Sigue tu pedido'))),
     el('div', { class: 'store-bar' },
       brandLink(),
@@ -348,7 +349,7 @@ function renderFooter() {
     el('ul', {}, links.map(([href, label]) => el('li', {}, el('a', { href, text: label })))));
   const benefits = el('div', { class: 'store-benefits' }, [
     ['truck', t('Envíos a todo el Perú'), t('Gratis desde S/ 299 en Lima Metropolitana')],
-    ['card', t('Paga como prefieras'), t('Contra entrega, transferencia o en tienda')],
+    ['card', t('Paga como prefieras'), t('Tarjeta, Yape, Plin, contra entrega o en tienda')],
     ['shield', t('Garantía oficial'), t('Productos nuevos y sellados de marca')],
     ['refresh', t('Cambios y devoluciones'), t('Hasta 7 días por fallas de fábrica')],
   ].map(([ic, title, text]) => el('div', { class: 'store-benefit' }, icon(ic), el('div', {}, el('strong', { text: title }), el('small', { text })))));
@@ -357,6 +358,7 @@ function renderFooter() {
     el('li', {}, icon('whatsapp'), el('span', {}, t('WhatsApp: {0}', CONTACT.whatsapp), demo)),
     el('li', {}, icon('call'), el('span', {}, t('Teléfono: {0}', CONTACT.phone), demo?.cloneNode(true))),
     el('li', {}, icon('clock'), el('span', { text: CONTACT.hours })),
+    el('li', { class: 'pm-footer__today' }, todayBadge()),
     el('li', {}, icon('mail'), el('span', {}, t('Soporte: '), el('a', { href: `mailto:${CONTACT.supportEmail}`, text: CONTACT.supportEmail }))),
     el('li', {}, icon('mail'), el('span', {}, t('Corporativo: '), el('a', { href: `mailto:${CONTACT.corporateEmail}`, text: CONTACT.corporateEmail }))),
     el('li', {}, icon('map'), el('span', { text: CONTACT.city })));
@@ -384,7 +386,7 @@ function renderFooter() {
   const legal = el('p', { class: 'pm-footer__legal' },
     el('strong', { text: `© ${new Date().getFullYear()} ${BRAND.name}. ` }), `${BRAND.slogan} `,
     t('Razón social: {0} · RUC: {1} · {2}. ', LEGAL.companyName || 'no configurada', LEGAL.taxId || 'no configurado', LEGAL.address),
-    t('Precios en soles (S/) con IGV. Tienda de demostración: precios, stock y promociones ilustrativos; no se procesan pagos en línea.'));
+    t('Precios en soles (S/) con IGV. Tienda de demostración: precios, stock y promociones ilustrativos; los pagos con tarjeta, Yape y Plin son de prueba y no cobran.'));
   footer.replaceChildren(
     benefits,
     el('div', { class: 'site-footer__grid' },

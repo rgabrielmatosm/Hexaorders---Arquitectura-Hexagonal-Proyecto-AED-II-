@@ -113,7 +113,7 @@ def main():
     customer.refresh_csrf()
     customer.call('POST', '/api/auth/register', {'username': f'tienda{suffix}', 'displayName': 'Cliente Tienda',
                                                  'email': f'tienda{suffix}@example.test', 'password': 'cobre lluvia faro norte 2026'}, expect=201)
-    customer.login(f'tienda{suffix}', 'cobre lluvia faro norte 2026')
+    customer.login(f'tienda{suffix}', 'cobre lluvia faro norte 2026', email=f'tienda{suffix}@example.test')
     in_stock = next(p for p in search(anon, available='true', sort='price_asc', size=60)['items'] if 3 <= p['stock'] <= 60)
     _, cart, _ = customer.call('POST', '/api/shop/cart/items', {'productId': in_stock['id'], 'quantity': 2}, expect=200)
     ok(cart['units'] == 2 and D(cart['subtotal']) == D(in_stock['price']) * 2, 'Agregar al carrito: subtotal calculado por el servidor')
@@ -131,8 +131,9 @@ def main():
     items = [{'productId': in_stock['id'], 'quantity': 2}]
     anon.refresh_csrf()  # el visitante también envía el token CSRF, igual que el navegador
     _, options, _ = anon.call('GET', '/api/shop/checkout-options', expect=200)
-    ok({o['code'] for o in options['delivery']} == {'STANDARD', 'EXPRESS', 'PICKUP'} and len(options['payment']) == 3,
-       'Métodos de entrega y de pago disponibles (sin pagos reales)')
+    ok({o['code'] for o in options['delivery']} == {'STANDARD', 'EXPRESS', 'PICKUP'} and len(options['payment']) == 6
+       and {o['code'] for o in options['payment'] if o['online']} == {'CARD', 'YAPE', 'PLIN'},
+       'Métodos de entrega y de pago: tarjeta, Yape y Plin en línea (pasarelas de prueba) y tres pagos diferidos')
     _, summary, _ = anon.call('POST', '/api/shop/checkout-summary', {'items': items, 'deliveryMethod': 'EXPRESS'}, expect=200)
     ok(D(summary['shippingCost']) == D('29.90') and D(summary['total']) == D(summary['subtotal']) + D('29.90'), 'Resumen: envío express sumado al total')
     status, _, _ = anon.call('POST', '/api/shop/checkout-summary', {'items': items, 'deliveryMethod': 'PICKUP', 'paymentMethod': 'CASH_ON_DELIVERY'})
@@ -158,6 +159,53 @@ def main():
     _, cancelled, _ = customer.call('POST', f'/api/shop/orders/{order["id"]}/cancel', expect=200)
     _, restored, _ = anon.call('GET', f'/api/catalog/products/{in_stock["id"]}', expect=200)
     ok(cancelled['status'] == 'CANCELLED' and restored['stock'] == in_stock['stock'], 'Cancelar devuelve las unidades al inventario')
+
+    print('v7 · Tienda física, pago en línea (tarjeta, Yape, Plin) y boleta')
+    _, store, _ = anon.call('GET', '/api/store', expect=200)
+    ok(store['mapsEmbedUrl'].startswith('https://www.google.com/maps?q=') and 'output=embed' in store['mapsEmbedUrl']
+       and store['mapsDirectionsUrl'].startswith('https://www.google.com/maps/dir/?api=1') and len(store['week']) == 7,
+       f'Tienda: mapa de Google Maps, «cómo llegar» y horario semanal ({store["fullAddress"]})')
+    _, today, _ = anon.call('GET', '/api/store/today', expect=200)
+    ok(today['date'] and today['googleCalendarUrl'].startswith('https://calendar.google.com/calendar/render?action=TEMPLATE'),
+       f'Hoy en Lima: {today["date"]} · {"abierto" if today["openNow"] else "cerrado"} · {today["opens"] or "sin atención"}–{today["closes"] or ""}')
+    cheap = next(p for p in search(anon, available='true', sort='price_asc', size=30)['items'] if p['stock'] >= 3)
+    pay_items = [{'productId': cheap['id'], 'quantity': 1}]
+
+    def online_order(method, tag):
+        _, placed, _ = customer.call('POST', '/api/shop/orders', {'items': pay_items, 'deliveryMethod': 'PICKUP', 'paymentMethod': method},
+                                     headers={'Idempotency-Key': f'pay-{tag}-{suffix}'}, expect=201)
+        return placed
+
+    card_order = online_order('CARD', 'card')
+    path = f'/api/shop/orders/{card_order["id"]}'
+    _, pending, _ = customer.call('GET', f'{path}/payment', expect=200)
+    ok(pending['online'] and pending['status'] is None and pending['paymentMethod'] == 'CARD', 'Pedido con tarjeta: pendiente de pago')
+    card = {'holder': 'Cliente Tienda', 'expMonth': 12, 'expYear': 2030, 'cvv': '123'}
+    status, declined, _ = customer.call('POST', f'{path}/payment/card', {**card, 'number': '4000 0000 0000 0002'})
+    ok(status == 402 and declined['status'] == 'DECLINED' and declined['failureCode'] == 'INSUFFICIENT_FUNDS', 'Tarjeta de prueba rechazada: 402 con el motivo')
+    status, _, _ = customer.call('POST', f'{path}/payment/card', {**card, 'number': '4111 1111 1111 1112'})
+    ok(status == 400, 'Número de tarjeta con dígito verificador incorrecto (Luhn): 400')
+    _, paid, _ = customer.call('POST', f'{path}/payment/card', {**card, 'number': '4111 1111 1111 1111'}, expect=200)
+    ok(paid['status'] == 'PAID' and paid['receipt'].startswith('B001-') and paid['cardLast4'] == '1111', f'Tarjeta aprobada al instante: boleta {paid["receipt"]}')
+    _, receipt, _ = customer.call('GET', f'{path}/receipt', expect=200)
+    ok(D(receipt['taxableBase']) + D(receipt['igv']) == D(receipt['total']) == D(card_order['amount']), 'Boleta: base imponible + IGV 18 % = total')
+    status, _, _ = customer.call('POST', f'{path}/payment/card', {**card, 'number': '4111 1111 1111 1111'})
+    ok(status == 409, 'No se cobra dos veces el mismo pedido (409)')
+    yape_order = online_order('YAPE', 'yape')
+    ypath = f'/api/shop/orders/{yape_order["id"]}'
+    _, qr, _ = customer.call('POST', f'{ypath}/payment/wallet', {'method': 'YAPE'}, expect=201)
+    ok(qr['status'] == 'PENDING' and 55 <= qr['remainingSeconds'] <= 60 and qr['qrPayload'].startswith('POLYMER-SANDBOX|YAPE|'),
+       f'Yape: solicitud con QR que vence en 60 s (quedan {qr["remainingSeconds"]} s)')
+    status, rejected, _ = customer.call('POST', f'{ypath}/payment/wallet/{qr["paymentId"]}/confirm', {'phone': '987654321', 'approvalCode': '000000'})
+    ok(status == 402 and rejected['failureCode'] == 'WRONG_APPROVAL_CODE', 'Yape: código de aprobación incorrecto → 402')
+    _, qr2, _ = customer.call('POST', f'{ypath}/payment/wallet', {'method': 'PLIN'}, expect=201)
+    _, wallet_paid, _ = customer.call('POST', f'{ypath}/payment/wallet/{qr2["paymentId"]}/confirm', {'phone': '+51 987 654 321', 'approvalCode': '482913'}, expect=200)
+    ok(wallet_paid['status'] == 'PAID' and wallet_paid['method'] == 'PLIN' and wallet_paid['reference'].startswith('PLIN-'),
+       f'Plin aprobado dentro de los 60 s: boleta {wallet_paid["receipt"]}')
+    _, used, _ = customer.call('GET', ypath, expect=200)
+    ok(used['checkout']['payment'] == 'PLIN', 'El pedido registra el método realmente usado (de Yape a Plin)')
+    status, _, _ = anon.call('GET', f'{path}/payment')
+    ok(status == 401, 'El pago de un pedido requiere la sesión del cliente (401)')
 
     print('Administración comercial')
     admin = Session().login('admin', demo_password)

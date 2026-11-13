@@ -6,6 +6,8 @@ el navegador. Uso:
 Variables: API_URL (por defecto http://127.0.0.1:8080), PROMETHEUS_URL (opcional, para métricas).
 """
 import argparse
+import urllib.parse
+import re
 import http.cookiejar
 import json
 import os
@@ -55,11 +57,41 @@ class Session:
         _, token, _ = self.call('GET', '/api/auth/csrf', expect=200)
         self.csrf = token['token']
 
-    def login(self, username, password):
+    def login(self, username, password, email=None, remember=False):
+        """v7: si el servidor pide el código de 6 dígitos (202), se lee del correo en Mailpit como haría una persona."""
         self.refresh_csrf()
-        self.call('POST', '/api/auth/login', {'username': username, 'password': password}, expect=200)
+        started = time.time()
+        status, body, _ = self.call('POST', '/api/auth/login', {'username': username, 'password': password, 'rememberMe': remember})
+        if status == 202 and body.get('verificationRequired'):
+            if not email:
+                raise AssertionError(f'{username}: el servidor pidió el código de verificación y no se indicó el correo')
+            self.call('POST', '/api/auth/verify', {'code': mail_code(email, started), 'rememberMe': remember}, expect=200)
+        elif status != 200:
+            raise AssertionError(f'POST /api/auth/login: esperado 200 o 202, recibido {status}: {body}')
         self.refresh_csrf()
         return self
+
+
+MAILPIT = os.environ.get('MAILPIT_URL', 'http://127.0.0.1:8025')
+
+
+def mail_code(email, since, timeout=30):
+    """Último código de 6 dígitos enviado a email después de «since» (asunto «123456 es tu código…»)."""
+    deadline = time.time() + timeout
+    query = urllib.parse.urlencode({'query': f'to:"{email}"', 'limit': 20})
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f'{MAILPIT}/api/v1/search?{query}', timeout=10) as response:
+                messages = json.loads(response.read()).get('messages') or []
+        except (urllib.error.URLError, OSError):
+            messages = []
+        for message in messages:
+            created = datetime.fromisoformat(message['Created'].replace('Z', '+00:00')).timestamp()
+            found = re.match(r'^(\d{6}) ', message.get('Subject', ''))
+            if found and created >= since - 5:
+                return found.group(1)
+        time.sleep(1)
+    raise AssertionError(f'No llegó el código de verificación a {email} (Mailpit {MAILPIT})')
 
 
 def main():
@@ -100,7 +132,7 @@ def main():
     password = 'nube cobre faro tigre 2026'
     customer.call('POST', '/api/auth/register', {'username': f'c_{suffix}', 'displayName': 'Cliente E2E',
                                                  'email': f'c_{suffix}@example.com', 'password': password}, expect=201)
-    customer.login(f'c_{suffix}', password)
+    customer.login(f'c_{suffix}', password, email=f'c_{suffix}@example.com')
     _, me, _ = customer.call('GET', '/api/auth/me', expect=200)
     ok(me['authenticated'] and me['user']['roles'] == ['CUSTOMER'], 'El registro crea una cuenta CUSTOMER y la sesión funciona')
     stock_before = item['stock']
@@ -125,7 +157,7 @@ def main():
     other.refresh_csrf()
     other.call('POST', '/api/auth/register', {'username': f'o_{suffix}', 'displayName': 'Otro cliente',
                                               'email': f'o_{suffix}@example.com', 'password': password}, expect=201)
-    other.login(f'o_{suffix}', password)
+    other.login(f'o_{suffix}', password, email=f'o_{suffix}@example.com')
     status, _, _ = other.call('GET', f'/api/shop/orders/{order["id"]}')
     ok(status == 404, 'Un cliente no puede consultar pedidos de otro cliente (404)')
     status, _, _ = customer.call('GET', '/api/admin/dashboard')

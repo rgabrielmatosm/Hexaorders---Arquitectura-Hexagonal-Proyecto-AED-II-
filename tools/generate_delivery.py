@@ -59,8 +59,13 @@ INLINE_MARKERS = {
 LARGE_FILE = 64 * 1024
 
 
-def packed(content: str) -> str:
-    data = gzip.compress(content.encode('utf-8'), compresslevel=9, mtime=0)
+# v7: archivos binarios (video y póster de la portada) viajan igual, en gzip + base64, byte a byte.
+BINARY_SUFFIXES = {'.mp4', '.webm', '.jpg', '.jpeg', '.png', '.gif', '.ico', '.woff2'}
+
+
+def packed(content) -> str:
+    raw = content if isinstance(content, bytes) else content.encode('utf-8')
+    data = gzip.compress(raw, compresslevel=9, mtime=0)
     encoded = base64.b64encode(data).decode('ascii')
     return '\n'.join(encoded[i:i + 76] for i in range(0, len(encoded), 76))
 
@@ -136,8 +141,14 @@ def inline_dockerfile(service: str) -> str:
             for file in members:
                 if not all(ch.isalnum() or ch in '._-' for ch in file.name):
                     raise ValueError(f'Nombre de archivo no soportado en heredoc: {file}')
-                content = read_text(file).rstrip('\n')
                 name = file.name
+                if file.suffix.lower() in BINARY_SUFFIXES:
+                    content, name = packed(file.read_bytes()), f'{file.name}.gz.b64'
+                    unpack.append(f'base64 -d {name} | gunzip > {file.name} && rm {name}')
+                    heredocs.append(f"<<'{name}'")
+                    bodies.extend([content, name])
+                    continue
+                content = read_text(file).rstrip('\n')
                 if len(content.encode('utf-8')) > LARGE_FILE:
                     # El heredoc termina en salto de línea: se comprime el contenido con él para restaurarlo igual.
                     content, name = packed(content + '\n'), f'{file.name}.gz.b64'

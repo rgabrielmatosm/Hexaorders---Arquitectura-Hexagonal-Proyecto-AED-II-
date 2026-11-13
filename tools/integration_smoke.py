@@ -23,6 +23,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -110,7 +111,7 @@ def new_customer():
     anon.refresh_csrf()
     anon.call('POST', '/api/auth/register', {'username': f'v5_{suffix}', 'displayName': 'Cliente v5',
                                             'email': email, 'password': 'faro lento nube cobre 2026'}, expect=201)
-    return Session().login(f'v5_{suffix}', 'faro lento nube cobre 2026'), email
+    return Session().login(f'v5_{suffix}', 'faro lento nube cobre 2026', email=email), email
 
 
 def place_order(customer, products=None):
@@ -159,8 +160,12 @@ def check():
     customer, email = new_customer()
     order, headers = place_order(customer)
     short = order['id'][:8]
-    messages = eventually(f'correos de {email} en Mailpit', lambda: (lambda m: m if len(m) >= 2 else None)(mails_to(email)), timeout=90)
+    # v7: el primer correo del cliente nuevo es su código de verificación («123456 es tu código…»); aquí cuentan los del pedido.
+    order_mails = lambda: [m for m in mails_to(email) if not re.match(r'^\d{6} ', m['Subject'])]
+    messages = eventually(f'correos de {email} en Mailpit', lambda: (lambda m: m if len(m) >= 2 else None)(order_mails()), timeout=90)
     subjects = sorted(m['Subject'] for m in messages)
+    ok(any(re.match(r'^\d{6} es tu código de verificación de POLYMER$', m['Subject']) for m in mails_to(email)),
+       'v7: el código de 6 dígitos para confirmar el correo llegó por correo (Mailpit)')
     ok(any('recibido' in s for s in subjects) and all(short in s for s in subjects),
        f'Mailpit capturó las notificaciones del pedido {short}: {subjects}')
     rabbit = ('hexaorders', secret('rabbitmq_password'))
@@ -173,6 +178,22 @@ def check():
        f"La cola de mensajes fallidos (DLQ) existe, es durable y está vacía (mensajes: {dlq.get('messages')}, argumentos: {dlq.get('arguments')})")
     exchange = get_json(f'{RABBITMQ}/api/exchanges/%2F/hexaorders.events', auth=rabbit)
     ok(exchange['type'] == 'topic' and exchange['durable'], 'Exchange hexaorders.events (topic, durable)')
+    print('v7 · Boleta por correo tras un pago en línea (pago → outbox → RabbitMQ → consumidor → SMTP)')
+    products = customer.call('GET', '/api/catalog/products', expect=200)[1]
+    item = min((p for p in products if p['stock'] >= 2), key=lambda p: p['price'])
+    status, paid_order, _ = customer.call('POST', '/api/shop/orders', {'items': [{'productId': item['id'], 'quantity': 1}],
+                                          'deliveryMethod': 'PICKUP', 'paymentMethod': 'CARD'}, headers={'Idempotency-Key': f'v7-{uuid.uuid4().hex[:20]}'})
+    ok(status == 201, 'Pedido con pago con tarjeta creado')
+    _, paid, _ = customer.call('POST', f'/api/shop/orders/{paid_order["id"]}/payment/card',
+                               {'number': '5555 5555 5555 4444', 'holder': 'Cliente v5', 'expMonth': 12, 'expYear': 2031, 'cvv': '321'}, expect=200)
+    receipt_mail = eventually(f'boleta {paid["receipt"]} en Mailpit',
+                              lambda: next((m for m in mails_to(email) if m['Subject'].startswith(f'Boleta {paid["receipt"]}')), None), timeout=90)
+    detail = get_json(f'{MAILPIT}/api/v1/message/{receipt_mail["ID"]}')
+    ok('IGV (18 %)' in detail.get('Text', '') and '<table' in detail.get('HTML', '') and 'Op. gravada' in detail.get('Text', ''),
+       f'Correo «{receipt_mail["Subject"]}» con la boleta en texto y HTML (base imponible, IGV y total)')
+    paid_metric = eventually('polymer_payments_total en Prometheus',
+                             lambda: (lambda v: v if v and v[0] >= 1 else None)(prom('sum(polymer_payments_total{outcome="paid"})')), timeout=45)
+    ok(paid_metric[0] >= 1, f'Prometheus: polymer_payments_total{{outcome="paid"}} = {paid_metric[0]:.0f}')
     eventually('outbox vacío', lambda: prom('polymer_outbox_pending') == [0.0], timeout=60)
     ok(True, 'Outbox transaccional vacío: todos los eventos confirmados por el broker')
 

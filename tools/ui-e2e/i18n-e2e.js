@@ -14,6 +14,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const { completeVerification } = require('./mail-code');
 
 const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8080';
 const OUT = process.env.SCREENSHOTS_DIR || path.join(__dirname, 'screenshots');
@@ -214,7 +215,8 @@ async function login(session, lang, user, password = PASSWORD) {
     const pw2 = signup.page.locator('.pw-group input').nth(1);
     await signup.page.fill('#view-root input[autocomplete="username"]', `e2e${Date.now().toString(36)}`);
     await signup.page.fill('#view-root input[autocomplete="name"]', 'Prueba Idiomas');
-    await signup.page.fill('#view-root input[type="email"]', `i18n.${Date.now()}@example.com`);
+    const signupEmail = `i18n.${Date.now()}@example.com`;
+    await signup.page.fill('#view-root input[type="email"]', signupEmail);
     await pw.fill('corta');
     check((await level()) === 'WEAK' && (await signup.page.textContent('.pw-tips')).includes('12'), 'Indicador: contraseña corta → débil, con el mínimo de 12');
     await pw.fill('password1234');
@@ -247,7 +249,13 @@ async function login(session, lang, user, password = PASSWORD) {
       check(response.status() === 400 && body.code === 'WEAK_PASSWORD' && Array.isArray(body.problems) && body.problems.length > 0,
         `Servidor: rechaza una contraseña débil de ${weak.length} caracteres (${response.status()} ${body.code}: ${(body.problems || []).join(', ')})`);
     }
-    await Promise.all([signup.page.waitForURL(new RegExp(`/en/(${slug("en", "/cliente/dashboard.html")}|${slug("en", "/carrito.html")})$`), { timeout: 20000 }), signup.page.click('#view-root button[type="submit"]')]);
+    // v7: con servidor de correo, la cuenta nueva confirma su correo con el código de 6 dígitos (en inglés).
+    const signupStarted = Date.now();
+    const landed = signup.page.waitForURL(new RegExp(`/en/(${slug("en", "/cliente/dashboard.html")}|${slug("en", "/carrito.html")})$`), { timeout: 40000 });
+    await signup.page.click('#view-root button[type="submit"]');
+    const verified = await completeVerification(signup.page, signupEmail, signupStarted);
+    if (verified) check(true, 'Registro: el paso de verificación con el código de 6 dígitos aparece en inglés y acepta el código del correo');
+    await landed;
     check(true, 'Registro con frase de contraseña fuerte: cuenta creada y sesión iniciada en inglés');
     await signup.context.close();
 

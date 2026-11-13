@@ -159,6 +159,24 @@
     "needsId": false
   },
   {
+    "path": "/cliente/pago.html",
+    "route": "/pago/:id",
+    "title": "Pago del pedido",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": true
+  },
+  {
+    "path": "/cliente/boleta.html",
+    "route": "/boleta/:id",
+    "title": "Boleta de venta",
+    "roles": [
+      "CUSTOMER"
+    ],
+    "needsId": true
+  },
+  {
     "path": "/admin/dashboard.html",
     "route": "/admin/:tab",
     "title": "Panel de administración",
