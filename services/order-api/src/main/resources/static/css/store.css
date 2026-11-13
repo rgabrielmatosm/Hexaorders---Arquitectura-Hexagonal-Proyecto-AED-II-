@@ -299,7 +299,7 @@
 @media (max-width: 1080px) {
   .product-grid--rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .product-grid--rail > :nth-child(n + 7) { display: none; }
-  .hero-store { grid-template-columns: 1fr; }
+  .hero-store { grid-template-columns: minmax(0, 1fr); }
   .hero-store__side { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .store-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .site-footer__grid { grid-template-columns: 1fr 1fr; }
@@ -360,6 +360,10 @@
 
 /* Tienda física: mapa + horario */
 .visit__grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.visit__grid > *, .hours-card > *, .map-card__body > * { min-width: 0; }
+.map-card__body address, .map-card__body p, .hours-card__label, .status-pill { overflow-wrap: anywhere; }
+.map-card__body .row-actions { justify-content: flex-start; }
+.map-card__body .row-actions .btn, .hours-card .btn { white-space: normal; text-align: center; max-width: 100%; }
 .map-card { padding: 0; overflow: hidden; }
 .map-card__frame { aspect-ratio: 16 / 10; background: var(--bg-3); }
 .map-card__frame iframe { width: 100%; height: 100%; border: 0; display: block; filter: saturate(0.95); }
@@ -367,13 +371,13 @@
 .map-card__body address { font-style: normal; color: var(--text); }
 .map-card__body .card__title svg, .map-card__body p svg { width: 16px; height: 16px; vertical-align: -3px; }
 .hours-card { display: grid; gap: 14px; }
-.hours-card__today { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.hours-card__today { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
 .hours-card__date { display: grid; place-items: center; width: 86px; padding: 10px 6px; border-radius: 14px; text-align: center;
   background: linear-gradient(160deg, var(--violet-soft), rgba(166, 184, 255, 0.12)); border: 1px solid var(--line-strong); }
 .hours-card__day { font-size: 2rem; font-weight: 800; line-height: 1; color: var(--violet); }
 .hours-card__label { font-size: 0.7rem; color: var(--text-2); }
 .hours-card__hours { display: block; font-size: 1.35rem; margin: 2px 0 6px; }
-.status-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+.status-pill { display: inline-block; max-width: 100%; padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
 .status-pill--open { background: var(--green-soft); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.4); }
 .status-pill--closed { background: var(--red-soft); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); }
 .hours-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
@@ -382,7 +386,7 @@
 .hours-table tr.is-today th, .hours-table tr.is-today td { color: var(--violet); font-weight: 700; }
 .mini-cal { border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
 .mini-cal__title { font-weight: 650; text-align: center; margin-bottom: 6px; }
-.mini-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; font-size: 0.78rem; }
+.mini-cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; font-size: 0.78rem; }
 .mini-cal__dow { color: var(--text-2); text-transform: uppercase; font-size: 0.66rem; padding: 2px 0; }
 .mini-cal__cell { padding: 5px 0; border-radius: 7px; }
 .mini-cal__cell.is-past { color: var(--text-2); opacity: 0.6; }
@@ -477,4 +481,4 @@
   .receipt * { color: #000 !important; border-color: #999 !important; }
   .view__head { display: none; }
 }
-@media (max-width: 860px) { .visit__grid { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .visit__grid { grid-template-columns: minmax(0, 1fr); } }

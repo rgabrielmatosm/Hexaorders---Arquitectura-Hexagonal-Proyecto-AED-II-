@@ -270,7 +270,17 @@ async function visitAll(session, role, ids) {
     for (const target of ['/', '/catalogo.html', `/producto.html?id=${ids.product}`, '/ofertas.html', '/ayuda.html', '/contacto.html']) {
       await mobile.page.goto(`${BASE_URL}${target}`);
       await rendered(mobile.page);
-      check(!(await mobile.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `Móvil (390 px): ${target} sin desplazamiento horizontal`);
+      const wide = await mobile.page.evaluate(() => {
+        if (document.documentElement.scrollWidth <= window.innerWidth + 1) return '';
+        const out = [];
+        for (const node of document.querySelectorAll('body *')) {
+          const box = node.getBoundingClientRect();
+          if (box.width > 0 && box.right > window.innerWidth + 1) out.push(`${node.tagName.toLowerCase()}.${String(node.className && node.className.baseVal !== undefined ? node.className.baseVal : node.className).trim().replace(/\s+/g, '.')} (${Math.round(box.right)} px)`);
+        }
+        return `${document.documentElement.scrollWidth} px: ${out.slice(-6).join(', ')}`;
+      });
+      if (wide) await mobile.page.screenshot({ path: path.join(OUT, 'v7-movil-desborde.png'), fullPage: true });
+      check(!wide, `Móvil (390 px): ${target} sin desplazamiento horizontal${wide ? ` — ${wide}` : ''}`);
     }
     await mobile.page.click('.nav-toggle');
     check(await mobile.page.isVisible('#primary-nav a[href="/ofertas.html"]'), 'Móvil: el menú desplegable muestra la navegación');
