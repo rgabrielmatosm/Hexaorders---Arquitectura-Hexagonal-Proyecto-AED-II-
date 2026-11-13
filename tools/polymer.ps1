@@ -522,7 +522,11 @@ function Assert-HostPortsFree {
             foreach ($listener in $listeners) {
                 $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
                 $name = if ($process) { $process.ProcessName } else { "PID $($listener.OwningProcess)" }
-                if ($name -match '^(com\.docker|docker|vpnkit|wslrelay|Docker Desktop|wsl|System|Idle)') { continue }
+                if ($name -eq 'wslrelay') {
+                    $programs += "  Puerto $port ($($ports[$port])): lo usa un programa dentro de WSL (Ubuntu u otra distribución). Ciérralo, o ejecuta: wsl --shutdown y vuelve a abrir Docker Desktop"
+                    continue
+                }
+                if ($name -match '^(com\.docker|docker|vpnkit|Docker Desktop|wsl|System|Idle)') { continue }
                 $programs += "  Puerto $port ($($ports[$port])): lo usa el programa $name (PID $($listener.OwningProcess))"
             }
         }
