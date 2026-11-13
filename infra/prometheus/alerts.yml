@@ -1,7 +1,7 @@
 groups:
-  - name: hexaorders
+  - name: polymer
     rules:
-      - alert: HexaOrdersServiceDown
+      - alert: PolymerServiceDown
         expr: up{job=~"order-api|risk-engine"} == 0
         for: 30s
         labels:
@@ -23,13 +23,13 @@ groups:
   # reserva el sufijo _created y exporta el contador Micrometer "orders_created" como orders_total.
   # Esta regla republica la serie con su nombre original para que los paneles y consultas existentes
   # (orders_created_total) muestren datos sin modificarlos.
-  - name: hexaorders-compat
+  - name: polymer-compat
     rules:
       - record: orders_created_total
         expr: orders_total
 
   # Alertas añadidas en la versión 3 (las dos alertas originales de arriba no se modifican).
-  - name: hexaorders-platform
+  - name: polymer-platform
     rules:
       - alert: RiskEngineDown
         expr: up{job="risk-engine"} == 0
@@ -39,7 +39,7 @@ groups:
         annotations:
           summary: 'Motor de riesgo no disponible'
           description: 'Los checkouts y pedidos nuevos responden 503 hasta que vuelva risk-engine.'
-      - alert: HexaOrdersHighErrorRate
+      - alert: PolymerHighErrorRate
         expr: sum(rate(http_server_requests_seconds_count{job="order-api",status=~"5.."}[2m])) > 0.05
         for: 2m
         labels:
@@ -47,7 +47,7 @@ groups:
         annotations:
           summary: 'Aumento de errores HTTP 5xx en order-api'
           description: 'Más de 0,05 respuestas 5xx por segundo durante 2 minutos.'
-      - alert: HexaOrdersHighLatency
+      - alert: PolymerHighLatency
         expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="order-api",uri=~"/api/.*"}[5m]))) > 1
         for: 5m
         labels:
@@ -55,32 +55,32 @@ groups:
         annotations:
           summary: 'Latencia p95 de la API superior a 1 s'
           description: 'Revisar PostgreSQL, el motor de riesgo y los recursos de order-api.'
-      - alert: HexaOrdersCheckoutFailures
-        expr: sum(increase(hexaorders_checkout_failures_total{reason="risk_unavailable"}[5m])) > 3
+      - alert: PolymerCheckoutFailures
+        expr: sum(increase(polymer_checkout_failures_total{reason="risk_unavailable"}[5m])) > 3
         for: 1m
         labels:
           severity: warning
         annotations:
           summary: 'Fallos recurrentes de integración Java-Python en el checkout'
           description: 'Más de 3 checkouts rechazados por indisponibilidad del motor de riesgo en 5 minutos.'
-      - alert: HexaOrdersPendingReviewGrowing
-        expr: hexaorders_orders_by_status{status="RISK_REVIEW"} > 10
+      - alert: PolymerPendingReviewGrowing
+        expr: polymer_orders_by_status{status="RISK_REVIEW"} > 10
         for: 10m
         labels:
           severity: info
         annotations:
           summary: 'Pedidos pendientes de revisión acumulándose'
           description: 'Más de 10 pedidos en RISK_REVIEW durante 10 minutos: asignar operadores.'
-      - alert: HexaOrdersAuthFailuresSpike
-        expr: sum(increase(hexaorders_auth_logins_total{outcome="failure"}[5m])) > 10
+      - alert: PolymerAuthFailuresSpike
+        expr: sum(increase(polymer_auth_logins_total{outcome="failure"}[5m])) > 10
         for: 1m
         labels:
           severity: warning
         annotations:
           summary: 'Muchos inicios de sesión fallidos'
           description: 'Más de 10 credenciales incorrectas en 5 minutos: posible ataque de fuerza bruta.'
-      - alert: HexaOrdersLowStock
-        expr: hexaorders_products_low_stock > 0
+      - alert: PolymerLowStock
+        expr: polymer_products_low_stock > 0
         for: 15m
         labels:
           severity: info

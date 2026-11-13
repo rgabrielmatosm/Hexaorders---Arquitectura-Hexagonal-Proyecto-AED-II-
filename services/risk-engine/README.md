@@ -22,7 +22,7 @@ escalar se agregan contenedores y Prometheus consulta cada instancia.
 Pruebas íntegramente en Docker:
 
 ```powershell
-docker build --target test -t hexaorders-risk:test services/risk-engine
+docker build --target test -t polymer-risk:test services/risk-engine
 ```
 
 El build de la imagen final también obliga a ejecutar estas pruebas. La imagen

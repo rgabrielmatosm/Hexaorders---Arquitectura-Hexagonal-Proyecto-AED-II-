@@ -1,5 +1,8 @@
 // Utilidades de presentación. Todo el texto dinámico se inserta con textContent (sin innerHTML).
 
+import { play } from './audio.js';
+import { locale, t } from './i18n.js';
+
 export const $ = (selector, root = document) => root.querySelector(selector);
 export const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
@@ -23,12 +26,17 @@ export function el(tag, props = {}, ...children) {
 
 export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
-const integer = new Intl.NumberFormat('es-ES');
-const dateTime = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeStyle: 'medium' });
-const relative = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+// Formatos del idioma de la página (i18n.js). Los importes no cambian: siempre en su moneda (S/ o USD).
+const moneyFormats = {
+  USD: new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }),
+  PEN: new Intl.NumberFormat(locale, { style: 'currency', currency: 'PEN', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2 }),
+};
+const integer = new Intl.NumberFormat(locale);
+const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' });
+const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
 
-export const formatMoney = (value) => money.format(Number(value));
+/** El laboratorio usa USD (contrato de la API original); la tienda, soles (PEN). */
+export const formatMoney = (value, currency = 'USD') => (moneyFormats[currency] || moneyFormats.USD).format(Number(value));
 export const formatInt = (value) => integer.format(value);
 export const formatDateTime = (iso) => dateTime.format(new Date(iso));
 
@@ -41,7 +49,7 @@ export function formatRelative(iso) {
   return relative.format(Math.round(seconds / 86400), 'day');
 }
 
-export const statusLabel = (status) => (status === 'REVIEW' ? 'REVISIÓN' : 'APROBADO');
+export const statusLabel = (status) => (status === 'REVIEW' ? t('REVISIÓN') : 'APROBADO');
 export const statusBadge = (status) => el('span', {
   class: `badge ${status === 'REVIEW' ? 'badge--warn' : 'badge--ok'}`,
   text: statusLabel(status),
@@ -52,7 +60,7 @@ export function scoreView(score) {
   const fill = el('span');
   fill.style.width = `${Math.max(0, Math.min(100, score))}%`;
   fill.style.background = color;
-  return el('span', { class: 'score', title: `Puntaje de riesgo ${score} de 100` },
+  return el('span', { class: 'score', title: t('Puntaje de riesgo {0} de 100', score) },
     el('span', { class: 'score__bar' }, fill), `${score}/100`);
 }
 
@@ -64,6 +72,7 @@ export function toast(message, kind = 'ok', timeout = 4200) {
   const node = el('div', { class: `toast toast--${kind}`, role: kind === 'error' ? 'alert' : 'status' },
     el('span', { class: `dot dot--${dotKind}` }), el('span', { text: message }));
   container.append(node);
+  play(kind === 'ok' ? 'notify' : 'error'); // solo suena si la persona activó los sonidos
   setTimeout(() => {
     node.classList.add('is-leaving');
     setTimeout(() => node.remove(), 320);
@@ -86,8 +95,8 @@ export function setStat(node, text) {
 export async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    toast('ID copiado al portapapeles', 'ok', 2000);
+    toast(t('ID copiado al portapapeles'), 'ok', 2000);
   } catch {
-    toast('No se pudo copiar automáticamente', 'warn', 2500);
+    toast(t('No se pudo copiar automáticamente'), 'warn', 2500);
   }
 }

@@ -1,16 +1,17 @@
 ﻿<#
 .SYNOPSIS
-    Genera los secretos de HexaOrders como archivos en <Root>\secrets\ (excluido de Git).
+    Genera los secretos de POLYMER como archivos en <Root>\secrets\ (excluido de Git).
 
 .DESCRIPTION
     Compose monta cada archivo de secrets\ como secreto de solo lectura en /run/secrets:
       db_password.txt       contraseña de PostgreSQL
       grafana_password.txt  contraseña del usuario admin de Grafana
-      demo_password.txt     contraseña común de las cuentas de demostración de HexaOrders
+      demo_password.txt     contraseña común de las cuentas de demostración de POLYMER
                             (admin, operador, logistica, logistica2, observador, cliente)
+      rabbitmq_password.txt v5: contraseña del usuario polymer de RabbitMQ (perfil "full")
 
-    Un archivo existente NUNCA se sobrescribe: PostgreSQL y Grafana guardan la contraseña
-    inicial en sus volúmenes y cambiarla rompería un entorno ya inicializado.
+    Un archivo existente NUNCA se sobrescribe: PostgreSQL, Grafana y RabbitMQ guardan la
+    contraseña inicial en sus volúmenes y cambiarla rompería un entorno ya inicializado.
 
     Problema conocido de Windows: si se arranca Docker antes de que exista el archivo, Docker
     Desktop crea un DIRECTORIO con ese nombre. Este script lo detecta (-PathType Container):
@@ -19,7 +20,7 @@
 
     Origen de cada valor nuevo, en este orden:
       1. Un .env de una versión anterior (DB_PASSWORD, GRAFANA_PASSWORD; migración).
-      2. Variables de entorno DB_PASSWORD / GRAFANA_PASSWORD / DEMO_PASSWORD (uso en CI).
+      2. Variables de entorno DB_PASSWORD / GRAFANA_PASSWORD / DEMO_PASSWORD / RABBITMQ_PASSWORD (CI).
       3. Valor aleatorio criptográfico de 48 caracteres hexadecimales.
 
     Compatible con Windows PowerShell 5.1 y PowerShell 7 (Windows, Linux, macOS).
@@ -27,7 +28,7 @@
 .EXAMPLE
     .\tools\init-env.ps1
 .EXAMPLE
-    .\tools\init-env.ps1 -Root C:\despliegue\hexaorders
+    .\tools\init-env.ps1 -Root C:\despliegue\polymer
 #>
 [CmdletBinding()]
 param(
@@ -65,7 +66,8 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $secrets = @(
     @{ File = 'db_password.txt'; Name = 'DB_PASSWORD' },
     @{ File = 'grafana_password.txt'; Name = 'GRAFANA_PASSWORD' },
-    @{ File = 'demo_password.txt'; Name = 'DEMO_PASSWORD' }
+    @{ File = 'demo_password.txt'; Name = 'DEMO_PASSWORD' },
+    @{ File = 'rabbitmq_password.txt'; Name = 'RABBITMQ_PASSWORD' }
 )
 
 foreach ($item in $secrets) {
@@ -76,7 +78,7 @@ foreach ($item in $secrets) {
         $content = @(Get-ChildItem -LiteralPath $path -Force)
         if ($content.Count -gt 0) {
             throw ("'$path' es un DIRECTORIO con contenido, no un archivo de secreto. No se ha borrado nada. " +
-                   "Detén los contenedores (.\hexaorders.cmd stop), revisa su contenido, muévelo fuera de secrets\ y vuelve a ejecutar este script.")
+                   "Detén los contenedores (.\polymer.cmd stop), revisa su contenido, muévelo fuera de secrets\ y vuelve a ejecutar este script.")
         }
         Write-Warning "'$path' era un directorio vacío (Docker Desktop lo crea si el archivo no existía al arrancar). Se reemplaza por el archivo de secreto."
         Remove-Item -LiteralPath $path
@@ -109,4 +111,5 @@ if (-not $onWindows) {
 
 Write-Host "Secretos listos en $secretsDir (excluido de Git; no compartas su contenido)."
 Write-Host "Contraseña de Grafana (usuario admin): $(Join-Path $secretsDir 'grafana_password.txt')"
-Write-Host "Contraseña de las cuentas de demostración de HexaOrders: $(Join-Path $secretsDir 'demo_password.txt')"
+Write-Host "Contraseña de las cuentas de demostración de POLYMER: $(Join-Path $secretsDir 'demo_password.txt')"
+Write-Host "Contraseña de RabbitMQ (usuario hexaorders, heredado; consola http://127.0.0.1:15672): $(Join-Path $secretsDir 'rabbitmq_password.txt')"

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import gzip
 import hashlib
 import json
 import shlex
@@ -29,13 +31,69 @@ BUILD_CONTEXTS = {
     'risk-engine': 'services/risk-engine',
     'prometheus': 'infra/prometheus',
     'grafana': 'infra/grafana',
+    # v5
+    'frontend': 'infra/frontend',
+    'rabbitmq': 'infra/rabbitmq',
+    'loki': 'infra/loki',
+    'tempo': 'infra/tempo',
+    'otel-collector': 'infra/otel-collector',
+    'alloy': 'infra/alloy',
 }
 INLINE_MARKERS = {
     '__INLINE_JAVA__': 'order-api',
     '__INLINE_RISK__': 'risk-engine',
     '__INLINE_PROMETHEUS__': 'prometheus',
     '__INLINE_GRAFANA__': 'grafana',
+    '__INLINE_FRONTEND__': 'frontend',
+    '__INLINE_RABBITMQ__': 'rabbitmq',
+    '__INLINE_LOKI__': 'loki',
+    '__INLINE_TEMPO__': 'tempo',
+    '__INLINE_OTEL_COLLECTOR__': 'otel-collector',
+    '__INLINE_ALLOY__': 'alloy',
 }
+
+
+# BuildKit recibe el Dockerfile en un solo mensaje gRPC (máximo 4 MiB, y el contenido viaja más de una
+# vez): los archivos de texto grandes (catálogos de traducción, catálogo SQL) se incrustan comprimidos
+# con gzip + base64 y una instrucción RUN los restaura byte a byte antes de compilar.
+LARGE_FILE = 64 * 1024
+
+
+def packed(content: str) -> str:
+    data = gzip.compress(content.encode('utf-8'), compresslevel=9, mtime=0)
+    encoded = base64.b64encode(data).decode('ascii')
+    return '\n'.join(encoded[i:i + 76] for i in range(0, len(encoded), 76))
+
+
+def canonical(text: str) -> str:
+    """Sustituye cada bloque gzip + base64 por el SHA-256 de su contenido descomprimido.
+
+    gzip no produce los mismos bytes con todas las versiones de zlib (Python de Windows, de Linux, del CI):
+    la comprobación --check y el SHA de la cabecera se calculan sobre este texto canónico, así que dos
+    entregables con el mismo contenido son iguales aunque se hayan generado en equipos distintos.
+    """
+    lines, out, i = text.split('\n'), [], 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        stripped = line.lstrip(' ')
+        if not stripped.startswith('COPY <<'):
+            continue
+        indent = line[:len(line) - len(stripped)]
+        for name in [part.split("'")[1] for part in stripped.split() if part.startswith("<<'")]:
+            body = []
+            while i < len(lines) and lines[i] != indent + name:
+                body.append(lines[i][len(indent):])
+                i += 1
+            if name.endswith('.gz.b64'):
+                data = gzip.decompress(base64.b64decode(''.join(body)))
+                body = [f'sha256:{hashlib.sha256(data).hexdigest()}']
+            out.extend(indent + b for b in body)
+            if i < len(lines):
+                out.append(lines[i])
+                i += 1
+    return '\n'.join(out)
 
 
 def inline_dockerfile(service: str) -> str:
@@ -50,7 +108,8 @@ def inline_dockerfile(service: str) -> str:
         if len(parts) != 3 or parts[1].startswith('--'):
             raise ValueError(f'COPY no soportado: {line}')
         source, destination = parts[1:]
-        origin = context / source
+        # '@repo/…' = ruta desde la raíz del repositorio (p. ej. el gateway reutiliza los estáticos de order-api).
+        origin = ROOT / source[len('@repo/'):] if source.startswith('@repo/') else context / source
         files = sorted_files(origin) if origin.is_dir() else [origin]
         files = [file for file in files if file.is_file()
                  and not any(part in {'__pycache__', '.pytest_cache', '.venv'} for part in file.parts)]
@@ -73,17 +132,25 @@ def inline_dockerfile(service: str) -> str:
             directory = str(Path(destination) / relative.parent).replace('\\', '/')
             groups.setdefault(directory, []).append(file)
         for directory, members in groups.items():
-            heredocs, bodies = [], []
+            heredocs, bodies, unpack = [], [], []
             for file in members:
                 if not all(ch.isalnum() or ch in '._-' for ch in file.name):
                     raise ValueError(f'Nombre de archivo no soportado en heredoc: {file}')
                 content = read_text(file).rstrip('\n')
-                if file.name in content.split('\n'):
+                name = file.name
+                if len(content.encode('utf-8')) > LARGE_FILE:
+                    # El heredoc termina en salto de línea: se comprime el contenido con él para restaurarlo igual.
+                    content, name = packed(content + '\n'), f'{file.name}.gz.b64'
+                    unpack.append(f'base64 -d {name} | gunzip > {file.name} && rm {name}')
+                if name in content.split('\n'):
                     raise ValueError(f'Colisión de heredoc en {file}')
-                heredocs.append(f"<<'{file.name}'")
-                bodies.extend([content, file.name])
-            result.append(f"COPY {' '.join(heredocs)} {directory.rstrip('/')}/")
+                heredocs.append(f"<<'{name}'")
+                bodies.extend([content, name])
+            target_dir = directory.rstrip('/')
+            result.append(f"COPY {' '.join(heredocs)} {target_dir}/")
             result.extend(bodies)
+            if unpack:
+                result.append(f"RUN cd {target_dir} && " + ' && '.join(unpack))
             index += 1
     return '\n'.join(result) + '\n'
 
@@ -99,7 +166,7 @@ def compose() -> str:
         if base.count(marker) != 1:
             raise ValueError(f'Marcador {marker} ausente o duplicado en compose.base.yml')
         base = base.replace(marker, '|\n' + block(inline_dockerfile(service), 8))
-    digest = hashlib.sha256(base.encode()).hexdigest()
+    digest = hashlib.sha256(canonical(base).encode()).hexdigest()
     return f'# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo {digest}\n' + base
 
 
@@ -110,15 +177,16 @@ def monitoring_configmap() -> str:
         'alerts.yml': 'infra/prometheus/alerts.yml',
         'datasource.yml': 'infra/grafana/provisioning/datasource.yml',
         'dashboards.yml': 'infra/grafana/provisioning/dashboards.yml',
-        'hexaorders.json': 'infra/grafana/dashboards/hexaorders.json',
-        'hexaorders-business.json': 'infra/grafana/dashboards/hexaorders-business.json',
-        'hexaorders-risk.json': 'infra/grafana/dashboards/hexaorders-risk.json',
-        'hexaorders-api.json': 'infra/grafana/dashboards/hexaorders-api.json',
-        'hexaorders-infrastructure.json': 'infra/grafana/dashboards/hexaorders-infrastructure.json',
-        'hexaorders-security.json': 'infra/grafana/dashboards/hexaorders-security.json',
-        'hexaorders-logistics.json': 'infra/grafana/dashboards/hexaorders-logistics.json',
+        'polymer.json': 'infra/grafana/dashboards/polymer.json',
+        'polymer-business.json': 'infra/grafana/dashboards/polymer-business.json',
+        'polymer-risk.json': 'infra/grafana/dashboards/polymer-risk.json',
+        'polymer-api.json': 'infra/grafana/dashboards/polymer-api.json',
+        'polymer-infrastructure.json': 'infra/grafana/dashboards/polymer-infrastructure.json',
+        'polymer-security.json': 'infra/grafana/dashboards/polymer-security.json',
+        'polymer-logistics.json': 'infra/grafana/dashboards/polymer-logistics.json',
+        'polymer-integrations.json': 'infra/grafana/dashboards/polymer-integrations.json',
     }
-    doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'hexaorders'},
+    doc = {'apiVersion': 'v1', 'kind': 'ConfigMap', 'metadata': {'name': 'monitoring-config', 'namespace': 'polymer'},
            'data': {key: read_text(ROOT / value) for key, value in paths.items()}}
     return json.dumps(doc, ensure_ascii=False, indent=2) + '\n'
 
@@ -131,7 +199,7 @@ def main() -> None:
     for name, expected in outputs.items():
         target = ROOT / name
         if args.check:
-            if not target.exists() or read_text(target) != expected:
+            if not target.exists() or canonical(read_text(target)) != canonical(expected):
                 raise SystemExit(f'Entregable desactualizado: {name}; ejecutar python tools/generate_delivery.py')
         else:
             target.write_text(expected, encoding='utf-8', newline='\n')

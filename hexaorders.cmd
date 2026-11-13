@@ -1,17 +1,6 @@
 @echo off
-rem HexaOrders - lanzador para Windows. Ejecuta tools\hexaorders.ps1 con PowerShell 7 si
-rem esta instalado (pwsh) o con Windows PowerShell 5.1 incluido en Windows.
-rem -ExecutionPolicy Bypass afecta solo a este proceso: no cambia la politica del equipo.
-rem Uso: hexaorders.cmd start ^| status ^| logs ^| stop [-RemoveData] ^| verify ^| help
-setlocal
-set "HEXA_PS=powershell"
-where pwsh >nul 2>nul && set "HEXA_PS=pwsh"
-if "%~1"=="" (
-    "%HEXA_PS%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\hexaorders.ps1" help
-    echo.
-    echo Ejemplo: hexaorders.cmd start
-    pause
-    exit /b 0
-)
-"%HEXA_PS%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\hexaorders.ps1" %*
+rem Alias de compatibilidad: el lanzador del proyecto ahora es polymer.cmd (mismos comandos).
+rem Se conserva para que los accesos directos y la documentacion antigua sigan funcionando.
+echo Aviso: hexaorders.cmd es un alias. Usa polymer.cmd %*
+call "%~dp0polymer.cmd" %*
 exit /b %ERRORLEVEL%

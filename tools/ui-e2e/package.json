@@ -1,7 +1,7 @@
 {
-  "name": "hexaorders-ui-e2e",
+  "name": "polymer-ui-e2e",
   "private": true,
-  "description": "Prueba end-to-end de la interfaz de HexaOrders contra el stack real (Docker Compose).",
+  "description": "Prueba end-to-end de la interfaz de POLYMER (POLYMER) contra el stack real (Docker Compose).",
   "scripts": {
     "test": "node ui-e2e.js"
   },

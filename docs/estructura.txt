@@ -1,10 +1,10 @@
-hexaorders/
+polymer/
 ├── .github/
 │   └── workflows/
 │       └── verify.yml
 ├── docs/
 │   ├── demo/
-│   │   ├── HexaOrders.postman_collection.json
+│   │   ├── POLYMER.postman_collection.json
 │   │   ├── README.md
 │   │   └── requests.http
 │   ├── english/
@@ -20,7 +20,7 @@ hexaorders/
 ├── infra/
 │   ├── grafana/
 │   │   ├── dashboards/
-│   │   │   └── hexaorders.json
+│   │   │   └── polymer.json
 │   │   ├── provisioning/
 │   │   │   ├── dashboards.yml
 │   │   │   └── datasource.yml
@@ -43,7 +43,7 @@ hexaorders/
 │   │   │   ├── main/
 │   │   │   │   ├── java/
 │   │   │   │   │   └── com/
-│   │   │   │   │       └── hexaorders/
+│   │   │   │   │       └── polymer/
 │   │   │   │   │           ├── adapter/
 │   │   │   │   │           │   ├── in/
 │   │   │   │   │           │   │   └── web/
@@ -90,7 +90,7 @@ hexaorders/
 │   │   │   └── test/
 │   │   │       └── java/
 │   │   │           └── com/
-│   │   │               └── hexaorders/
+│   │   │               └── polymer/
 │   │   │                   ├── adapter/
 │   │   │                   │   ├── HttpRiskAssessmentAdapterTest.java
 │   │   │                   │   └── OrderControllerTest.java
@@ -128,7 +128,7 @@ hexaorders/
 │       └── requirements.txt
 ├── tools/
 │   ├── generate_delivery.py
-│   ├── hexaorders.ps1
+│   ├── polymer.ps1
 │   ├── init-env.ps1
 │   ├── smoke.py
 │   ├── ui-e2e/
@@ -139,6 +139,6 @@ hexaorders/
 ├── .gitattributes
 ├── .gitignore
 ├── docker-compose.yml
-├── hexaorders.cmd
+├── polymer.cmd
 ├── README.md
 └── requirements-tools.txt

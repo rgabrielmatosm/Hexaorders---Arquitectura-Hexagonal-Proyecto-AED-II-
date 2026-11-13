@@ -2,15 +2,16 @@
 // qué navegación mostrar. Un botón oculto no protege nada; el servidor responde 401/403.
 
 import { authApi, forgetCsrf, refreshCsrf } from './api.js';
+import { t } from './i18n.js';
 
 let current = null; // { id, username, displayName, roles: [] } | null
 
 export const ROLE_LABELS = {
-  CUSTOMER: 'Cliente',
-  ADMIN: 'Administración',
-  ORDER_OPERATOR: 'Operador de pedidos',
-  LOGISTICS_OPERATOR: 'Operador logístico',
-  OBSERVABILITY_VIEWER: 'Observabilidad',
+  CUSTOMER: t('Cliente'),
+  ADMIN: t('Administración'),
+  ORDER_OPERATOR: t('Operador de pedidos'),
+  LOGISTICS_OPERATOR: t('Operador logístico'),
+  OBSERVABILITY_VIEWER: t('Observabilidad'),
 };
 
 /** Página de inicio de cada rol tras iniciar sesión (páginas HTML reales del sitio multipágina). */
@@ -25,7 +26,7 @@ export function homeFor(user) {
   return '/catalogo.html';
 }
 
-function emit() { window.dispatchEvent(new CustomEvent('hexa:session', { detail: current })); }
+function emit() { window.dispatchEvent(new CustomEvent('polymer:session', { detail: current })); }
 
 export const session = {
   user: () => current,

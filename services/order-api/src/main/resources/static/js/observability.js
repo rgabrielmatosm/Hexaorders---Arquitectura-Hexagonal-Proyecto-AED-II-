@@ -117,9 +117,9 @@ export async function refreshObservability() {
 }
 
 export function initObservability() {
-  $('#link-grafana').href = `${GRAFANA_URL}/d/hexaorders`;
+  $('#link-grafana').href = `${GRAFANA_URL}/d/polymer`;
   $('#link-prometheus').href = `${PROMETHEUS_URL}/targets`;
-  window.addEventListener('hexa:api-status', (event) => {
+  window.addEventListener('polymer:api-status', (event) => {
     apiState = event.detail;
   });
 }

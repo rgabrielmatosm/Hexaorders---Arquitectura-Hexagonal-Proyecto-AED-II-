@@ -1,4 +1,4 @@
-// Navegación de HexaOrders.
+// Navegación de POLYMER (sitio multipágina).
 //
 // v4 — sitio multipágina: cada página HTML real (catalogo.html, admin/usuarios.html…) declara en
 // <body data-route="…"> qué vista renderiza, y esta capa la busca en el registro de rutas.
@@ -7,12 +7,13 @@
 // que ahora redirige a la página real para no romper enlaces guardados.
 
 import { session } from './session.js';
+import { localizeHref, t } from './i18n.js';
 
 const routes = [];
 let current = null;
 
 /** path con parámetros ":id"; roles = roles permitidos (vacío = público, 'auth' = cualquier sesión). */
-export function route(path, render, { roles = [], title = 'HexaOrders' } = {}) {
+export function route(path, render, { roles = [], title = 'POLYMER' } = {}) {
   const keys = [];
   const pattern = new RegExp(`^${path.replace(/:[a-zA-Z]+/g, (m) => { keys.push(m.slice(1)); return '([^/]+)'; })}$`);
   routes.push({ path, pattern, keys, render, roles, title });
@@ -26,6 +27,11 @@ const PAGE_URLS = [
   [/^\/tienda$/, () => '/catalogo.html'],
   [/^\/producto\/([^/]+)$/, (id) => `/producto.html?id=${encodeURIComponent(id)}`],
   [/^\/carrito$/, () => '/carrito.html'],
+  [/^\/ofertas$/, () => '/ofertas.html'],
+  [/^\/ayuda$/, () => '/ayuda.html'],
+  [/^\/empresa$/, () => '/empresa.html'],
+  [/^\/legal$/, () => '/legal.html'],
+  [/^\/libro-reclamaciones$/, () => '/libro-reclamaciones.html'],
   [/^\/checkout$/, () => '/checkout.html'],
   [/^\/entrar$/, () => '/login.html'],
   [/^\/registro$/, () => '/registro.html'],
@@ -54,6 +60,10 @@ const PAGE_URLS = [
  * HTML. Las URLs que ya son páginas ("/catalogo.html", "/laboratorio.html#panel") no cambian.
  */
 export function link(target) {
+  return localizeHref(pageLink(target));
+}
+
+function pageLink(target) {
   let value = String(target || '/');
   if (value.startsWith('#/')) value = value.slice(1);
   if (!value.startsWith('/') || /\.html(\?|#|$)/.test(value) || value === '/') return value;
@@ -108,11 +118,11 @@ async function render(r, params) {
   if (r.roles.length) {
     if (!session.isAuthenticated()) {
       const here = window.location.pathname + window.location.search;
-      window.location.replace(`/login.html?next=${encodeURIComponent(here)}`);
+      window.location.replace(localizeHref(`/login.html?next=${encodeURIComponent(here)}`));
       return;
     }
     if (!r.roles.includes('auth') && !session.has(...r.roles)) {
-      messageView(root, 'Acceso restringido', 'Tu rol no tiene acceso a esta sección. El servidor también lo impide.', '/', 'Volver al inicio');
+      messageView(root, t('Acceso restringido'), t('Tu rol no tiene acceso a esta sección. El servidor también lo impide.'), '/', t('Volver al inicio'));
       return;
     }
   }
@@ -122,8 +132,8 @@ async function render(r, params) {
     current.cleanup = (await r.render(root, params)) || null;
   } catch (error) {
     const status = error && error.status;
-    if (status === 404) messageView(root, 'No encontrado', error.message || 'El recurso no existe o no te pertenece.', '/', 'Volver al inicio');
-    else messageView(root, 'No se pudo cargar la sección', error && error.message ? error.message : String(error), window.location.href, 'Reintentar');
+    if (status === 404) messageView(root, t('No encontrado'), error.message || t('El recurso no existe o no te pertenece.'), '/', t('Volver al inicio'));
+    else messageView(root, t('No se pudo cargar la sección'), error && error.message ? error.message : String(error), window.location.href, t('Reintentar'));
   } finally {
     root.removeAttribute('aria-busy');
   }
@@ -136,16 +146,16 @@ async function render(r, params) {
 export async function startPage(path) {
   const r = routes.find((candidate) => candidate.path === path);
   const root = document.getElementById('view-root');
-  if (!r) { messageView(root, 'Página no disponible', `No hay ninguna vista registrada para ${path}.`, '/', 'Volver al inicio'); return; }
+  if (!r) { messageView(root, t('Página no disponible'), t('No hay ninguna vista registrada para {0}.', path), '/', t('Volver al inicio')); return; }
   const query = new URLSearchParams(window.location.search);
   const fixed = JSON.parse(document.body.dataset.params || '{}');
   const params = { query };
   for (const key of r.keys) params[key] = fixed[key] ?? query.get(key) ?? '';
   if (r.keys.includes('id') && !params.id) {
-    messageView(root, 'Falta el identificador', 'Esta página necesita un parámetro ?id= en la URL.', '/', 'Volver al inicio');
+    messageView(root, t('Falta el identificador'), t('Esta página necesita un parámetro ?id= en la URL.'), '/', t('Volver al inicio'));
     return;
   }
-  document.title = `${document.body.dataset.title || r.title} · HexaOrders`;
+  document.title = `${t(document.body.dataset.title || r.title)} · POLYMER`;
   await render(r, params);
 }
 

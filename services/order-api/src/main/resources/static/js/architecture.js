@@ -9,7 +9,7 @@
 import { ApiError, ordersApi } from './api.js';
 import { $, $$, el, reducedMotion, toast } from './ui.js';
 
-const JAVA = 'services/order-api/src/main/java/com/hexaorders/';
+const JAVA = 'services/order-api/src/main/java/com/polymer/';
 const PY = 'services/risk-engine/risk_engine/';
 
 const NODES = [
@@ -213,7 +213,7 @@ function drawEdges(highlight = new Set(), activeEdges = new Set()) {
   const ns = 'http://www.w3.org/2000/svg';
   svg.replaceChildren();
   const defs = document.createElementNS(ns, 'defs');
-  for (const [id, color] of [['arrow', 'rgba(148,163,184,0.45)'], ['arrow-related', '#A78BFA'], ['arrow-active', '#10B981']]) {
+  for (const [id, color] of [['arrow', 'rgba(148,163,184,0.45)'], ['arrow-related', '#A6B8FF'], ['arrow-active', '#10B981']]) {
     const marker = document.createElementNS(ns, 'marker');
     marker.setAttribute('id', id);
     marker.setAttribute('viewBox', '0 0 10 10');
@@ -412,7 +412,7 @@ async function runRequest() {
     } catch (error) {
       rows.push(evidenceRow('Relectura GET /api/orders/{id}', `falló: ${error.message}`));
     }
-    window.dispatchEvent(new CustomEvent('hexa:orders-changed'));
+    window.dispatchEvent(new CustomEvent('polymer:orders-changed'));
   } else {
     rows.push(evidenceRow('Estado HTTP', failure.status ? String(failure.status) : 'sin respuesta'));
     if (failure.title) rows.push(evidenceRow('Título (ProblemDetail)', failure.title));

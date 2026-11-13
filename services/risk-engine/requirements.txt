@@ -1,16 +1,37 @@
-# Fully pinned runtime dependency set, resolved for Python 3.12 on 2026-10-19.
+# Fully pinned runtime dependency set, resolved for Python 3.12 on 2026-11-02.
+# v5: OpenTelemetry (trazas OTLP hacia otel-collector → Tempo), activo solo si el collector existe.
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.15.1
+asgiref==3.13.0
+certifi==2026.10.18
+charset-normalizer==3.5.2
 click==8.5.0
 fastapi==0.146.0
+googleapis-common-protos==1.76.0
 h11==0.16.0
 idna==3.20
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
+opentelemetry-exporter-http-transport==0.66b2
+opentelemetry-exporter-otlp-common==0.66b2
+opentelemetry-exporter-otlp-proto-common==1.45.2
+opentelemetry-exporter-otlp-proto-http==1.45.2
+opentelemetry-instrumentation==0.66b2
+opentelemetry-instrumentation-asgi==0.66b2
+opentelemetry-instrumentation-fastapi==0.66b2
+opentelemetry-proto==1.45.2
+opentelemetry-sdk==1.45.2
+opentelemetry-semantic-conventions==0.66b2
+opentelemetry-util-http==0.66b2
+packaging==26.3
+prometheus_client==0.26.0
+protobuf==7.36.2
 pydantic==2.14.1
-pydantic-core==2.50.1
+pydantic_core==2.50.1
+requests==2.34.2
 starlette==1.9.0
-typing-extensions==4.16.0
+typing_extensions==4.16.0
 typing-inspection==0.4.4
+urllib3==2.8.0
 uvicorn==0.53.0
-prometheus-client==0.26.0
+wrapt==2.5.2

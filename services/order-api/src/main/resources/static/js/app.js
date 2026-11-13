@@ -1,4 +1,4 @@
-// Punto de entrada del frontend de HexaOrders (módulos ES nativos, sin frameworks).
+// Punto de entrada del frontend de POLYMER (módulos ES nativos, sin frameworks).
 
 import { ordersApi, prometheusApi, reportApiStatus } from './api.js';
 import { initArchitecture } from './architecture.js';
@@ -16,7 +16,7 @@ const DATA_REFRESH_MS = 20000;
 const OBS_REFRESH_MS = 15000;
 
 // ---- Estado de la API en la barra superior --------------------------------
-window.addEventListener('hexa:api-status', ({ detail }) => {
+window.addEventListener('polymer:api-status', ({ detail }) => {
   const pill = $('#api-status');
   pill.querySelector('.dot').className = `dot ${detail.ok ? 'dot--ok' : 'dot--error'}`;
   pill.querySelector('.status-pill__text').textContent = detail.ok ? 'API conectada' : 'API no disponible';
@@ -59,13 +59,13 @@ function setSplashCheck(name, ok, text) {
 function initSplash(apiCheck) {
   const splash = $('#splash');
   let seen = false;
-  try { seen = sessionStorage.getItem('hexaorders.splash') === 'seen'; } catch { /* almacenamiento no disponible */ }
+  try { seen = sessionStorage.getItem('polymer.splash') === 'seen'; } catch { /* almacenamiento no disponible */ }
   if (seen) { splash.hidden = true; return; }
   let closed = false;
   const close = () => {
     if (closed) return;
     closed = true;
-    try { sessionStorage.setItem('hexaorders.splash', 'seen'); } catch { /* sin almacenamiento */ }
+    try { sessionStorage.setItem('polymer.splash', 'seen'); } catch { /* sin almacenamiento */ }
     splash.classList.add('is-leaving');
     setTimeout(() => { splash.hidden = true; }, reducedMotion() ? 0 : 460);
     document.removeEventListener('keydown', onKey);
@@ -168,10 +168,10 @@ function markActiveRoute(path) {
 // ---- Arranque ----------------------------------------------------------------
 async function start() {
   initGrid($('#grid-canvas'));
-  window.addEventListener('hexa:session', renderAccount);
-  window.addEventListener('hexa:cart', renderCartCount);
-  window.addEventListener('hexa:route', (event) => markActiveRoute(event.detail.path));
-  window.addEventListener('hexa:unauthenticated', () => {
+  window.addEventListener('polymer:session', renderAccount);
+  window.addEventListener('polymer:cart', renderCartCount);
+  window.addEventListener('polymer:route', (event) => markActiveRoute(event.detail.path));
+  window.addEventListener('polymer:unauthenticated', () => {
     if (session.isAuthenticated()) { session.expire(); toast('Tu sesión ha caducado: vuelve a iniciar sesión', 'warn'); }
   });
   renderCartCount();
@@ -189,7 +189,7 @@ async function start() {
   firstLoad.finally(() => refreshObservability());
 
   $$('[data-refresh]').forEach((button) => button.addEventListener('click', refreshData));
-  window.addEventListener('hexa:orders-changed', () => { refreshData(); });
+  window.addEventListener('polymer:orders-changed', () => { refreshData(); });
 
   setInterval(() => { if (!document.hidden) refreshData(); }, DATA_REFRESH_MS);
   setInterval(() => { if (!document.hidden) refreshObservability(); }, OBS_REFRESH_MS);

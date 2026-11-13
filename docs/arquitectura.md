@@ -1,4 +1,4 @@
-# HexaOrders: defensa técnica leyendo docker-compose.yml
+# POLYMER: defensa técnica leyendo docker-compose.yml
 
 La aplicación permite crear y consultar pedidos en USD. Java coordina el caso de uso; Python asigna riesgo mediante reglas explicables; PostgreSQL conserva el pedido. El resultado es `APPROVED` o `REVIEW`. No hay aprendizaje automático, procesamiento asíncrono ni cola en esta versión.
 
@@ -26,7 +26,7 @@ El repositorio mantiene fuentes normales bajo `services/` para poder editarlos y
 | `networks` | `data`, `compute` y `telemetry` son internas; `edge` permite acceso a los servicios publicados. Las redes no son un diagrama de dependencias Java. | Separación de conectividad |
 | `volumes` | Conserva datos PostgreSQL, TSDB Prometheus y SQLite/configuración Grafana al recrear contenedores. | Persistencia operativa |
 | `secrets` | Monta `./secrets/*.txt` (generados en el destino, fuera de Git) como archivos de solo lectura en `/run/secrets`; es la única fuente que Compose admite en servicios `read_only`. | `DB_PASSWORD_FILE` y `GF_SECURITY_ADMIN_PASSWORD__FILE` |
-| Imágenes `hexaorders/prometheus` y `hexaorders/grafana` | Contenido íntegro de configuración y dashboard dentro de la imagen, sin archivos externos y compatible con `read_only`. | `infra/prometheus/Dockerfile`, `infra/grafana/Dockerfile` |
+| Imágenes `polymer/prometheus` y `polymer/grafana` | Contenido íntegro de configuración y dashboard dentro de la imagen, sin archivos externos y compatible con `read_only`. | `infra/prometheus/Dockerfile`, `infra/grafana/Dockerfile` |
 
 `healthcheck` decide si un servicio responde; `restart: unless-stopped` actúa cuando el proceso termina. Docker no reinicia automáticamente un proceso que sigue vivo por estar `unhealthy`. Tras una caída de Python, Java devuelve 503 y registra un fallo; la recuperación de Python permite aceptar nuevas solicitudes. Su liveness no depende de otros servicios; la readiness Java incluye DB para señalar si puede consultar pedidos. La salud de Python se observa por su propia sonda y por Prometheus.
 
@@ -89,7 +89,7 @@ Una falla o respuesta inválida de Python produce 503 **antes de insertar**. Una
 
 Los contadores no equivalen a un inventario histórico de la tabla: se reinician con el proceso; `rate`/`increase` contemplan esos reinicios. Las gráficas de tasas y p95 necesitan tráfico y varias muestras; genera pedidos durante al menos 30 segundos para la demo. No se usan etiquetas por cliente o UUID, evitando alta cardinalidad.
 
-Las reglas `HexaOrdersServiceDown` y `RiskRequestsFailing` aparecen en la página Alerts de Prometheus. Este proyecto no incluye Alertmanager ni envíos de correo. El stack observa aplicaciones y Prometheus; no se incluye exporter de métricas internas de PostgreSQL ni del host.
+Las reglas `PolymerServiceDown` y `RiskRequestsFailing` aparecen en la página Alerts de Prometheus. Este proyecto no incluye Alertmanager ni envíos de correo. El stack observa aplicaciones y Prometheus; no se incluye exporter de métricas internas de PostgreSQL ni del host.
 
 ## Persistencia y límites de operación
 

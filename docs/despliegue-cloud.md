@@ -15,16 +15,16 @@ $ZONE = 'us-central1-a'
 $ADMIN_CIDR = 'TU_IP_PUBLICA/32'
 gcloud config set project $PROJECT_ID
 gcloud services enable compute.googleapis.com
-gcloud compute networks create hexaorders-vpc --subnet-mode=auto
-gcloud compute firewall-rules create hexaorders-ssh `
-  --network=hexaorders-vpc --direction=INGRESS `
+gcloud compute networks create polymer-vpc --subnet-mode=auto
+gcloud compute firewall-rules create polymer-ssh `
+  --network=polymer-vpc --direction=INGRESS `
   --action=ALLOW --rules=tcp:22 `
-  --source-ranges=$ADMIN_CIDR --target-tags=hexaorders-ssh
-gcloud compute instances create hexaorders-demo `
+  --source-ranges=$ADMIN_CIDR --target-tags=polymer-ssh
+gcloud compute instances create polymer-demo `
   --zone=$ZONE --machine-type=e2-standard-2 `
   --image-family=ubuntu-2404-lts-amd64 --image-project=ubuntu-os-cloud `
   --boot-disk-size=30GB --boot-disk-type=pd-balanced `
-  --network=hexaorders-vpc --tags=hexaorders-ssh `
+  --network=polymer-vpc --tags=polymer-ssh `
   --no-service-account --no-scopes
 ```
 
@@ -37,16 +37,16 @@ export ZONE='us-central1-a'
 export ADMIN_CIDR='TU_IP_PUBLICA/32'
 gcloud config set project "$PROJECT_ID"
 gcloud services enable compute.googleapis.com
-gcloud compute networks create hexaorders-vpc --subnet-mode=auto
-gcloud compute firewall-rules create hexaorders-ssh \
-  --network=hexaorders-vpc --direction=INGRESS \
+gcloud compute networks create polymer-vpc --subnet-mode=auto
+gcloud compute firewall-rules create polymer-ssh \
+  --network=polymer-vpc --direction=INGRESS \
   --action=ALLOW --rules=tcp:22 \
-  --source-ranges="$ADMIN_CIDR" --target-tags=hexaorders-ssh
-gcloud compute instances create hexaorders-demo \
+  --source-ranges="$ADMIN_CIDR" --target-tags=polymer-ssh
+gcloud compute instances create polymer-demo \
   --zone="$ZONE" --machine-type=e2-standard-2 \
   --image-family=ubuntu-2404-lts-amd64 --image-project=ubuntu-os-cloud \
   --boot-disk-size=30GB --boot-disk-type=pd-balanced \
-  --network=hexaorders-vpc --tags=hexaorders-ssh \
+  --network=polymer-vpc --tags=polymer-ssh \
   --no-service-account --no-scopes
 ```
 
@@ -55,8 +55,8 @@ La VPC dedicada recibe únicamente la regla SSH indicada. El ejemplo no añade r
 Desde la carpeta que contiene el YAML, usando **el mismo equipo cuya IP autorizaste** (PowerShell):
 
 ```powershell
-gcloud compute scp docker-compose.yml hexaorders-demo:~/docker-compose.yml --zone=$ZONE
-gcloud compute ssh hexaorders-demo --zone=$ZONE
+gcloud compute scp docker-compose.yml polymer-demo:~/docker-compose.yml --zone=$ZONE
+gcloud compute ssh polymer-demo --zone=$ZONE
 ```
 
 En Bash, igual con `--zone="$ZONE"`. En Windows, `gcloud compute ssh` abre la sesión con PuTTY, que el instalador de Google Cloud CLI incluye. Si creaste recursos desde Cloud Shell y te conectarás desde tu PC, ejecuta allí primero `gcloud auth login`, configura el mismo proyecto y define `$ZONE = 'us-central1-a'`. [Transferir con SCP](https://docs.cloud.google.com/sdk/gcloud/reference/compute/scp).
@@ -93,9 +93,9 @@ Exige **Docker Compose >= 2.23.1**, y BuildKit, porque el entregable construye s
 Dentro de la VM, mueve el YAML a su directorio estable y genera los secretos una sola vez. Conserva `secrets/`: PostgreSQL mantiene sus credenciales dentro del volumen existente y cambiar estos archivos por sí solo no rota la contraseña de una base ya inicializada.
 
 ```bash
-mkdir -p ~/hexaorders/secrets
-mv ~/docker-compose.yml ~/hexaorders/docker-compose.yml
-cd ~/hexaorders
+mkdir -p ~/polymer/secrets
+mv ~/docker-compose.yml ~/polymer/docker-compose.yml
+cd ~/polymer
 chmod 700 secrets
 for name in db_password grafana_password; do
   [ -s "secrets/$name.txt" ] || openssl rand -hex 24 | tr -d '\n' > "secrets/$name.txt"
@@ -125,7 +125,7 @@ El pedido de importe 125.50 debe quedar aprobado con score 10. Un pedido de impo
 Desde una **segunda terminal de tu equipo** (PowerShell), conserva abierta esta sesión. Las aplicaciones están publicadas en la interfaz loopback de la VM:
 
 ```powershell
-gcloud compute ssh hexaorders-demo --zone=us-central1-a --ssh-flag="-N" `
+gcloud compute ssh polymer-demo --zone=us-central1-a --ssh-flag="-N" `
   --ssh-flag="-L 8080:127.0.0.1:8080" `
   --ssh-flag="-L 3000:127.0.0.1:3000" `
   --ssh-flag="-L 9091:127.0.0.1:9091"
@@ -134,21 +134,21 @@ gcloud compute ssh hexaorders-demo --zone=us-central1-a --ssh-flag="-N" `
 En Windows, gcloud usa PuTTY (`plink`), que admite `-N` y `-L puerto:destino:puerto`. Equivalente en Bash (Linux/macOS), con OpenSSH:
 
 ```bash
-gcloud compute ssh hexaorders-demo --zone=us-central1-a -- \
+gcloud compute ssh polymer-demo --zone=us-central1-a -- \
   -N -o ExitOnForwardFailure=yes \
   -L 127.0.0.1:8080:127.0.0.1:8080 \
   -L 127.0.0.1:3000:127.0.0.1:3000 \
   -L 127.0.0.1:9091:127.0.0.1:9091
 ```
 
-Abre [aplicación/API](http://127.0.0.1:8080), [Grafana](http://127.0.0.1:3000/d/hexaorders) y [Prometheus](http://127.0.0.1:9091) en tu navegador local. Grafana utiliza `admin` y la contraseña generada en la VM. Consulta `~/hexaorders/secrets/grafana_password.txt` en tu sesión privada cuando necesites iniciar sesión. Si alguno de los puertos locales está ocupado, cambia únicamente el primer número del reenvío correspondiente. [Reenvío SSH con gcloud](https://docs.cloud.google.com/sdk/gcloud/reference/compute/ssh).
+Abre [aplicación/API](http://127.0.0.1:8080), [Grafana](http://127.0.0.1:3000/d/polymer) y [Prometheus](http://127.0.0.1:9091) en tu navegador local. Grafana utiliza `admin` y la contraseña generada en la VM. Consulta `~/polymer/secrets/grafana_password.txt` en tu sesión privada cuando necesites iniciar sesión. Si alguno de los puertos locales está ocupado, cambia únicamente el primer número del reenvío correspondiente. [Reenvío SSH con gcloud](https://docs.cloud.google.com/sdk/gcloud/reference/compute/ssh).
 
 ## 5. Reinicio, actualización y conservación de datos
 
-En cada nueva sesión, entra a `~/hexaorders` antes de ejecutar Compose; los secretos se leen de `secrets/` sin pasos adicionales. `restart: unless-stopped` permite reiniciar servicios con Docker; un contenedor parado explícitamente permanece parado.
+En cada nueva sesión, entra a `~/polymer` antes de ejecutar Compose; los secretos se leen de `secrets/` sin pasos adicionales. `restart: unless-stopped` permite reiniciar servicios con Docker; un contenedor parado explícitamente permanece parado.
 
 ```bash
-cd ~/hexaorders
+cd ~/polymer
 sudo docker compose logs --tail=100
 sudo docker compose down
 sudo docker compose up -d --wait --wait-timeout 240
@@ -162,7 +162,7 @@ sudo docker compose exec -T db \
   pg_dump -U orders -d orders > "orders-$(date +%Y%m%d-%H%M%S).sql"
 ```
 
-Al acabar la presentación puedes detener la VM con `gcloud compute instances stop hexaorders-demo --zone=us-central1-a`. El disco y otros recursos asociados pueden seguir generando cargos; elimina deliberadamente los recursos que ya no necesites tras conservar lo que quieras recuperar.
+Al acabar la presentación puedes detener la VM con `gcloud compute instances stop polymer-demo --zone=us-central1-a`. El disco y otros recursos asociados pueden seguir generando cargos; elimina deliberadamente los recursos que ya no necesites tras conservar lo que quieras recuperar.
 
 ## AWS o Azure
 

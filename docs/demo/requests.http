@@ -1,4 +1,4 @@
-### HexaOrders — solicitudes de demostración (VS Code REST Client / JetBrains HTTP Client)
+### POLYMER — solicitudes de demostración (VS Code REST Client / JetBrains HTTP Client)
 @baseUrl = http://127.0.0.1:8080
 
 ### 1. Pedido aprobado: 125.50 → riesgo 10, APPROVED

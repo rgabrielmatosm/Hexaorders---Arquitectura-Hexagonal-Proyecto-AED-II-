@@ -1,6 +1,6 @@
-# Sitio web multipágina de HexaOrders (v4)
+# Sitio web multipágina de POLYMER (v4)
 
-HexaOrders tiene **39 páginas HTML reales generadas** más el **laboratorio original** (`laboratorio.html`). Cada página tiene su propia URL, se puede abrir directamente, funciona tras recargar, tiene navegación hacia el resto, respeta los permisos del rol (en el navegador **y** en Spring Security), consume la API real y gestiona los estados de carga, error y vacío.
+POLYMER tiene **39 páginas HTML reales generadas** más el **laboratorio original** (`laboratorio.html`). Cada página tiene su propia URL, se puede abrir directamente, funciona tras recargar, tiene navegación hacia el resto, respeta los permisos del rol (en el navegador **y** en Spring Security), consume la API real y gestiona los estados de carga, error y vacío.
 
 ## 1. Cómo está construido
 

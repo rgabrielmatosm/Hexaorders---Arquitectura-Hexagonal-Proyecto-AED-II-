@@ -53,11 +53,15 @@ for path in dashboards:
     if data.get('uid') in uids:
         fail(f'uid duplicado {data.get("uid")} en {path.name} y {uids[data.get("uid")]}')
     uids[data.get('uid')] = path.name
+    baseline_dashboard = any(d['uid'] == data.get('uid') for d in BASELINE['grafana_dashboards'])
     for panel in data.get('panels', []):
         if panel.get('type') in ('row', 'text'):
             continue
-        if panel.get('datasource', {}).get('uid') != 'prometheus':
-            fail(f'{path.name}: panel {panel.get("id")} no usa el datasource uid=prometheus')
+        uid = panel.get('datasource', {}).get('uid')
+        # v5: los dashboards NUEVOS pueden usar también Loki y Tempo; los de la línea base, solo Prometheus.
+        allowed = {'prometheus'} if baseline_dashboard else {'prometheus', 'loki', 'tempo'}
+        if uid not in allowed:
+            fail(f'{path.name}: panel {panel.get("id")} usa el datasource uid={uid} (permitidos: {sorted(allowed)})')
 
 # 3. Datasources.
 datasources = yaml.safe_load((ROOT / 'infra/grafana/provisioning/datasource.yml').read_text(encoding='utf-8'))['datasources']
@@ -65,6 +69,17 @@ for old in BASELINE['grafana_datasources']:
     match = [d for d in datasources if d.get('uid') == old['uid']]
     if not match or any(match[0].get(key) != old[key] for key in ('name', 'type', 'url')):
         fail(f'Datasource {old["uid"]} eliminado o modificado')
+
+# 3b. v5: fuentes Loki y Tempo en un archivo propio, copiado en la imagen; datasource.yml no se toca.
+extra = ROOT / 'infra/grafana/provisioning/datasource-logs-traces.yml'
+if extra.exists():
+    extra_uids = {d.get('uid'): d.get('type') for d in yaml.safe_load(extra.read_text(encoding='utf-8'))['datasources']}
+    if extra_uids.get('loki') != 'loki' or extra_uids.get('tempo') != 'tempo':
+        fail('datasource-logs-traces.yml: faltan las fuentes loki y tempo')
+    if 'provisioning/datasource-logs-traces.yml' not in grafana_dockerfile:
+        fail('datasource-logs-traces.yml no se copia en la imagen de Grafana')
+    if set(extra_uids) & {d.get('uid') for d in datasources}:
+        fail('datasource-logs-traces.yml repite un uid de datasource.yml')
 
 # 4. Prometheus: global, ficheros de reglas y jobs previos intactos.
 prometheus = yaml.safe_load((ROOT / 'infra/prometheus/prometheus.yml').read_text(encoding='utf-8'))

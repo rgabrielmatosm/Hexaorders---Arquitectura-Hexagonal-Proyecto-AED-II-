@@ -1,4 +1,4 @@
-/* HexaOrders — cuadrícula interactiva, animaciones y movimiento reducido. */
+/* POLYMER — cuadrícula interactiva, animaciones y movimiento reducido. */
 
 /* Cuadrícula interactiva: un único <canvas> fijo detrás del contenido. */
 .grid-canvas {
@@ -9,8 +9,8 @@
 body::after {
   content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(70% 55% at 50% 0%, rgba(139, 92, 246, 0.10), transparent 70%),
-    radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(11, 15, 20, 0.85) 100%);
+    radial-gradient(70% 55% at 50% 0%, rgba(61, 226, 208, 0.10), transparent 70%),
+    radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(16, 24, 39, 0.85) 100%);
 }
 .topbar, .splash, .toasts { z-index: 20; }
 .splash { z-index: 50; }
@@ -45,7 +45,7 @@ body::after {
 
 /* Valor que cambia en una estadística */
 @keyframes value-flash {
-  from { text-shadow: 0 0 18px rgba(167, 139, 250, 0.9); }
+  from { text-shadow: 0 0 18px rgba(166, 184, 255, 0.9); }
   to { text-shadow: none; }
 }
 .stat__value.is-updated { animation: value-flash 1.2s var(--ease); }

@@ -1,3 +1,4 @@
+import { DEFAULT_LANG, lang, productName, t, td } from './i18n.js';
 // Cliente HTTP del frontend: único módulo que habla con el backend y con Prometheus.
 // No contiene reglas de negocio: el dominio Java es la autoridad.
 
@@ -28,7 +29,7 @@ export async function requestJson(url, { method = 'GET', body, timeout = DEFAULT
       signal: controller.signal,
     });
   } catch (error) {
-    const reason = error.name === 'AbortError' ? 'Tiempo de espera agotado' : 'Sin conexión con el servidor';
+    const reason = error.name === 'AbortError' ? t('Tiempo de espera agotado') : t('Sin conexión con el servidor');
     throw new ApiError(reason, { status: 0 });
   } finally {
     clearTimeout(timer);
@@ -41,7 +42,7 @@ export async function requestJson(url, { method = 'GET', body, timeout = DEFAULT
   }
   if (!response.ok) {
     // Spring devuelve ProblemDetail (RFC 9457): { title, detail, status }.
-    const message = (data && (data.detail || data.title)) || `Error HTTP ${response.status}`;
+    const message = (data && (data.detail || data.title)) || t('Error HTTP {0}', response.status);
     throw new ApiError(message, { status: response.status, title: (data && data.title) || '', body: data });
   }
   return { data, status: response.status, headers: response.headers, ms };
@@ -92,7 +93,7 @@ export async function grafanaReachable() {
 
 /** Notifica a la interfaz el resultado de la última llamada a la API Java. */
 export function reportApiStatus(ok, detail = '') {
-  window.dispatchEvent(new CustomEvent('hexa:api-status', { detail: { ok, detail, at: new Date() } }));
+  window.dispatchEvent(new CustomEvent('polymer:api-status', { detail: { ok, detail, at: new Date() } }));
 }
 
 // ---- Plataforma v3: escrituras con sesión y token CSRF ------------------------
@@ -130,7 +131,7 @@ export async function send(method, url, body, { headers = {}, retry = true } = {
       signal: controller.signal,
     });
   } catch (error) {
-    throw new ApiError(error.name === 'AbortError' ? 'Tiempo de espera agotado' : 'Sin conexión con el servidor', { status: 0 });
+    throw new ApiError(error.name === 'AbortError' ? t('Tiempo de espera agotado') : t('Sin conexión con el servidor'), { status: 0 });
   } finally {
     clearTimeout(timer);
   }
@@ -142,10 +143,10 @@ export async function send(method, url, body, { headers = {}, retry = true } = {
     return send(method, url, body, { headers, retry: false });
   }
   if (response.status === 401 && url !== '/api/auth/login') {
-    window.dispatchEvent(new CustomEvent('hexa:unauthenticated'));
+    window.dispatchEvent(new CustomEvent('polymer:unauthenticated'));
   }
   if (!response.ok) {
-    const message = (data && (data.detail || data.title)) || `Error HTTP ${response.status}`;
+    const message = (data && (data.detail || data.title)) || t('Error HTTP {0}', response.status);
     throw new ApiError(message, { status: response.status, title: (data && data.title) || '', body: data });
   }
   return { data, status: response.status, headers: response.headers };
@@ -166,19 +167,101 @@ export const authApi = {
   register: (payload) => post('/api/auth/register', payload),
 };
 
+// ---- Datos del catálogo en el idioma de la página -----------------------------------------------
+// Las categorías, frases comerciales, etiquetas técnicas, promociones y estados vienen en español
+// de la base de datos; se traducen aquí, en un único punto, con el mismo catálogo que la interfaz.
+// NO se traducen marcas, modelos, nombres de producto, SKU ni importes. Lo que no tenga traducción
+// se muestra en español (alternativa válida). La administración edita siempre los datos originales.
+const LONG_DESCRIPTION = /^(.+) es (.+)\. Sus características principales son (.+)\. Producto nuevo y sellado, con (\d+) meses de garantía de marca, comprobante electrónico y soporte postventa de Polymer\. Revisa la ficha técnica completa antes de comprar\.$/s;
+
+function localizeProduct(p) {
+  const originalName = p.name;
+  p.name = productName(p.name, p.brand);
+  for (const key of ['categoryName', 'mainCategoryName', 'promotionName', 'statusLabel', 'availabilityLabel']) p[key] = td(p[key]);
+  const specs = Array.isArray(p.specs) ? p.specs : [];
+  p.specs = specs.map((s) => ({ ...s, label: td(s.label), value: td(s.value) }));
+  if (p.description) p.description = p.description.split(' · ').map(td).join(' · ');
+  const match = typeof p.longDescription === 'string' && p.longDescription.match(LONG_DESCRIPTION);
+  if (match) {
+    const highlights = p.specs.slice(0, 5).map((s) => `${lang === 'de' ? s.label : s.label.toLowerCase()}: ${s.value}`).join('; ');
+    p.longDescription = t('{0} es {1}. Sus características principales son {2}. Producto nuevo y sellado, con {3} meses de garantía de marca, comprobante electrónico y soporte postventa de Polymer. Revisa la ficha técnica completa antes de comprar.',
+      match[1] === originalName ? p.name : match[1], td(match[2]), highlights, match[4]);
+  } else if (p.longDescription && lang !== DEFAULT_LANG) {
+    p.longDescriptionLang = 'es'; // texto libre sin traducción: se marca como español
+  }
+  return p;
+}
+
+function localizeCatalog(value) {
+  if (lang === DEFAULT_LANG || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(localizeCatalog);
+  if ('sku' in value) return localizeProduct(value);
+  const out = { ...value };
+  if (typeof out.name === 'string' && ('slug' in out || 'count' in out)) out.name = td(out.name);
+  if (typeof out.description === 'string' && 'slug' in out) out.description = td(out.description);
+  if (typeof out.label === 'string' && 'key' in out) out.label = td(out.label);
+  if (out.attributeLabels) out.attributeLabels = Object.fromEntries(Object.entries(out.attributeLabels).map(([k, v]) => [k, td(v)]));
+  for (const [key, child] of Object.entries(out)) {
+    if (child && typeof child === 'object' && key !== 'attributeLabels') out[key] = localizeCatalog(child);
+  }
+  return out;
+}
+
 export const catalogApi = {
-  categories: () => get('/api/catalog/categories'),
-  products: (q, category) => get(`/api/catalog/products${qs({ q, category })}`),
-  product: (id) => get(`/api/catalog/products/${encodeURIComponent(id)}`),
+  categories: () => get('/api/catalog/categories').then(localizeCatalog),
+  products: (q, category) => get(`/api/catalog/products${qs({ q, category })}`).then(localizeCatalog),
+  product: (id) => get(`/api/catalog/products/${encodeURIComponent(id)}`).then(localizeCatalog),
+  related: (id, limit = 8) => get(`/api/catalog/products/${encodeURIComponent(id)}/related?limit=${limit}`).then(localizeCatalog),
+  promotions: () => get('/api/catalog/promotions').then(localizeCatalog),
+  /** params: URLSearchParams o pares {clave: valor | [valores]}; los filtros técnicos van como attr.CLAVE. */
+  search: (params) => {
+    const search = params instanceof URLSearchParams ? params : new URLSearchParams();
+    if (!(params instanceof URLSearchParams)) {
+      Object.entries(params || {}).forEach(([key, value]) => {
+        (Array.isArray(value) ? value : [value]).filter((v) => v !== undefined && v !== null && v !== '').forEach((v) => search.append(key, v));
+      });
+    }
+    const text = search.toString();
+    return get(`/api/catalog/search${text ? `?${text}` : ''}`).then(localizeCatalog);
+  },
 };
 
+/**
+ * Datos de compra (opciones de entrega y pago, resúmenes, pedidos): las etiquetas vienen del dominio en
+ * español y se traducen aquí, en la presentación. Los nombres de producto de las líneas solo traducen su
+ * sustantivo genérico inicial; importes, códigos e identificadores no se tocan.
+ */
+const SHOP_TEXT_KEYS = new Set(['label', 'eta', 'detail', 'instructions', 'deliveryLabel', 'paymentLabel']);
+function localizeShop(value) {
+  if (lang === DEFAULT_LANG || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(localizeShop);
+  const out = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (typeof child === 'string' && SHOP_TEXT_KEYS.has(key)) out[key] = td(child);
+    else if (typeof child === 'string' && key === 'productName') out[key] = productName(child);
+    else out[key] = child && typeof child === 'object' ? localizeShop(child) : child;
+  }
+  return out;
+}
+
 export const shopApi = {
-  quote: (items) => post('/api/shop/quote', { items }),
+  quote: (items) => post('/api/shop/quote', { items }).then(localizeShop),
   /** La misma Idempotency-Key en un reintento devuelve el mismo pedido (nunca se duplica). */
   place: (items, idempotencyKey, shipping) => send('POST', '/api/shop/orders', shipping ? { items, shipping } : { items },
     { headers: { 'Idempotency-Key': idempotencyKey } }),
-  orders: () => get('/api/shop/orders'),
-  order: (id) => get(`/api/shop/orders/${encodeURIComponent(id)}`),
+  /** v6: totales con promociones y envío según el método elegido (también para visitantes). */
+  summary: (items, deliveryMethod, paymentMethod) => post('/api/shop/checkout-summary', { items, deliveryMethod, paymentMethod }).then(localizeShop),
+  options: () => get('/api/shop/checkout-options').then(localizeShop),
+  /** v6: entrega y pago elegidos en el checkout. */
+  checkout: (payload, idempotencyKey) => send('POST', '/api/shop/orders', payload, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  cart: () => get('/api/shop/cart'),
+  cartAdd: (productId, quantity) => post('/api/shop/cart/items', { productId, quantity }),
+  cartSet: (productId, quantity) => put(`/api/shop/cart/items/${productId}`, { quantity }),
+  cartRemove: (productId) => send('DELETE', `/api/shop/cart/items/${productId}`).then((r) => r.data),
+  cartClear: () => send('DELETE', '/api/shop/cart').then((r) => r.data),
+  cartMerge: (items) => post('/api/shop/cart/merge', { items }),
+  orders: () => get('/api/shop/orders').then(localizeShop),
+  order: (id) => get(`/api/shop/orders/${encodeURIComponent(id)}`).then(localizeShop),
   cancel: (id) => post(`/api/shop/orders/${encodeURIComponent(id)}/cancel`),
 };
 
@@ -186,6 +269,8 @@ export const accountApi = {
   me: () => get('/api/account/me'),
   profile: (displayName, email) => put('/api/account/profile', { displayName, email }),
   password: (currentPassword, newPassword) => send('PUT', '/api/account/password', { currentPassword, newPassword }),
+  /** Idioma preferido (correos de notificación). */
+  locale: (language) => send('PUT', '/api/account/locale', { language }),
 };
 
 export const adminApi = {
@@ -198,7 +283,12 @@ export const adminApi = {
   createProduct: (product) => post('/api/admin/products', product),
   updateProduct: (id, product) => put(`/api/admin/products/${id}`, product),
   adjustStock: (id, delta, reason) => post(`/api/admin/products/${id}/stock`, { delta, reason }),
-  createCategory: (slug, name) => post('/api/admin/categories', { slug, name }),
+  createCategory: (slug, name, parentId) => post('/api/admin/categories', { slug, name, parentId: parentId || null }),
+  categories: () => get('/api/admin/categories'),
+  promotions: () => get('/api/admin/promotions'),
+  createPromotion: (promotion) => post('/api/admin/promotions', promotion),
+  updatePromotion: (id, promotion) => put(`/api/admin/promotions/${id}`, promotion),
+  setPromotionActive: (id, enabled) => put(`/api/admin/promotions/${id}/active`, { enabled }),
   contactMessages: (limit = 50) => get(`/api/admin/contact-messages?limit=${limit}`),
 };
 

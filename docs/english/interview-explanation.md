@@ -1,14 +1,14 @@
-# HexaOrders v3 — Interview Explanation (5–8 minutes)
+# POLYMER v3 — Interview Explanation (5–8 minutes)
 
-A spoken script to present HexaOrders in a technical interview or portfolio review. It runs **about 6–7 minutes** at a calm pace (roughly 130 words per minute). The section times are guides. The demo cues in *italics* are optional: if you cannot share your screen, skip them.
+A spoken script to present POLYMER in a technical interview or portfolio review. It runs **about 6–7 minutes** at a calm pace (roughly 130 words per minute). The section times are guides. The demo cues in *italics* are optional: if you cannot share your screen, skip them.
 
-> Before you start: run `.\hexaorders.cmd start` and open the shop (`http://127.0.0.1:8080/#/tienda`), the admin area (log in as `admin`) and Grafana (`http://127.0.0.1:3000/d/hexaorders-business`). The demo password is in `secrets\demo_password.txt`.
+> Before you start: run `.\polymer.cmd start` and open the shop (`http://127.0.0.1:8080/#/tienda`), the admin area (log in as `admin`) and Grafana (`http://127.0.0.1:3000/d/polymer-business`). The demo password is in `secrets\demo_password.txt`.
 
 ---
 
 ## 1. Opening — what it is (≈ 45 s)
 
-"HexaOrders started as a university project to demonstrate **hexagonal architecture**, also called ports and adapters. It began as a small lab: a Java service receives an order, asks a Python risk engine for a score, and stores the decision in PostgreSQL.
+"POLYMER started as a university project to demonstrate **hexagonal architecture**, also called ports and adapters. It began as a small lab: a Java service receives an order, asks a Python risk engine for a score, and stores the decision in PostgreSQL.
 
 For version 3, I evolved it into a small **commerce and operations platform**. It has a public shop with a catalog, cart and demo checkout, five security roles, an order lifecycle with ten states, a logistics calendar, incidents, an audit log and six Grafana dashboards. The rule I set for myself was: **keep everything that already existed and only add**. The original API, the lab UI, the original dashboard, its metrics and its alerts all still work, and automated checks prove it."
 
@@ -66,7 +66,7 @@ There are limitations, and I document them. The checkout is a demo with no payme
 
 ## 8. Closing (≈ 15 s)
 
-"In short, HexaOrders shows that hexagonal architecture is not just a diagram. It let me grow a small lab into a multi-role platform while reusing the core, protecting existing data, and proving with automated checks that nothing that already worked was broken. Thank you. I'm happy to go deeper into any part."
+"In short, POLYMER shows that hexagonal architecture is not just a diagram. It let me grow a small lab into a multi-role platform while reusing the core, protecting existing data, and proving with automated checks that nothing that already worked was broken. Thank you. I'm happy to go deeper into any part."
 
 ---
 

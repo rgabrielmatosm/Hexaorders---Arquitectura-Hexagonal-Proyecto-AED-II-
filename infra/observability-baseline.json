@@ -2,9 +2,9 @@
   "captured_from_commit": "604394a",
   "grafana_dashboards": [
     {
-      "file": "infra/grafana/dashboards/hexaorders.json",
-      "uid": "hexaorders",
-      "title": "HexaOrders · Puertos, adaptadores y métricas",
+      "file": "infra/grafana/dashboards/polymer.json",
+      "uid": "polymer",
+      "title": "POLYMER · Puertos, adaptadores y métricas",
       "panels": [
         {
           "id": 1,
@@ -94,7 +94,7 @@
       "scrape_interval": "10s",
       "evaluation_interval": "10s",
       "external_labels": {
-        "project": "hexaorders"
+        "project": "polymer"
       }
     },
     "rule_files": [
@@ -126,7 +126,7 @@
   },
   "alert_rules": [
     {
-      "alert": "HexaOrdersServiceDown",
+      "alert": "PolymerServiceDown",
       "expr": "up{job=~\"order-api|risk-engine\"} == 0",
       "for": "30s"
     },

@@ -1,4 +1,4 @@
-# Publicar HexaOrders en tu GitHub
+# Publicar POLYMER en tu GitHub
 
 Ejecuta estos pasos desde la raíz del proyecto con Git y [GitHub CLI](https://cli.github.com/) instalados. Se publican el YAML autosuficiente y el material de apoyo. Las credenciales se generan por máquina y se excluyen mediante `.gitignore`.
 
@@ -21,7 +21,7 @@ git diff --cached --check
 La lista preparada no debe contener `.env`, `secrets/`, contraseñas, bases de datos ni resultados de compilación. Revisa también los valores de `k8s/` si los has personalizado. Si ya existe un repositorio, conserva su historia y su remoto: utiliza `git status` y `git remote -v` antes de seguir.
 
 ```powershell
-git commit -m "Implement HexaOrders with hexagonal architecture and Docker Compose"
+git commit -m "Implement POLYMER with hexagonal architecture and Docker Compose"
 ```
 
 ## 2. Crear y subir el remoto
@@ -30,7 +30,7 @@ Autentícate mediante el navegador y crea un repositorio privado en tu cuenta. S
 
 ```powershell
 gh auth login --hostname github.com --git-protocol https --web
-gh repo create TU_USUARIO/hexaorders --private --source=. --remote=origin --push
+gh repo create TU_USUARIO/polymer --private --source=. --remote=origin --push
 gh repo view --web
 ```
 
@@ -39,7 +39,7 @@ Comparte acceso con tu profesor desde la configuración del repositorio. Para un
 Si creaste antes un repositorio **vacío** desde la web, utiliza esta alternativa en lugar de `gh repo create`:
 
 ```powershell
-git remote add origin https://github.com/TU_USUARIO/hexaorders.git
+git remote add origin https://github.com/TU_USUARIO/polymer.git
 git push -u origin main
 ```
 
