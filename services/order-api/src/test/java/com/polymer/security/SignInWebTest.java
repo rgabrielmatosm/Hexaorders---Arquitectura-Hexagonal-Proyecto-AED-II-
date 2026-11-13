@@ -79,6 +79,7 @@ class SignInWebTest {
     @MockitoBean SignInUseCases signIn;
     @MockitoBean PaymentUseCases payments;
     @MockitoBean StoreUseCases store;
+    @MockitoBean com.polymer.application.port.in.TestimonialUseCases testimonials;
     @MockitoBean AdministrationUseCases administration;
     @MockitoBean OperationsUseCases operations;
     @MockitoBean LogisticsUseCases logistics;

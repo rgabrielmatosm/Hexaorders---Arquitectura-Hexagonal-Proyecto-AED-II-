@@ -33,12 +33,13 @@ Cada slice tiene un **rol que lo verifica** dentro del sistema. Ese rol es la cu
 | 7 | Cambiar un adaptador sin tocar el núcleo | El mismo puerto `RiskAssessmentPort` con otro adaptador (puntaje fijo) y la caché `CatalogCache` sin Redis | `.\polymer.cmd demo -Scenario adaptador` · `docs/final/DEMOSTRACION_HEXAGONAL.md` |
 | 8 | Microservicio de riesgo | `risk-engine` (FastAPI) también es hexagonal: dominio `risk.py`, caso de uso `ScoreRisk`, adaptador HTTP | http://localhost:8000/docs → `POST /score` con `amount` 1500 → `REVIEW` |
 | 9 | Compra y riesgo (cliente) | Carrito, checkout, evaluación de riesgo y pedido aprobado o en revisión | ENLACES.html → slice 03 → «Entrar como cliente» |
-| 10 | Google, código de 6 dígitos y «Recordarme» | Nuevo adaptador de entrada (OIDC) sin cambiar el dominio de cuentas; código por correo; dispositivo de confianza 30 días | http://localhost:8080/login.html · código en Mailpit http://localhost:8025 (o tu Gmail) |
+| 10 | Google, código de 6 dígitos y «Recordarme» | Nuevo adaptador de entrada (OIDC) sin cambiar el dominio de cuentas; «Iniciar sesión» rechaza a quien no tiene cuenta y «Registrarse» la crea; código por correo; dispositivo de confianza 30 días | http://localhost:8080/login.html · código en Mailpit http://localhost:8025 (o tu Gmail) |
 | 11 | Pagos: tarjeta al instante, Yape con 60 s | Puertos `CardGateway`, `WalletGateway`, `PaymentWindow` (TTL en Redis); boleta con IGV por correo | `.\polymer.cmd demo -Scenario pagos` · `/cliente/pago.html` · Mailpit |
 | 12 | Operación interna por rol | Operador revisa riesgo, logística agenda entregas, admin gestiona catálogo y auditoría: permisos en el servidor | Slices 08, 09 y 10 → «Entrar como…» |
 | 13 | Eventos asíncronos | Outbox transaccional → RabbitMQ → consumidor idempotente → correo; si RabbitMQ cae, nada se pierde | http://localhost:15672 (cola `hexaorders.notifications`) · `.\polymer.cmd demo -Scenario rabbitmq-caida` |
 | 14 | Observabilidad | Métricas de cada puerto, logs y trazas Java → Python | Grafana http://localhost:3000 · Prometheus http://localhost:9091/targets · Alloy http://localhost:12345 |
 | 15 | Calidad verificada | 163 pruebas Java, 63 Python, E2E en navegador y CI con Docker real (4 jobs en verde) | `docs/final/RESULTADOS_VALIDACION.md` (ejecución del CI) |
+| 15 bis | El equipo (testimonios) | Slice nuevo hecho igual que los demás: dominio `Testimonial`, puerto `TestimonialUseCases`, adaptador JDBC; carrusel con nuestras fotos y LinkedIn y formulario para clientes | http://localhost:8080/nosotros.html#testimonios |
 | 16 | Conclusiones | El núcleo no cambió para añadir Google, pagos, Redis o RabbitMQ: solo se añadieron puertos y adaptadores | — |
 
 ## Capturas recomendadas

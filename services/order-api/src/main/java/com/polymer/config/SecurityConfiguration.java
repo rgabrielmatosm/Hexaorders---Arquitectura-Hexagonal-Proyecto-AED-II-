@@ -24,6 +24,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -81,9 +83,15 @@ public class SecurityConfiguration {
         if (google.registration() != null) {
             // v7: «Continuar con Google» (OpenID Connect). Los manejadores no dejan la sesión autenticada
             // hasta verificar el código de 6 dígitos enviado por correo.
+            InMemoryClientRegistrationRepository registrations = new InMemoryClientRegistrationRepository(google.registration());
+            // v9: Google muestra siempre «Elige una cuenta» (prompt=select_account), también si ya hay una sesión de Google.
+            DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
+                    registrations, OAuth2AuthorizationRequestRedirectFilter.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI);
+            resolver.setAuthorizationRequestCustomizer(builder -> builder.additionalParameters(params -> params.put("prompt", "select_account")));
             http.oauth2Login(oauth -> oauth
                     .loginPage("/login.html")
-                    .clientRegistrationRepository(new InMemoryClientRegistrationRepository(google.registration()))
+                    .clientRegistrationRepository(registrations)
+                    .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(resolver))
                     .successHandler(googleHandlers)
                     .failureHandler(googleHandlers));
         }
@@ -101,6 +109,10 @@ public class SecurityConfiguration {
                     .requestMatchers(HttpMethod.POST, "/api/shop/quote", "/api/shop/checkout-summary").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/shop/checkout-options").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()
+                    // v9: carrusel público de testimonios; dejar uno requiere una cuenta de cliente.
+                    .requestMatchers(HttpMethod.GET, "/api/testimonials").permitAll()
+                    .requestMatchers(HttpMethod.PUT, "/api/testimonials/mine").hasRole("CUSTOMER")
+                    .requestMatchers("/api/testimonials/mine").authenticated()
                     .requestMatchers("/api/shop/**").hasRole("CUSTOMER")
                     .requestMatchers("/api/account/**").authenticated()
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")

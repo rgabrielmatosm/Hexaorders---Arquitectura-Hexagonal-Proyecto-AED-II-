@@ -1090,6 +1090,14 @@ function Sync-GoogleOAuthOnStart {
     $jsonPath = Get-GoogleOAuthJsonPath
     if (-not (Test-NonEmptyFile $jsonPath)) {
         $download = Find-GoogleOAuthDownload
+        if (-not $download -and -not $AssumeYes) {
+            # v9: también en Descargas (client_secret_*.json), con confirmación.
+            $candidate = Find-GoogleOAuthDownload -IncludeDownloads
+            if ($candidate) {
+                $answer = Read-Host "  Encontré credenciales de Google en $([System.IO.Path]::GetDirectoryName($candidate)). ¿Usarlas para «Continuar con Google»? [S/n]"
+                if ($answer -notmatch '^[nN]') { $download = $candidate }
+            }
+        }
         if ($download) {
             try { [void](Read-GoogleOAuthJson $download); Copy-Item -LiteralPath $download -Destination $jsonPath -Force
                   if (-not $OnWindows) { & chmod 644 $jsonPath }

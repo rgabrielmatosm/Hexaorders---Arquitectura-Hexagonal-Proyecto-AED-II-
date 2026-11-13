@@ -19,6 +19,21 @@ const { codeFor, completeVerification, messagesTo } = require('./mail-code');
 const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8080';
 const OUT = process.env.SCREENSHOTS_DIR || path.join(__dirname, 'screenshots');
 const GOOGLE_EMAIL = process.env.GOOGLE_TEST_EMAIL || 'cliente.google@example.test';
+const GOOGLE_SUB = process.env.GOOGLE_TEST_SUB || 'ci-google-subject-0001';
+
+/**
+ * v9: con prompt=select_account el proveedor de pruebas muestra su pantalla de «elige una cuenta» (como Google):
+ * se elige la cuenta de prueba. Espera a volver a POLYMER (url que cumple `back`).
+ */
+async function chooseGoogleAccount(page, back) {
+  await page.waitForURL((url) => back.test(url.href) || /\/google\/authorize/.test(url.href), { timeout: 30000, waitUntil: 'commit' });
+  if (!back.test(page.url())) {
+    await page.fill('input[name="username"]', GOOGLE_SUB);
+    await page.fill('textarea[name="claims"]', JSON.stringify({ email: GOOGLE_EMAIL, email_verified: true, name: 'Cliente Google' }));
+    await page.click('input[type="submit"]');
+  }
+  await page.waitForURL(back, { timeout: 30000, waitUntil: 'commit' });
+}
 const passed = [];
 const problems = [];
 
@@ -81,9 +96,9 @@ async function cheapProduct(request) {
     const poster = await home.context.request.get(`${BASE_URL}/media/polymer-hero.jpg`);
     check(poster.status() === 200, 'Póster del video disponible (se ve con «reducir movimiento»)');
     await home.page.waitForFunction(() => { const v = document.querySelector('[data-testid="hero-video"]'); return v && v.readyState >= 2; }, null, { timeout: 15000 });
-    const toggle = home.page.locator('.hero-video__toggle');
-    await toggle.click();
-    check(await home.page.evaluate(() => document.querySelector('[data-testid="hero-video"]').paused), 'El botón pausa el video (WCAG 2.2.2)');
+    check(await home.page.locator('.hero-video__toggle, #sound-toggle.icon-btn').count() === 0
+      && await home.page.evaluate(() => document.querySelector('[data-testid="hero-video"]').muted),
+      'v9: sin botón «Pausar video» ni altavoz en la cabecera; el video de fondo va en silencio');
     const map = home.page.locator('[data-testid="store-map"] iframe');
     await map.waitFor({ timeout: 15000 });
     check((await map.getAttribute('src')).startsWith('https://www.google.com/maps?q=') && (await map.getAttribute('src')).includes('output=embed'),
@@ -106,10 +121,27 @@ async function cheapProduct(request) {
     await google.page.goto(`${BASE_URL}/login.html`);
     await rendered(google.page);
     const button = google.page.locator('[data-testid="google-signin"]');
-    check(await button.count() === 1, 'El acceso muestra «Continuar con Google» (cliente OAuth configurado)');
-    const startedGoogle = Date.now();
+    check(await button.count() === 1 && /Iniciar sesión con Google/.test(await button.textContent()), 'El acceso muestra «Iniciar sesión con Google» (cliente OAuth configurado)');
+    // v9: «Iniciar sesión con Google» sin cuenta POLYMER se rechaza y ofrece registrarse.
     await button.click();
-    await google.page.waitForURL(/verificar=google/, { timeout: 30000 });
+    await chooseGoogleAccount(google.page, /google=sin-cuenta/);
+    await rendered(google.page);
+    await google.page.locator('[data-testid="google-no-account"]').waitFor({ timeout: 10000 });
+    const anonymous = await (await google.context.request.get(`${BASE_URL}/api/auth/me`)).json();
+    check(!anonymous.authenticated, 'Iniciar sesión con Google sin cuenta POLYMER: se rechaza, no se crea la cuenta y se invita a registrarse');
+    await google.page.screenshot({ path: path.join(OUT, 'v9-google-sin-cuenta.png') });
+    // «Registrarse con Google»: Google muestra «Elige una cuenta» (prompt=select_account) y se crea la cuenta.
+    await google.page.goto(`${BASE_URL}/registro.html`);
+    await rendered(google.page);
+    const googleSignup = google.page.locator('[data-testid="google-signin"][data-intent="registro"]');
+    check(/Registrarse con Google/.test(await googleSignup.textContent()), 'El registro muestra «Registrarse con Google»');
+    const startedGoogle = Date.now();
+    const [authorize] = await Promise.all([
+      google.page.waitForRequest((request) => /\/authorize\?/.test(request.url()), { timeout: 30000 }),
+      googleSignup.click(),
+    ]);
+    check(new URL(authorize.url()).searchParams.get('prompt') === 'select_account', 'Google pide elegir la cuenta (prompt=select_account)');
+    await chooseGoogleAccount(google.page, /registro\.html\?verificar=google/);
     await rendered(google.page);
     const form = google.page.locator('[data-testid="verification-form"]');
     await form.waitFor({ timeout: 15000 });
@@ -122,7 +154,7 @@ async function cheapProduct(request) {
     await google.page.keyboard.type(code);
     await google.page.waitForURL(/\/cliente\/dashboard\.html/, { timeout: 20000 });
     const me = await (await google.context.request.get(`${BASE_URL}/api/auth/me`)).json();
-    check(me.authenticated && me.user.roles.includes('CUSTOMER') && me.user.username.startsWith('cliente_google'),
+    check(me.authenticated && me.user.roles.includes('CUSTOMER') && me.user.username.startsWith(GOOGLE_EMAIL.split('@')[0].replace(/[^A-Za-z0-9]/g, '_').toLowerCase()),
       `Cuenta creada con Google y sesión abierta tras el código (${me.user.username})`);
     const cookies = await google.context.cookies();
     const remember = cookies.find((c) => c.name === 'POLYMER_REMEMBER');
@@ -224,8 +256,51 @@ async function cheapProduct(request) {
     await google.context.request.post(`${BASE_URL}/api/auth/logout`, { headers: { 'X-CSRF-TOKEN': tokenOut } });
     await google.page.goto(`${BASE_URL}/login.html`);
     await rendered(google.page);
-    await Promise.all([google.page.waitForURL(/\/cliente\/dashboard\.html/, { timeout: 30000 }), google.page.click('[data-testid="google-signin"]')]);
+    await google.page.click('[data-testid="google-signin"]');
+    await chooseGoogleAccount(google.page, /\/cliente\/dashboard\.html/);
     check(true, 'Dispositivo de confianza: el segundo acceso con Google entra sin pedir el código');
+
+    // ---- v9 · Testimonios: equipo con LinkedIn, carrusel, formulario del cliente y moderación ------------------
+    console.log('Testimonios: carrusel del equipo (LinkedIn), formulario del cliente y moderación');
+    await google.page.goto(`${BASE_URL}/nosotros.html`);
+    await rendered(google.page);
+    await google.page.locator('[data-testid="testimonial"][data-kind="TEAM"]').first().waitFor({ timeout: 15000 });
+    const team = await google.page.$$eval('[data-testid="testimonial"][data-kind="TEAM"]', (cards) => cards.map((card) => {
+      const parts = [...card.children].map((child) => child.className.split(' ')[0]);
+      const link = card.querySelector('[data-testid="testimonial-linkedin"]');
+      return { name: card.querySelector('.tm-card__name').textContent, photo: card.querySelector('img.tm-card__photo')?.getAttribute('src'),
+        parts, href: link?.getAttribute('href'), target: link?.getAttribute('target') };
+    }));
+    check(team.length === 3 && team.every((c) => c.photo && c.photo.startsWith('/img/equipo/')), 'Carrusel con los 3 integrantes del equipo y su foto');
+    check(team.every((c) => c.parts[0] === 'tm-card__profile' && c.parts[1] === 'tm-card__linkedin' && c.parts.indexOf('tm-card__quote') > 1),
+      'Cada tarjeta: primero el perfil, luego el enlace a LinkedIn y al final el comentario');
+    const linkedins = team.map((c) => c.href).join(' ');
+    check(['ronaldo-gabriel-matos-mart%C3%ADnez-614841392', 'khyara-morales-053a75444', 'jonathan-retuerto-5b089a395'].every((slug) => linkedins.includes(`https://www.linkedin.com/in/${slug}`))
+      && team.every((c) => c.target === '_blank'), 'Los enlaces llevan a los perfiles de LinkedIn del equipo (pestaña nueva)');
+    const before = await google.page.$eval('.tm-track', (track) => track.style.transform);
+    await google.page.click('.tm-nav--next');
+    await google.page.waitForTimeout(700);
+    check(before !== await google.page.$eval('.tm-track', (track) => track.style.transform), 'El carrusel avanza con la flecha');
+    const opinion = `Compré con Google y Yape en minutos, todo llegó perfecto. ${Date.now()}`;
+    await google.page.fill('.tm-form textarea', opinion);
+    await google.page.click('.tm-rate__star >> nth=3');
+    await google.page.click('.tm-form button[type="submit"]');
+    await google.page.locator(`[data-testid="testimonial"][data-kind="CUSTOMER"]:has-text("${opinion.slice(0, 30)}")`).waitFor({ timeout: 15000 });
+    const published = (await (await google.context.request.get(`${BASE_URL}/api/testimonials`)).json()).find((t) => t.comment === opinion);
+    check(published && published.rating === 4 && published.kind === 'CUSTOMER' && !('userId' in published),
+      'El cliente publica su testimonio (4 estrellas) y aparece en el carrusel al instante (sin exponer su cuenta)');
+    await google.page.screenshot({ path: path.join(OUT, 'v9-testimonios.png') });
+    if (process.env.DEMO_PASSWORD) {
+      const staff = await browser.newContext();
+      const token = (await (await staff.request.get(`${BASE_URL}/api/auth/csrf`)).json()).token;
+      const login = await staff.request.post(`${BASE_URL}/api/auth/login`, { headers: { 'X-CSRF-TOKEN': token }, data: { username: 'admin', password: process.env.DEMO_PASSWORD } });
+      const adminToken = (await (await staff.request.get(`${BASE_URL}/api/auth/csrf`)).json()).token;
+      const hide = await staff.request.put(`${BASE_URL}/api/admin/testimonials/${published.id}/visibility`, { headers: { 'X-CSRF-TOKEN': adminToken }, data: { visible: false } });
+      const after = (await (await staff.request.get(`${BASE_URL}/api/testimonials`)).json()).some((t) => t.id === published.id);
+      check(login.status() === 200 && hide.status() === 200 && !after, 'La administración oculta un testimonio y sale del carrusel');
+      await staff.request.put(`${BASE_URL}/api/admin/testimonials/${published.id}/visibility`, { headers: { 'X-CSRF-TOKEN': adminToken }, data: { visible: true } });
+      await staff.close();
+    }
     await google.context.close();
 
     // ---- 6. Registro con contraseña + código -----------------------------------------------------------------

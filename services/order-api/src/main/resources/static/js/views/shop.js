@@ -12,7 +12,7 @@ import { link, rerender, route } from '../router.js';
 import { ROLE_LABELS, homeFor, session } from '../session.js';
 import { $$, el, formatDateTime, formatRelative, toast } from '../ui.js';
 import { newPasswordFields, revealToggle } from '../password-strength.js';
-import { divider, googleButton, providers, rememberCheckbox, verificationPanel } from '../auth-ui.js';
+import { authAside, divider, googleButton, googleReturnNotice, providers, rememberCheckbox, verificationPanel } from '../auth-ui.js';
 import { addToCart, availabilityNote, badges, priceBlock, productCard, productRail, skeletonCards } from '../store-ui.js';
 import { lang, locale, localizeHref, localized, t, td } from '../i18n.js';
 
@@ -719,8 +719,8 @@ route('/entrar', async (root, { query }) => {
     const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: t('Iniciar sesión') });
     const form = el('form', { class: 'card form', novalidate: true },
       el('h2', { class: 'card__title', text: t('Iniciar sesión') }),
-      methods.google ? googleButton(t('Continuar con Google'), safeNext) : null,
-      methods.google ? divider(t('o con tu usuario')) : null,
+      googleButton(t('Iniciar sesión con Google'), safeNext, { intent: 'login', available: methods.google }),
+      divider(t('o con tu usuario')),
       field(t('Usuario'), username),
       (() => { const f = field(t('Contraseña'), password); const wrap = el('div', { class: 'pw-input' }); password.replaceWith(wrap); wrap.append(password, revealToggle(password)); return f; })(),
       remember.element, submit, errorNode,
@@ -741,12 +741,7 @@ route('/entrar', async (root, { query }) => {
   }
 
   root.append(view(el('div', { class: 'auth' },
-    el('div', { class: 'auth__aside' },
-      el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: t('Bienvenido a POLYMER') }),
-      el('p', { text: t('Inicia sesión para comprar, guardar tu carrito y seguir tus pedidos.') }),
-      el('ul', { class: 'auth__perks' }, [t('Pago seguro con tarjeta, Yape o Plin'), t('Boleta de tu compra en tu correo'), t('Verificación en dos pasos por correo')]
-        .map((text) => el('li', {}, icon('shield'), el('span', { text })))),
+    authAside('login',
       el('details', { class: 'demo-accounts-box' }, el('summary', { text: t('Cuentas de demostración') }),
         el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => {
           const form = container.querySelector('form');
@@ -754,8 +749,7 @@ route('/entrar', async (root, { query }) => {
         } }, el('span', {}, el('strong', { text: user }), el('small', { text: ` · ${ROLE_LABELS[role]}` })), el('small', { text: 'usar' })))))),
     container)));
 
-  // Vuelta desde Google: código pendiente, error o sesión ya abierta.
-  const google = query.get('google');
+  // Vuelta desde Google: código pendiente, cuenta inexistente, error o sesión ya abierta.
   if (query.get('verificar')) {
     try {
       const pending = await authApi.pending();
@@ -763,15 +757,12 @@ route('/entrar', async (root, { query }) => {
       showVerification(pending);
       return;
     } catch { toast(t('La verificación ya no está activa: vuelve a iniciar sesión'), 'warn'); }
-  } else if (google === 'error') {
-    toast(t('No se pudo iniciar sesión con Google. Inténtalo de nuevo.'), 'error');
-  } else if (google === 'off') {
-    toast(t('El inicio de sesión con Google no está configurado en este servidor.'), 'warn');
   }
   container.replaceChildren(loginForm());
+  googleReturnNotice(query, container, { onRegister: authApi.googleUrl(null, localizeHref('/registro.html'), 'registro') });
 }, { title: t('Iniciar sesión') });
 
-route('/registro', async (root) => {
+route('/registro', async (root, { query }) => {
   const methods = await providers();
   const container = el('div', {});
   const username = el('input', { autocomplete: 'username', maxlength: '32' });
@@ -787,8 +778,8 @@ route('/registro', async (root) => {
     window.location.assign(localizeHref(cart.count() ? '/carrito.html' : '/cliente/dashboard.html'));
   };
   const form = el('form', { class: 'card form', novalidate: true }, el('h2', { class: 'card__title', text: t('Crea tu cuenta') }),
-    methods.google ? googleButton(t('Registrarse con Google'), null) : null,
-    methods.google ? divider(t('o con tu correo')) : null,
+    googleButton(t('Registrarse con Google'), null, { intent: 'registro', available: methods.google }),
+    divider(t('o con tu correo')),
     field(t('Usuario'), username, t('3 a 32 letras, dígitos, guion o guion bajo.')), field(t('Nombre'), displayName),
     field(t('Correo electrónico'), email, methods.emailVerification ? t('Te enviaremos un código de 6 dígitos para confirmarlo.') : ''),
     password.element, remember.element, submit, errorNode,
@@ -810,12 +801,17 @@ route('/registro', async (root) => {
     } catch { /* el error ya se muestra */ }
   });
   container.append(form);
-  root.append(view(el('div', { class: 'auth' },
-    el('div', { class: 'auth__aside' }, el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: t('Tu cuenta POLYMER') }),
-      el('ul', { class: 'auth__perks' }, [t('Guarda tu carrito en todos tus dispositivos'), t('Sigue tus pedidos en tiempo real'), t('Compra más rápido con tus datos guardados')]
-        .map((text) => el('li', {}, icon('sparkle'), el('span', { text }))))),
-    container)));
+  root.append(view(el('div', { class: 'auth' }, authAside('registro'), container)));
+  // v9: vuelta de «Registrarse con Google»: código de 6 dígitos (con «Recordarme 30 días») o aviso.
+  if (query.get('verificar')) {
+    try {
+      const pending = await authApi.pending();
+      toast(query.get('nueva') ? t('Creamos tu cuenta con Google. Confirma el código que te enviamos.') : t('Ya tenías una cuenta POLYMER: confirma el código que te enviamos.'), 'ok');
+      container.replaceChildren(verificationPanel(pending, { onDone: done, onCancel: () => window.location.assign(localizeHref('/registro.html')) }));
+      return;
+    } catch { toast(t('La verificación ya no está activa: vuelve a iniciar sesión'), 'warn'); }
+  }
+  googleReturnNotice(query, container);
   username.focus();
 }, { title: t('Registro') });
 

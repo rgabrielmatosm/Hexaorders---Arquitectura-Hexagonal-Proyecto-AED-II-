@@ -2,8 +2,8 @@
 // «Recordarme durante 30 días». El servidor decide si hace falta el código (la sesión no queda
 // autenticada hasta verificarlo); aquí solo se presenta el paso y se envía el código.
 
-import { authApi } from './api.js';
-import { formError, showFormError, submitting } from './components.js';
+import { authApi, testimonialsApi } from './api.js';
+import { formError, icon, showFormError, submitting } from './components.js';
 import { session } from './session.js';
 import { el, toast } from './ui.js';
 import { t } from './i18n.js';
@@ -15,11 +15,37 @@ export function providers() {
   return providersCache;
 }
 
-/** Botón «Continuar con Google» (o «Registrarse con Google»). Navegación completa: Google exige redirecciones. */
-export function googleButton(label, next) {
+/**
+ * Botón de Google. v9: siempre visible; «login» solo entra con una cuenta POLYMER existente y «registro» la crea.
+ * Google muestra «Elige una cuenta». Navegación completa: Google exige redirecciones.
+ */
+export function googleButton(label, next, { intent = 'login', available = true } = {}) {
   const from = window.location.pathname;
-  return el('a', { class: 'btn btn--google btn--block', href: authApi.googleUrl(next || null, from), 'data-testid': 'google-signin' },
-    el('img', { src: '/img/google-g.svg', alt: '', width: '18', height: '18' }), el('span', { text: label }));
+  const button = el('a', { class: 'btn btn--google btn--block', href: authApi.googleUrl(next || null, from, intent === 'registro' ? 'registro' : null),
+    'data-testid': 'google-signin', 'data-intent': intent },
+  el('img', { src: '/img/google-g.svg', alt: '', width: '18', height: '18' }), el('span', { text: label }));
+  if (!available) {
+    button.setAttribute('aria-disabled', 'true');
+    button.addEventListener('click', (event) => { event.preventDefault(); toast(t('El acceso con Google estará disponible muy pronto en esta tienda.'), 'warn'); });
+  }
+  return button;
+}
+
+/** Mensajes al volver de Google (?google=…). Devuelve true si hay un código pendiente que mostrar. */
+export function googleReturnNotice(query, container, { onRegister } = {}) {
+  const google = query.get('google');
+  if (google === 'sin-cuenta') {
+    const box = el('div', { class: 'auth-notice', role: 'alert', 'data-testid': 'google-no-account' },
+      el('strong', { text: t('No encontramos una cuenta POLYMER para esa cuenta de Google') }),
+      el('p', { text: t('Para entrar con Google primero crea tu cuenta: es gratis y toma un minuto. Te enviaremos un código de 6 dígitos a tu correo para confirmarla.') }),
+      onRegister ? el('a', { class: 'btn btn--primary', href: onRegister, text: t('Registrarme con Google') }) : null);
+    container.prepend(box);
+    toast(t('Esa cuenta de Google no está registrada en POLYMER.'), 'warn');
+  } else if (google === 'error') {
+    toast(t('No se pudo iniciar sesión con Google. Inténtalo de nuevo.'), 'error');
+  } else if (google === 'off') {
+    toast(t('El acceso con Google estará disponible muy pronto en esta tienda.'), 'warn');
+  }
 }
 
 export const divider = (text) => el('div', { class: 'auth-divider', role: 'separator' }, el('span', { text }));
@@ -155,4 +181,51 @@ export function verificationPanel(data, { onDone, onCancel } = {}) {
   tick();
   window.setTimeout(() => inputs.focus(), 50);
   return form;
+}
+
+// ---- v9 · Panel lateral del acceso y del registro ----------------------------------------------------
+const ORBIT = ['laptop', 'phone', 'gamepad', 'headphones', 'monitor', 'watch'];
+
+/** Panel decorado: logo con halo, órbita animada de productos, ventajas, cifras y un testimonio que rota. */
+export function authAside(kind, ...extra) {
+  const login = kind === 'login';
+  const orbit = el('div', { class: 'auth-orbit', 'aria-hidden': 'true' },
+    el('div', { class: 'auth-orbit__core' }, el('img', { src: '/img/logo.svg', alt: '', width: '64', height: '64' })),
+    el('div', { class: 'auth-orbit__ring auth-orbit__ring--1' }),
+    el('div', { class: 'auth-orbit__ring auth-orbit__ring--2' }),
+    ORBIT.map((name, i) => el('span', { class: `auth-orbit__item auth-orbit__item--${i + 1}` }, icon(name))));
+  const perks = login
+    ? [['card', t('Pago seguro con tarjeta, Yape o Plin')], ['mail', t('Boleta de tu compra en tu correo')], ['shield', t('Verificación en dos pasos por correo')], ['truck', t('Sigue tus pedidos en tiempo real')]]
+    : [['cart', t('Guarda tu carrito en todos tus dispositivos')], ['truck', t('Sigue tus pedidos en tiempo real')], ['bolt', t('Compra más rápido con tus datos guardados')], ['shield', t('Código de 6 dígitos y «Recordarme 30 días»')]];
+  const quote = el('figure', { class: 'auth-quote', hidden: true, 'aria-live': 'polite' });
+  testimonialsApi.list().then((items) => {
+    const list = (items || []).filter((item) => item.comment);
+    if (!list.length) return;
+    let index = 0;
+    const show = () => {
+      const item = list[index % list.length];
+      index += 1;
+      quote.classList.remove('is-in');
+      window.setTimeout(() => {
+        quote.replaceChildren(el('blockquote', { text: `“${item.comment.length > 170 ? `${item.comment.slice(0, 167)}…` : item.comment}”` }),
+          el('figcaption', {}, item.photoUrl ? el('img', { src: item.photoUrl, alt: '', width: '32', height: '32', loading: 'lazy' }) : el('span', { class: 'auth-quote__initial', text: (item.name || '?').charAt(0) }),
+            el('span', {}, el('strong', { text: item.name }), el('small', { text: item.role || t('Cliente POLYMER') }))));
+        quote.hidden = false;
+        quote.classList.add('is-in');
+      }, 220);
+    };
+    show();
+    if (list.length > 1) window.setInterval(show, 6500);
+  }).catch(() => {});
+  return el('div', { class: `auth__aside auth__aside--rich auth__aside--${login ? 'login' : 'registro'}` },
+    el('div', { class: 'auth__glow', 'aria-hidden': 'true' }),
+    orbit,
+    el('h2', { class: 'auth__title', text: login ? t('Bienvenido a POLYMER') : t('Tu cuenta POLYMER') }),
+    el('p', { class: 'auth__lead', text: login ? t('Inicia sesión para comprar, guardar tu carrito y seguir tus pedidos.') : t('Crea tu cuenta en un minuto, con tu correo o con Google, y compra tecnología con garantía oficial.') }),
+    el('ul', { class: 'auth__perks' }, perks.map(([name, text]) => el('li', {}, icon(name), el('span', { text })))),
+    el('div', { class: 'auth__stats' },
+      [['+550', t('productos')], ['20', t('categorías')], ['24/7', t('seguimiento')]]
+        .map(([value, label]) => el('div', {}, el('strong', { text: value }), el('small', { text: label })))),
+    quote,
+    ...extra);
 }

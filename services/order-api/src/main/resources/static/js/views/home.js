@@ -9,6 +9,7 @@ import { route } from '../router.js';
 import { homeFor, session } from '../session.js';
 import { el, formatDateTime, reducedMotion } from '../ui.js';
 import { visitSection } from '../store-info.js';
+import { testimonialsSection } from '../testimonials.js';
 import { productCard, productRail, skeletonCards } from '../store-ui.js';
 import { t } from '../i18n.js';
 
@@ -29,25 +30,21 @@ function liveRail(title, params, moreHref, lead) {
 }
 
 /**
- * v7: video de fondo de la portada (pieza original de la marca, sin audio, en bucle). Con «reducir
- * movimiento» no se reproduce (se ve el póster) y siempre hay un botón para pausarlo (WCAG 2.2.2).
+ * v7: video de fondo de la portada (pieza original de la marca, sin audio, en bucle). v9: sin botón de pausa
+ * (a pedido); con «reducir movimiento» no se reproduce y se ve el póster. Se pausa solo cuando no está a la vista.
  */
 function heroVideo() {
   const video = el('video', { class: 'hero-video__media', muted: true, loop: true, playsinline: true, preload: 'metadata',
     poster: '/media/polymer-hero.jpg', 'aria-hidden': 'true', 'data-testid': 'hero-video' },
   el('source', { src: '/media/polymer-hero.mp4', type: 'video/mp4' }));
   video.muted = true; // requisito de la reproducción automática en los navegadores
-  const toggle = el('button', { type: 'button', class: 'hero-video__toggle', 'aria-pressed': 'false' });
-  const label = () => {
-    toggle.textContent = video.paused ? t('▶ Reproducir video') : t('❚❚ Pausar video');
-    toggle.setAttribute('aria-pressed', String(video.paused));
-  };
-  toggle.addEventListener('click', () => { if (video.paused) video.play().catch(() => {}); else video.pause(); });
-  video.addEventListener('play', label);
-  video.addEventListener('pause', label);
-  if (!reducedMotion()) video.play().catch(() => label());
-  label();
-  return el('div', { class: 'hero-video' }, video, el('div', { class: 'hero-video__shade', 'aria-hidden': 'true' }), toggle);
+  if (!reducedMotion()) {
+    video.play().catch(() => {});
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(([entry]) => { if (entry.isIntersecting) video.play().catch(() => {}); else video.pause(); }, { threshold: 0.1 }).observe(video);
+    }
+  }
+  return el('div', { class: 'hero-video' }, video, el('div', { class: 'hero-video__shade', 'aria-hidden': 'true' }));
 }
 
 // ---- Portada ------------------------------------------------------------------------------------
@@ -90,6 +87,7 @@ route('/inicio', async (root) => {
     liveRail(t('Laptops'), { category: id('computadoras') }, '/catalogo.html?categoria=computadoras'),
     liveRail(t('Smartphones y tablets'), { category: id('smartphones-tablets') }, '/catalogo.html?categoria=smartphones-tablets'),
     liveRail(t('Dispositivos inteligentes'), { category: id('smart-home') }, '/catalogo.html?categoria=smart-home', t('Focos, enchufes, cámaras y asistentes para tu hogar.')),
+    testimonialsSection(),
     visitSection(),
     el('section', { class: 'help-banner' },
       el('div', {}, el('h2', { text: t('¿Necesitas ayuda para elegir?') }),
@@ -178,6 +176,7 @@ route('/nosotros', async (root) => {
       el('p', { text: t('{0} nació en {1} con una idea simple: que comprar tecnología sea tan fácil como usarla. Empezamos asesorando a estudiantes y profesionales que armaban su primera PC, y hoy ofrecemos más de 500 productos de 20 categorías.', BRAND.displayName, CONTACT.city) }),
       el('p', { text: t('Nuestro nombre viene de los polímeros: cadenas de piezas pequeñas que, unidas, forman algo más fuerte. Así vemos la tecnología y a nuestros clientes: conectados.') }),
       el('p', { class: 'small muted', text: t('Proyecto de demostración: la historia y los datos de la empresa son ilustrativos.') })),
+    testimonialsSection({ withForm: true }),
     el('section', { class: 'help-banner' },
       el('div', {}, el('h2', { text: t('¿Compras para tu empresa?') }), el('p', { text: t('Cotizaciones por volumen, facturación y equipos para oficinas, data centers y puntos de venta.') })),
       el('a', { class: 'btn btn--primary', href: '/contacto.html?tema=SALES', text: t('Solicitar cotización') }))));

@@ -21,6 +21,11 @@ OAuth, SMTP, Redis ni PostgreSQL.
 
 ## 2. Configurar «Continuar con Google» (gratis)
 
+> **v9 · Iniciar sesión y registrarse son distintos:** «Iniciar sesión con Google» solo entra si ya tienes cuenta POLYMER
+> (vinculada a esa cuenta de Google o con el mismo correo); si no, se rechaza y se ofrece «Registrarme con Google».
+> «Registrarse con Google» crea la cuenta y pide el código de 6 dígitos enviado a tu correo (con «Recordarme 30 días»).
+> En ambos casos Google muestra «Elige una cuenta».
+>
 > **Forma recomendada (v8): el JSON de Google Cloud.**
 >
 > 1. En Google Cloud → **Google Auth Platform**: en *Público* añade tu Gmail como **usuario de prueba**; en

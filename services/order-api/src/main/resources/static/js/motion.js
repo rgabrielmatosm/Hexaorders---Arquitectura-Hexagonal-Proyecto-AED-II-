@@ -2,6 +2,8 @@
 // navegación, «vuelo» al carrito, parallax sutil y check animado de confirmación.
 // Solo anima transform y opacity. Con prefers-reduced-motion todo queda estático y visible.
 
+import { play } from './audio.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -10,6 +12,8 @@ export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: r
 const REVEAL = [
   '.view__head', '.store-benefit', '.promo-tile', '.category-tile', '.product-card', '.store-section > header',
   '.offer-card', '.help-card', '.info-block', '.site-footer__col', '.footer-pay', '.card.reveal-ok',
+  // v9: más secciones con entrada animada.
+  '.rail__head', '.testimonials .tm-holder', '.tm-form', '.about-card', '.visit__grid > *', '.help-banner', '.auth__perks li', '.auth__stats > div',
 ].join(',');
 
 let observer = null;
@@ -92,6 +96,7 @@ export function flyToCart(source) {
   target.classList.remove('is-bumped');
   void target.offsetWidth; // reinicia la animación del contador
   target.classList.add('is-bumped');
+  play('success'); // v9: sonido al añadir al carrito
   if (reducedMotion() || !source.getBoundingClientRect || !document.body.animate) return;
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
@@ -132,4 +137,15 @@ export function startMotion() {
   startReveal();
   startNavProgress();
   startParallax();
+  startTapSounds();
+}
+
+// v9: clic suave en los botones y enlaces principales (nunca al pasar el ratón ni al desplazarse).
+const TAP = '.btn, .tm-nav, .tm-dot, .category-tile, .chip, .tab, .icon-btn, .nav a, .pm-quick a';
+function startTapSounds() {
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target.closest(TAP) : null;
+    if (!target || target.closest('.tm-carousel')) return; // el carrusel ya tiene su propio sonido
+    play('tap');
+  }, { capture: true, passive: true });
 }

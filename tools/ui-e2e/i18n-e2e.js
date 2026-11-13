@@ -132,7 +132,8 @@ async function login(session, lang, user, password = PASSWORD) {
     const guest = await open(browser, 'selector', { skipIntro: false });
     await guest.page.goto(url('es', '/producto.html', `?id=${product.id}`));
     await guest.page.waitForSelector('#polymer-intro', { timeout: 5000 });
-    await guest.page.click('text=Omitir intro');
+    await guest.page.keyboard.press('Escape'); // v9: la intro no tiene botones; Esc o un clic la abren
+    await guest.page.waitForSelector('#polymer-intro', { state: 'detached', timeout: 4000 });
     await rendered(guest.page);
     await guest.page.click('.product-detail .btn--ghost');
     await guest.page.waitForFunction(() => document.querySelector('#cart-count')?.textContent === '1', null, { timeout: 10000 });

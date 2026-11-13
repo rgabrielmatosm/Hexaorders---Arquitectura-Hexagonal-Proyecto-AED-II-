@@ -18,6 +18,7 @@ import com.polymer.application.port.out.UserPreferences;
 import com.polymer.application.port.out.UserRepository;
 import com.polymer.application.port.out.VerificationChallenges;
 import com.polymer.domain.identity.ExternalIdentity;
+import com.polymer.domain.identity.ExternalSignInIntent;
 import com.polymer.domain.identity.Role;
 import com.polymer.domain.identity.UserAccount;
 import com.polymer.domain.identity.VerificationChallenge;
@@ -87,7 +88,7 @@ public final class SignInService implements SignInUseCases {
     }
 
     @Override
-    public SignInStep withExternalIdentity(ExternalIdentity identity, String trustedDevice) {
+    public SignInStep withExternalIdentity(ExternalIdentity identity, String trustedDevice, ExternalSignInIntent intent) {
         if (!identity.emailVerified()) throw new ForbiddenOperationException("Google no ha verificado ese correo");
         boolean created = false;
         Optional<Long> linked = security.userForIdentity(identity.provider(), identity.subject());
@@ -98,6 +99,9 @@ public final class SignInService implements SignInUseCases {
             Optional<UserAccount> byEmail = users.findByEmail(identity.email());
             if (byEmail.isPresent()) {
                 userId = byEmail.get().id();
+            } else if (intent == ExternalSignInIntent.SIGN_IN) {
+                audit.record(identity.provider(), "EXTERNAL_SIGN_IN_REFUSED", "identity:" + identity.provider(), "sin cuenta POLYMER");
+                throw new BusinessConflictException("NO_ACCOUNT", "No hay una cuenta POLYMER con esa cuenta de Google: regístrate primero");
             } else {
                 userId = createCustomer(identity).id();
                 created = true;

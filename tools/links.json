@@ -246,6 +246,18 @@
       ]
     },
     {
+      "id": "testimonios",
+      "name": "v9 · Testimonios: equipo (LinkedIn) y clientes",
+      "verifier": "Cliente",
+      "account": "cliente (y admin para moderar)",
+      "login": "/nosotros.html#deja-tu-testimonio",
+      "containers": [
+        "frontend",
+        "order-api",
+        "db"
+      ]
+    },
+    {
       "id": "contacto",
       "name": "Contacto y libro de reclamaciones",
       "verifier": "Visitante",

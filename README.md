@@ -38,6 +38,7 @@ Tienda de tecnología y plataforma de gestión de pedidos con **arquitectura hex
 18. [Exposición, demostraciones y documentación final](#18-exposición-demostraciones-y-documentación-final)
 19. [Novedades v7: Google, código por correo, pagos, boleta, mapa, horario y video](#19-novedades-v7-google-código-por-correo-pagos-boleta-mapa-horario-y-video)
 20. [v8: enlaces por slice, asistente de Google y guía de la PPT](#20-v8-enlaces-por-slice-asistente-de-google-y-guía-de-la-ppt)
+21. [v9: Google (iniciar sesión vs registrarse), testimonios, sonido e intro](#21-v9-google-iniciar-sesión-vs-registrarse-testimonios-sonido-e-intro)
 
 Anexos: [API](#anexo-a-api) · [Documentación técnica](#anexo-b-documentación-técnica) · [Historial y migración](#anexo-c-historial-y-migración)
 
@@ -522,6 +523,17 @@ Mailpit, las pasarelas de prueba y una dirección de demostración.
 | `.\polymer.cmd google` | Asistente: pide el ID y el secreto de OAuth de Google y, opcional, tu Gmail con su contraseña de aplicación; los guarda sin mostrarlos, reinicia `order-api`, comprueba la redirección a Google y envía un correo de prueba |
 | **Google con el JSON de Google Cloud** | Guarda el JSON del cliente OAuth como `secrets\google-oauth.json` (Docker secret `google_oauth`; nunca en Git, imágenes, logs ni ZIP) y ejecuta `.\polymer.cmd google`. Producción: `POLYMER_PUBLIC_URL` y, si hace falta, `POLYMER_GOOGLE_REDIRECT_URI` ([guía](docs/final/GUIA_GOOGLE_Y_PAGOS.md)) |
 | **Guía de la PPT** | [`docs/final/GUIA_PPT_EXPOSICION.md`](docs/final/GUIA_PPT_EXPOSICION.md): diapositiva por diapositiva, con el enlace y la captura de cada una |
+
+## 21. v9: Google (iniciar sesión vs registrarse), testimonios, sonido e intro
+
+| Novedad | Qué hace |
+| --- | --- |
+| **Iniciar sesión con Google** | Google muestra **«Elige una cuenta»** (`prompt=select_account`). Si esa cuenta de Google no tiene cuenta POLYMER (ni vinculada ni con el mismo correo) **se rechaza** y la página invita a registrarse |
+| **Registrarse con Google** | Crea la cuenta de cliente y envía el **código de 6 dígitos** al correo (Mailpit o tu Gmail) con la opción **«Recordarme 30 días»**: en ese dispositivo no se vuelve a pedir el código ni la contraseña |
+| **Botón de Google siempre visible** | En el acceso y el registro; si el servidor aún no tiene credenciales, avisa que estará disponible pronto. `start` también encuentra el JSON en **Descargas** (con confirmación) |
+| **Testimonios** (slice nuevo) | Carrusel en la portada y en **Nosotros**: el equipo (foto → perfil de **LinkedIn** → comentario) y los clientes. Formulario «Deja tu testimonio» (clientes con sesión, uno por cuenta, editable); la administración los oculta o muestra. Hexagonal: `Testimonial` (dominio) → `TestimonialUseCases`/`TestimonialService` → `TestimonialRepository`/`JdbcTestimonialRepository`; Flyway **V13** |
+| **Intro y sonido** | Intro sin botones; **sonido activado por defecto** (los navegadores lo permiten desde el primer clic o tecla); sin altavoz en la cabecera ni «Pausar video»: el interruptor de sonido está en el pie |
+| **Más movimiento** | Panel de acceso y registro con órbita animada, ventajas, cifras y un testimonio que rota; brillo en botones, entrada animada de secciones y sonidos suaves al pulsar, añadir al carrito o publicar |
 
 ## Anexo A. API
 

@@ -19,6 +19,7 @@ import com.polymer.application.port.out.UserRepository;
 import com.polymer.application.port.out.VerificationChallenges;
 import com.polymer.application.service.SignInService;
 import com.polymer.domain.identity.ExternalIdentity;
+import com.polymer.domain.identity.ExternalSignInIntent;
 import com.polymer.domain.identity.Language;
 import com.polymer.domain.identity.Role;
 import com.polymer.domain.identity.UserAccount;
@@ -178,6 +179,28 @@ class SignInServiceTest {
         clock.advance(Duration.ofDays(31));
         security.twoFactor.put(id, true);
         assertThat(signIn.afterPassword(id, device).completed()).isFalse();
+    }
+
+    @Test
+    void signInWithGoogleRefusesPeopleWithoutAPolymerAccountButSignUpCreatesIt() {
+        ExternalIdentity stranger = new ExternalIdentity("google", "sub-new", "nuevo@gmail.com", true, "Nuevo");
+        assertThatThrownBy(() -> signIn.withExternalIdentity(stranger, null, ExternalSignInIntent.SIGN_IN))
+                .isInstanceOf(BusinessConflictException.class)
+                .satisfies(error -> assertThat(((BusinessConflictException) error).code()).isEqualTo("NO_ACCOUNT"));
+        assertThat(users.findByEmail("nuevo@gmail.com")).isEmpty();
+        assertThat(security.identities).doesNotContainKey("google:sub-new");
+        // «Registrarse con Google»: crea la cuenta y pide el código; después «Iniciar sesión con Google» ya entra.
+        SignInStep created = signIn.withExternalIdentity(stranger, null, ExternalSignInIntent.SIGN_UP);
+        assertThat(created.newAccount()).isTrue();
+        assertThat(created.completed()).isFalse();
+        signIn.verify(created.challenge().id(), lastCode());
+        SignInStep again = signIn.withExternalIdentity(stranger, null, ExternalSignInIntent.SIGN_IN);
+        assertThat(again.userId()).isEqualTo(created.userId());
+        // Una cuenta POLYMER existente con el mismo correo también puede iniciar sesión con Google (se vincula).
+        long id = users.add("existente", "existente@gmail.com");
+        SignInStep linked = signIn.withExternalIdentity(new ExternalIdentity("google", "sub-x", "existente@gmail.com", true, "E"), null, ExternalSignInIntent.SIGN_IN);
+        assertThat(linked.userId()).isEqualTo(id);
+        assertThat(linked.newAccount()).isFalse();
     }
 
     @Test

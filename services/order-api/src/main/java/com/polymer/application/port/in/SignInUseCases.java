@@ -1,6 +1,7 @@
 package com.polymer.application.port.in;
 
 import com.polymer.domain.identity.ExternalIdentity;
+import com.polymer.domain.identity.ExternalSignInIntent;
 import com.polymer.domain.identity.UserAccount;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +16,12 @@ public interface SignInUseCases {
     SignInStep afterPassword(long userId, String trustedDevice);
 
     /** Primer factor superado con Google: vincula o crea la cuenta y pide el código salvo en un dispositivo de confianza. */
-    SignInStep withExternalIdentity(ExternalIdentity identity, String trustedDevice);
+    /** v9: SIGN_IN rechaza (NO_ACCOUNT) si no hay cuenta POLYMER; SIGN_UP la crea. */
+    SignInStep withExternalIdentity(ExternalIdentity identity, String trustedDevice, ExternalSignInIntent intent);
+
+    default SignInStep withExternalIdentity(ExternalIdentity identity, String trustedDevice) {
+        return withExternalIdentity(identity, trustedDevice, ExternalSignInIntent.SIGN_UP);
+    }
 
     /** Comprueba el código; si es correcto, la verificación queda consumida y el inicio de sesión completo. */
     SignInStep verify(UUID challengeId, String code);

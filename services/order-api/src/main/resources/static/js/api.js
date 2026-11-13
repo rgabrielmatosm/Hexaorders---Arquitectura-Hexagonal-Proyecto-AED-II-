@@ -173,7 +173,16 @@ export const authApi = {
   resend: () => post('/api/auth/verify/resend'),
   cancelVerification: () => send('POST', '/api/auth/verify/cancel', {}).then((r) => r.data),
   /** URL de inicio de «Continuar con Google» (navegación completa, no fetch). */
-  googleUrl: (next, from) => `/api/auth/google${qs({ next, from })}`,
+  googleUrl: (next, from, intent) => `/api/auth/google${qs({ next, from, intent })}`,
+};
+
+/** v9: testimonios del carrusel (público), el tuyo (cliente con sesión) y su moderación (ADMIN). */
+export const testimonialsApi = {
+  list: () => get('/api/testimonials'),
+  mine: () => get('/api/testimonials/mine'),
+  submit: (draft) => put('/api/testimonials/mine', draft),
+  adminList: () => get('/api/admin/testimonials'),
+  setVisible: (id, visible) => put(`/api/admin/testimonials/${encodeURIComponent(id)}/visibility`, { visible }),
 };
 
 /** v7: tienda física (mapa de Google Maps, horario de hoy, Google Calendar). Público. */

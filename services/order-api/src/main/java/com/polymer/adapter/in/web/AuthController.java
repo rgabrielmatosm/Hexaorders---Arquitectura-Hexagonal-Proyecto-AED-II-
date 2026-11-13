@@ -161,6 +161,7 @@ public final class AuthController {
     @GetMapping("/google")
     public void google(@RequestParam(name = "next", required = false) String next,
                        @RequestParam(name = "from", required = false) String from,
+                       @RequestParam(name = "intent", required = false) String intent,
                        HttpServletRequest request, HttpServletResponse response) throws IOException {
         String loginPage = GoogleSignInHandlers.safePath(from) && from.length() <= 60 ? from : "/login.html";
         if (!googleEnabled) {
@@ -170,6 +171,8 @@ public final class AuthController {
         HttpSession session = request.getSession(true);
         if (GoogleSignInHandlers.safePath(next)) session.setAttribute(GoogleSignInHandlers.NEXT, next);
         session.setAttribute(GoogleSignInHandlers.LOGIN_PAGE, loginPage);
+        // v9: «Registrarse con Google» crea la cuenta; «Iniciar sesión con Google» solo entra si ya existe.
+        session.setAttribute(GoogleSignInHandlers.INTENT, "registro".equals(intent) ? "SIGN_UP" : "SIGN_IN");
         response.sendRedirect("/oauth2/authorization/google");
     }
 

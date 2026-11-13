@@ -50,8 +50,8 @@ Arranca primero con <code>.\polymer.cmd start</code>. Contraseña de las cuentas
 <button class="btn" id="recheck" type="button">Volver a comprobar</button>
 <span class="muted">● verde = responde · ● rojo = apagado · ◌ = privado por diseño (sin puerto publicado)</span></div>
 
-<h2>Slices (13)</h2>
-<ul class="index"><li><a href="#s-hexagonal">Arquitectura hexagonal: núcleo, puertos y adaptadores</a></li><li><a href="#s-catalogo">Catálogo, búsqueda y ofertas</a></li><li><a href="#s-checkout">Carrito, checkout y evaluación de riesgo</a></li><li><a href="#s-pagos">v7 · Pago en línea (tarjeta, Yape, Plin) y boleta</a></li><li><a href="#s-acceso">v7 · Acceso con Google, código por correo y «Recordarme 30 días»</a></li><li><a href="#s-tienda">v7 · Tienda física: Google Maps, horario de hoy y Google Calendar</a></li><li><a href="#s-seguimiento">Mis pedidos y seguimiento</a></li><li><a href="#s-operaciones">Operaciones: pedidos y revisión de riesgo</a></li><li><a href="#s-logistica">Logística: calendario, entregas y asignaciones</a></li><li><a href="#s-admin">Administración: catálogo, inventario, promociones, usuarios y auditoría</a></li><li><a href="#s-notificaciones">Notificaciones asíncronas (outbox → RabbitMQ → correo)</a></li><li><a href="#s-monitoreo">Monitoreo y observabilidad</a></li><li><a href="#s-contacto">Contacto y libro de reclamaciones</a></li></ul>
+<h2>Slices (14)</h2>
+<ul class="index"><li><a href="#s-hexagonal">Arquitectura hexagonal: núcleo, puertos y adaptadores</a></li><li><a href="#s-catalogo">Catálogo, búsqueda y ofertas</a></li><li><a href="#s-checkout">Carrito, checkout y evaluación de riesgo</a></li><li><a href="#s-pagos">v7 · Pago en línea (tarjeta, Yape, Plin) y boleta</a></li><li><a href="#s-acceso">v7 · Acceso con Google, código por correo y «Recordarme 30 días»</a></li><li><a href="#s-tienda">v7 · Tienda física: Google Maps, horario de hoy y Google Calendar</a></li><li><a href="#s-seguimiento">Mis pedidos y seguimiento</a></li><li><a href="#s-operaciones">Operaciones: pedidos y revisión de riesgo</a></li><li><a href="#s-logistica">Logística: calendario, entregas y asignaciones</a></li><li><a href="#s-admin">Administración: catálogo, inventario, promociones, usuarios y auditoría</a></li><li><a href="#s-notificaciones">Notificaciones asíncronas (outbox → RabbitMQ → correo)</a></li><li><a href="#s-monitoreo">Monitoreo y observabilidad</a></li><li><a href="#s-testimonios">v9 · Testimonios: equipo (LinkedIn) y clientes</a></li><li><a href="#s-contacto">Contacto y libro de reclamaciones</a></li></ul>
 
 <h2>Contenedores (13) y su enlace</h2>
 <div class="table-wrap"><table><thead><tr><th></th><th>Contenedor</th><th>Qué demuestra</th><th>Enlace</th></tr></thead><tbody>
@@ -195,8 +195,18 @@ Arranca primero con <code>.\polymer.cmd start</code>. Contraseña de las cuentas
   </div>
   <p class="foot"><span>Demostración: <code>.\polymer.cmd demo -Scenario observabilidad</code></span><span class="muted">Pruebas: integration_smoke.py · check_observability.py</span></p>
 </article>
+<article class="slice" id="s-testimonios">
+  <header><span class="num">13</span><h3>v9 · Testimonios: equipo (LinkedIn) y clientes</h3></header>
+  <p class="who"><span class="tag tag--role">Verifica: Cliente</span> <span class="tag">Cuenta: cliente (y admin para moderar)</span>
+     <label class="owner">Expone: <input data-owner="testimonios" placeholder="nombre del integrante" maxlength="60"></label></p>
+  <div class="cols">
+    <div><h4>Páginas</h4><ul><li><a href="http://localhost:8080/nosotros.html#testimonios" target="_blank" rel="noopener">Nosotros → carrusel y formulario</a></li><li><a href="http://localhost:8080/#testimonios" target="_blank" rel="noopener">Portada → carrusel</a></li><li><a href="http://localhost:8080/admin/dashboard.html" target="_blank" rel="noopener">Admin → moderación</a></li></ul><a class="btn btn--primary" href="http://localhost:8080/login.html?next=/nosotros.html#deja-tu-testimonio" target="_blank" rel="noopener">Entrar como cliente</a></div>
+    <div><h4>Contenedores</h4><p class="chips"><a class="chip" href="http://localhost:8080/" target="_blank" rel="noopener"><span class="dot" data-check="http://127.0.0.1:8080/"></span>frontend</a><a class="chip" href="http://localhost:8081/" target="_blank" rel="noopener"><span class="dot" data-check="http://127.0.0.1:8081/api/catalog/categories"></span>order-api</a><span class="chip chip--private"><span class="dot dot--private"></span>db</span></p><h4>Evidencia</h4><ul><li><a href="http://localhost:8080/api/testimonials" target="_blank" rel="noopener">API · testimonios publicados (JSON)</a></li></ul></div>
+  </div>
+  <p class="foot"><span>Demostración: <span class="muted">—</span></span><span class="muted">Pruebas: TestimonialServiceTest · v7-e2e.js</span></p>
+</article>
 <article class="slice" id="s-contacto">
-  <header><span class="num">13</span><h3>Contacto y libro de reclamaciones</h3></header>
+  <header><span class="num">14</span><h3>Contacto y libro de reclamaciones</h3></header>
   <p class="who"><span class="tag tag--role">Verifica: Visitante</span> <span class="tag">Cuenta: — (lo revisa admin)</span>
      <label class="owner">Expone: <input data-owner="contacto" placeholder="nombre del integrante" maxlength="60"></label></p>
   <div class="cols">

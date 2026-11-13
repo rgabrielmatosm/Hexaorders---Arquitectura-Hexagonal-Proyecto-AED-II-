@@ -228,11 +228,11 @@ function languageSelect() {
   return select;
 }
 
-/** Silencio global de los sonidos de la interfaz (apagados por defecto). */
+/** v9: interruptor discreto de los sonidos (activados por defecto) en el pie de página, no en la cabecera. */
 function soundToggle() {
-  const button = el('button', { type: 'button', class: 'icon-btn sound-toggle', id: 'sound-toggle' });
+  const button = el('button', { type: 'button', class: 'sound-toggle', id: 'sound-toggle' });
   const paint = (on) => {
-    button.replaceChildren(icon(on ? 'volume' : 'volumeOff'));
+    button.replaceChildren(icon(on ? 'volume' : 'volumeOff'), el('span', { text: on ? t('Sonidos: activados') : t('Sonidos: silenciados') }));
     button.setAttribute('aria-pressed', String(on));
     button.setAttribute('aria-label', on ? t('Sonidos activados: pulsa para silenciar') : t('Sonidos silenciados: pulsa para activarlos'));
     button.title = on ? t('Silenciar sonidos') : t('Activar sonidos');
@@ -286,7 +286,7 @@ function renderHeader() {
     el('div', { class: 'store-bar' },
       brandLink(),
       searchForm(),
-      el('div', { class: 'topbar__actions' }, languageSelect(), soundToggle(), accountMenu(), cartLink, burger)),
+      el('div', { class: 'topbar__actions' }, languageSelect(), accountMenu(), cartLink, burger)),
     el('div', { class: 'store-nav' }, megaMenu(), nav));
 }
 
@@ -392,7 +392,7 @@ function renderFooter() {
     el('div', { class: 'site-footer__grid' },
       brandColumn,
       column(t('Sobre nosotros'), [['/nosotros.html', t('Quiénes somos')], ['/nosotros.html#historia', t('Nuestra historia')],
-        ['/empresa.html#canales', t('Canales de atención')], ['/empresa.html#compra-segura', t('Compra fácil y segura')],
+        ['/nosotros.html#testimonios', t('Testimonios')], ['/empresa.html#canales', t('Canales de atención')], ['/empresa.html#compra-segura', t('Compra fácil y segura')],
         ['/empresa.html#metodos-pago', t('Métodos de pago')]]),
       column(t('Te informamos'), [['/empresa.html#tiendas', t('Nuestras tiendas')], ['/empresa.html#cobertura', t('Cobertura de delivery')],
         ['/legal.html#garantias', t('Garantías')], ['/legal.html#terminos', t('Términos y condiciones')], ['/legal.html#privacidad', t('Política de privacidad')],
@@ -409,7 +409,7 @@ function renderFooter() {
       el('ul', { class: 'pm-quick', 'aria-label': t('Enlaces rápidos') },
         [['/legal.html#terminos', t('Términos')], ['/legal.html#privacidad', t('Privacidad')], ['/legal.html#cookies', t('Cookies')],
           ['/libro-reclamaciones.html', t('Libro de reclamaciones')], ['/ayuda.html', t('Ayuda')]].map(([href, label]) => el('li', {}, el('a', { href, text: label }))),
-        el('li', {}, replay)),
+        el('li', {}, replay), el('li', {}, soundToggle())),
       legal));
 }
 
