@@ -1,6 +1,8 @@
 package com.polymer.config;
 
+import com.polymer.adapter.in.web.security.GoogleSignInHandlers;
 import com.polymer.adapter.in.web.security.PolymerUserPrincipal;
+import com.polymer.adapter.in.web.security.RememberedLoginFilter;
 import com.polymer.adapter.in.web.security.SecurityTelemetry;
 import com.polymer.application.port.out.UserRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -21,6 +23,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -36,8 +40,10 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 public class SecurityConfiguration {
-    private static final String CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    // v7: Google Maps y Google Calendar se incrustan como iframes (frame-src); el video de portada es local (media-src).
+    private static final String CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; "
             + "connect-src 'self' http://*:9091 https://*:9091 http://*:3000 https://*:3000; font-src 'self'; "
+            + "frame-src https://www.google.com https://maps.google.com https://calendar.google.com; "
             + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
     @Bean
@@ -68,7 +74,19 @@ public class SecurityConfiguration {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository contextRepository,
-                                            SecurityTelemetry telemetry) throws Exception {
+                                            SecurityTelemetry telemetry, RememberedLoginFilter rememberedLogin,
+                                            SignInConfiguration.GoogleClient google, GoogleSignInHandlers googleHandlers) throws Exception {
+        // v7: «Recordarme durante 30 días» (después de cargar la sesión, antes de autorizar).
+        http.addFilterAfter(rememberedLogin, SecurityContextHolderFilter.class);
+        if (google.registration() != null) {
+            // v7: «Continuar con Google» (OpenID Connect). Los manejadores no dejan la sesión autenticada
+            // hasta verificar el código de 6 dígitos enviado por correo.
+            http.oauth2Login(oauth -> oauth
+                    .loginPage("/login.html")
+                    .clientRegistrationRepository(new InMemoryClientRegistrationRepository(google.registration()))
+                    .successHandler(googleHandlers)
+                    .failureHandler(googleHandlers));
+        }
         http
             .securityContext(context -> context.securityContextRepository(contextRepository))
             // SPA: the token is read from GET /api/auth/csrf and sent in the X-CSRF-TOKEN header.
@@ -78,6 +96,7 @@ public class SecurityConfiguration {
                     .requestMatchers("/api/orders", "/api/orders/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
                     .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/shop/quote", "/api/shop/checkout-summary").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/shop/checkout-options").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()

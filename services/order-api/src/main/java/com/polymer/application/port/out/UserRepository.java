@@ -10,6 +10,8 @@ public interface UserRepository {
     Optional<UserAccount> findById(long id);
     Optional<StoredCredentials> credentials(String username);
     Optional<StoredCredentials> credentials(long id);
+    /** v7: cuenta por correo (sin distinguir mayúsculas), para vincular el inicio de sesión con Google. */
+    Optional<UserAccount> findByEmail(String email);
     boolean usernameExists(String username);
     boolean emailExists(String email, Long excludingId);
     UserAccount create(String username, String displayName, String email, String passwordHash, Set<Role> roles);

@@ -169,8 +169,9 @@ public class PlatformConfiguration {
     @Bean PasswordBlocklist passwordBlocklist() { return new ClasspathPasswordBlocklist(); }
     @Bean UserPreferences userPreferences(JdbcTemplate jdbc) { return new JdbcUserPreferences(jdbc); }
     @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist,
-                                          UserPreferences preferences) {
-        return new AccountService(users, hasher, audit, blocklist, preferences);
+                                          UserPreferences preferences, com.polymer.application.port.out.AccountSecurity security,
+                                          SignInConfiguration.MailSenderHolder mail) {
+        return new AccountService(users, hasher, audit, blocklist, preferences, security, mail.sender() != null);
     }
 
     /** Creates the demo accounts once, from the demo_password secret; never modifies existing users. */

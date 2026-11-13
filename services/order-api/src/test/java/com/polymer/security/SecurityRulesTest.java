@@ -47,7 +47,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /** RBAC, CSRF and compatibility of the original public API, exercised through the real security filter chain. */
 @WebMvcTest
-@Import({SecurityConfiguration.class, SecurityRulesTest.Metrics.class})
+@Import({SecurityConfiguration.class, SecurityRulesTest.Metrics.class, com.polymer.security.SignInTestBeans.class})
 class SecurityRulesTest {
     @TestConfiguration
     static class Metrics {
@@ -61,6 +61,7 @@ class SecurityRulesTest {
     @MockitoBean com.polymer.application.port.in.PromotionUseCases promotions;
     @MockitoBean com.polymer.application.port.in.CartUseCases carts;
     @MockitoBean AccountUseCases accounts;
+    @MockitoBean com.polymer.application.port.in.SignInUseCases signIn;
     @MockitoBean AdministrationUseCases administration;
     @MockitoBean OperationsUseCases operations;
     @MockitoBean LogisticsUseCases logistics;

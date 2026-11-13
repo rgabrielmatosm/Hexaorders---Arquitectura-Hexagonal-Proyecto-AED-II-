@@ -45,7 +45,35 @@ public final class IntegrationEnvironment implements EnvironmentPostProcessor {
                 throw new IllegalStateException("No se pudo leer " + passwordFile, unreadable);
             }
         }
+        // v7: correo. Mailpit en el perfil full; un relé SMTP real (p. ej. Gmail) si se configura SMTP_HOST y el secreto smtp_password.
+        String smtpHost = env.getProperty("SMTP_HOST", "mailpit");
+        props.put("polymer.integrations.mail.enabled", enabled(mode, smtpHost));
+        props.put("polymer.mail.sandbox", "mailpit".equalsIgnoreCase(smtpHost.trim()));
+        String smtpPassword = secret(env, "SMTP_PASSWORD_FILE");
+        if (!smtpPassword.isEmpty()) {
+            props.put("spring.mail.username", env.getProperty("SMTP_USERNAME", ""));
+            props.put("spring.mail.password", smtpPassword);
+            props.put("spring.mail.properties.mail.smtp.auth", true);
+            props.put("spring.mail.properties.mail.smtp.starttls.enable", env.getProperty("SMTP_STARTTLS", "true"));
+            props.put("spring.mail.properties.mail.smtp.starttls.required", env.getProperty("SMTP_STARTTLS", "true"));
+        }
+        // v7: «Continuar con Google». Sin client id/secret (archivos vacíos) el botón no se muestra.
+        String googleId = env.getProperty("GOOGLE_CLIENT_ID", "").isBlank() ? secret(env, "GOOGLE_CLIENT_ID_FILE") : env.getProperty("GOOGLE_CLIENT_ID").strip();
+        String googleSecret = env.getProperty("GOOGLE_CLIENT_SECRET", "").isBlank() ? secret(env, "GOOGLE_CLIENT_SECRET_FILE") : env.getProperty("GOOGLE_CLIENT_SECRET").strip();
+        props.put("polymer.google.client-id", googleId);
+        props.put("polymer.google.client-secret", googleSecret);
         env.getPropertySources().addFirst(new MapPropertySource("polymer-integrations", props));
+    }
+
+    /** Contenido de un secreto montado como archivo; vacío si la variable no existe o el archivo falta. */
+    private static String secret(ConfigurableEnvironment env, String variable) {
+        String file = env.getProperty(variable);
+        if (file == null || file.isBlank() || !Files.isRegularFile(Path.of(file))) return "";
+        try {
+            return Files.readString(Path.of(file), StandardCharsets.UTF_8).strip();
+        } catch (IOException unreadable) {
+            throw new IllegalStateException("No se pudo leer " + file, unreadable);
+        }
     }
 
     private static boolean enabled(String mode, String host) {
