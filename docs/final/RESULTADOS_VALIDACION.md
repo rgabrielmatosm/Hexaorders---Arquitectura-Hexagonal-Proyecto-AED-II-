@@ -47,7 +47,41 @@ ni Grafana (por eso el correo de la boleta y los pasos de monitoreo se validan e
 | Validaciones estáticas | `generate_pages --check` (47 páginas), `check_frontend`, `check_i18n` (2663 textos × 5 idiomas), `check_observability` (8 dashboards, 2 paneles nuevos), `generate_delivery --check`, `validate_delivery` |
 | Entregable autosuficiente | Restauración simulada de los heredocs: `services/order-api/src` y el video idénticos byte a byte |
 
-## 2. CI con Docker real
+## 1 ter. v7 · CI con Docker real (13/11/2026)
+
+Ejecución **[43384929823](https://github.com/rgabrielmatosm/Polymer-Tech-Proyecto-AED-II/actions/runs/43384929823)** del workflow `Verify POLYMER` sobre el commit `c6da401` (rama
+`claude/clever-curie-1597uv`, PR 4): **los 4 jobs en verde** (`compose` 07:19–07:35 UTC, `compose-basic`,
+`windows`, `migrate-from-v6`). Líneas literales del registro:
+
+| Paso | Resultado (texto del registro) |
+| --- | --- |
+| `polymer.ps1 verify` (modo full) | `Tests run: 163, Failures: 0, Errors: 0, Skipped: 0` · pytest `62 passed` · `OK plataforma: 39 comprobaciones` · `OK tienda: 51 comprobaciones` · `OK integración (check): 49 comprobaciones` · `degraded` 4 · `recovered` 3 · persistencia tras reinicio · `HTTP 503 recibido correctamente.` · `VERIFICACIÓN COMPLETA (modo full): todos los servicios funcionan de extremo a extremo.` |
+| Validaciones estáticas | `OK: 47 páginas HTML al día` · `frontend multipágina coherente (47 páginas …, 39 rutas, 13 transiciones, CSP sin estilos ni scripts en línea …)` · `OK i18n: 2663 textos traducidos en 5 idiomas (+ español)` |
+| `ui-e2e.js` | `UI E2E correcta: 28 comprobaciones` |
+| `pages-e2e.js` | `Páginas E2E correctas: 295 comprobaciones` (incluye Prometheus/Grafana y la vista móvil de 390 px) |
+| `intro-e2e.js` | `OK: intro y movimiento de POLYMER (41 comprobaciones)` |
+| `i18n-e2e.js` | `OK i18n e2e: 78 comprobaciones` |
+| `v7-e2e.js` (con el proveedor OIDC de pruebas y RabbitMQ: incluye el correo de la boleta) | `OK v7 e2e: 34 comprobaciones` |
+| Escenario `pagos` (exposición) | `OK demostración «pagos»: 9 evidencias comprobadas en 67 s` |
+| Resto de escenarios | `preparar` 1 · `arquitectura` 11 · `rabbitmq` 5 · `postgres` 3 · `riesgo` 3 · `observabilidad` 2 · `redis-caida` 3 · `rabbitmq-caida` 6 · `riesgo-caida` 3 · `activar-demo` 2 · `redis` 8 · `adaptador` 2 · `desactivar-demo` 1 · `preparar` 1 — todos «OK» |
+| `migrate-from-v6` | Flyway hasta **V12**; `Volúmenes: 8 originales conservados y 8 polymer_* migrados` · `Antes: 1/6/557/1 · después: 1/6/557/1` · `Pedido de la v6 intacto` · cuentas existentes siguen verificadas (V11) y tabla `payments` creada (V12) · `change-password` de PostgreSQL, Grafana y RabbitMQ · segunda migración: `No hay volúmenes pendientes de migrar.` |
+| `windows` (PowerShell 5.1) | `OK init-env.ps1` · `OK polymer.ps1` · `OK polymer-demo.ps1` · `Comprobaciones correctas.` · `62 passed` · `Tests unitarios correctos.` |
+
+Errores que el CI encontró en la v7 y se corrigieron antes de esta ejecución:
+
+1. El contexto de construcción de `order-api` superaba el límite de 4 MiB de BuildKit (gRPC) por el video
+   y los archivos grandes del entregable → los archivos de más de 4 KB se empaquetan aparte (`LARGE_FILE`).
+2. El `RUN` que desempaqueta el frontend se ejecutaba como usuario sin privilegios → `USER root` durante la
+   construcción y `USER 101` al final (archivos idénticos byte a byte).
+3. `integration_smoke.py recovered` contaba también el correo del código de 6 dígitos → se filtra.
+4. `migrate-from-v6` esperaba Flyway V10 → V12, con comprobaciones nuevas de `email_verified` y `payments`.
+5. **Vista móvil (390 px) de la portada con desplazamiento horizontal**: las tarjetas del mapa y del horario
+   crecían con su contenido (`1fr` con mínimo automático) → `minmax(0, 1fr)`, `min-width: 0` y ajuste de
+   línea en dirección, correo y botones. La prueba ahora indica qué elemento desborda y guarda una captura.
+6. `intro-e2e.js` aún exigía «pagos próximamente» en el pie → ahora comprueba que el pie lista tarjeta, Yape,
+   Plin y contra entrega sin anunciar marcas de tarjeta.
+
+## 2. CI con Docker real (v6, referencia)
 
 Ejecución **[43324523676](https://github.com/rgabrielmatosm/Hexaorders---Arquitectura-Hexagonal-Proyecto-AED-II-/actions/runs/43324523676)** del workflow `Verify POLYMER` sobre el commit `016f521` (rama
 `claude/clever-curie-1597uv`): **los 4 jobs en verde** (`compose`, `compose-basic`, `windows`,
