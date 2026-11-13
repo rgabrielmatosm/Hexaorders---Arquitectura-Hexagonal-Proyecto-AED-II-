@@ -360,6 +360,9 @@ function Show-StartFailure {
     } else {
         Write-Host 'Para ver otro servicio: docker compose logs --no-color --tail=80 NOMBRE' -ForegroundColor Yellow
     }
+    Write-Host ('Si el error dice «port is already allocated» o «ports are not available»: otro contenedor o programa usa ese puerto. ' +
+                'Ejecuta de nuevo .\polymer.cmd start (te dice cuál es y ofrece detenerlo). Si no aparece ninguno, reinicia Docker Desktop ' +
+                '(icono -> Restart) y vuelve a intentarlo. Tus datos no se tocaron.') -ForegroundColor Yellow
 }
 
 function Invoke-RepairDbPassword {
@@ -478,6 +481,70 @@ function Import-LegacySecrets([switch]$Explicit) {
             Copy-Item -LiteralPath $source -Destination (Join-Path $target $file)
             Write-Host "  copiado $file"
         }
+    }
+}
+
+# ---------------------------------------------------------------- puertos del equipo (antes de arrancar)
+
+function Get-HostPorts {
+    # Puertos que POLYMER publica en 127.0.0.1 (deben coincidir con tools/validate_delivery.py).
+    $ports = [ordered]@{ 8080 = 'frontend (tienda)'; 8081 = 'order-api'; 8000 = 'risk-engine'; 9091 = 'prometheus'; 3000 = 'grafana' }
+    if ($FullMode) { $ports[15672] = 'rabbitmq'; $ports[8025] = 'mailpit'; $ports[13133] = 'otel-collector'; $ports[12345] = 'alloy' }
+    return $ports
+}
+
+function Assert-HostPortsFree {
+    # «port is already allocated»: otro contenedor (de otro proyecto) o un programa ya usa un puerto de POLYMER.
+    # Se detecta ANTES de arrancar, se dice quién lo usa y se ofrece detenerlo (detener no borra nada).
+    $project = if ($env:COMPOSE_PROJECT_NAME) { $env:COMPOSE_PROJECT_NAME } elseif ($IsVerifyCommand) { $VerifyProject } else { 'polymer' }
+    $ports = Get-HostPorts
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $rows = @(& docker ps --format '{{.Names}}|{{.Label "com.docker.compose.project"}}|{{.Ports}}' 2>$null) } finally { $ErrorActionPreference = $previous }
+    $containers = @{}
+    $lines = @()
+    foreach ($row in $rows) {
+        $parts = "$row".Split([char]'|', 3)
+        if ($parts.Count -lt 3 -or $parts[1] -eq $project) { continue }
+        foreach ($port in $ports.Keys) {
+            if ($parts[2] -match (':' + $port + '->')) {
+                $containers[$parts[0]] = $parts[1]
+                $owner = if ($parts[1]) { "proyecto «$($parts[1])»" } else { 'sin proyecto de Compose' }
+                $lines += "  Puerto $port ($($ports[$port])): lo usa el contenedor $($parts[0]) ($owner)"
+            }
+        }
+    }
+    # Windows: programas que escuchan en esos puertos fuera de Docker (los procesos de Docker Desktop se ignoran).
+    $programs = @()
+    if ($OnWindows -and (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {
+        foreach ($port in $ports.Keys) {
+            $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+            foreach ($listener in $listeners) {
+                $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+                $name = if ($process) { $process.ProcessName } else { "PID $($listener.OwningProcess)" }
+                if ($name -match '^(com\.docker|docker|vpnkit|wslrelay|Docker Desktop|wsl|System|Idle)') { continue }
+                $programs += "  Puerto $port ($($ports[$port])): lo usa el programa $name (PID $($listener.OwningProcess))"
+            }
+        }
+    }
+    if (-not $lines -and -not $programs) { return }
+    Write-Host ''
+    Write-Host 'Puertos de POLYMER ocupados en este equipo:' -ForegroundColor Yellow
+    foreach ($line in @($lines + $programs | Select-Object -Unique)) { Write-Host $line -ForegroundColor Yellow }
+    if ($containers.Count) {
+        $names = @($containers.Keys)
+        $auto = @($containers.Values | Where-Object { $_ -notin @('polymer-verify', $LegacyProject) }).Count -eq 0
+        $answer = if ($AssumeYes -and $auto) { 's' } elseif ($AssumeYes) { 'n' } else {
+            Read-Host "¿Detener ahora $($names -join ', ')? Se detienen, NO se borran (docker start NOMBRE los vuelve a arrancar) [S/n]" }
+        if ($answer -notmatch '^[nN]') {
+            Write-Step "Detener (sin borrar) $($names -join ', ')"
+            Invoke-Native 'docker' (@('stop') + $names) | Out-Null
+            $containers = @{}
+        }
+    }
+    if ($containers.Count -or $programs) {
+        throw ("POLYMER necesita esos puertos libres. Detén los contenedores con: docker stop NOMBRE, o cierra el programa indicado, " +
+               'y vuelve a ejecutar .\polymer.cmd start. Tus datos no se tocaron.')
     }
 }
 
@@ -789,6 +856,8 @@ function Invoke-Start {
     Write-Step 'Construir imágenes (incluye los tests de Java y Python)'
     [void](Invoke-Compose @('build', '--pull'))
     if ((Test-DbVolumeExists) -and -not (Test-DatabasePassword)) { throw (Get-DbPasswordHelp) }
+    Write-Step 'Comprobar que los puertos de POLYMER están libres'
+    Assert-HostPortsFree
     Write-Step "Arrancar los servicios del modo $Mode y esperar a que estén sanos"
     try { [void](Invoke-Compose @('up', '-d', '--wait', '--wait-timeout', "$WaitTimeout")) }
     catch { Show-StartFailure; throw }
