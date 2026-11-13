@@ -1214,14 +1214,24 @@ function Invoke-GoogleSetup {
         if ($interactive) {
             $answer = Read-Host '  ¿Enviar ahora un correo de prueba a tu Gmail para comprobar la contraseña? [S/n]'
             if ($answer -notmatch '^[nN]') {
+                # Windows PowerShell 5.1 (.NET Framework) usa TLS 1.0 por defecto y Gmail exige TLS 1.2 o superior.
+                try { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12 } catch { }
                 $smtp = New-Object System.Net.Mail.SmtpClient('smtp.gmail.com', 587)
                 $smtp.EnableSsl = $true
+                $smtp.Timeout = 20000
                 $smtp.Credentials = New-Object System.Net.NetworkCredential($gmail, $appPassword)
                 try {
                     $smtp.Send($gmail, $gmail, 'POLYMER: Gmail configurado', 'Este correo confirma que POLYMER puede enviar los códigos de verificación y las boletas a tu Gmail.')
                     Write-Host '  Correo de prueba enviado: revisa tu bandeja.' -ForegroundColor Green
                 } catch {
-                    throw "Gmail rechazó la contraseña de aplicación o la conexión ($($_.Exception.InnerException.Message)). Revisa la verificación en 2 pasos y crea otra contraseña de aplicación."
+                    # Motivo real (cadena de excepciones) y vuelta a Mailpit para que los códigos sigan llegando.
+                    $reasons = @(); $e = $_.Exception
+                    while ($e) { if ($e.Message) { $reasons += $e.Message }; $e = $e.InnerException }
+                    Write-Host "  Gmail no aceptó el envío: $(($reasons | Select-Object -Unique) -join ' -> ')" -ForegroundColor Yellow
+                    Write-Host '  Causas habituales: contraseña de aplicación mal copiada (créala de nuevo), un antivirus o red que bloquea el puerto 587.' -ForegroundColor Yellow
+                    Set-DotEnvValues ([ordered]@{ POLYMER_SMTP_HOST = 'mailpit'; POLYMER_SMTP_PORT = '1025'; POLYMER_SMTP_USERNAME = ''; POLYMER_MAIL_FROM = "'Polymer <no-reply@polymer.local>'" })
+                    Write-PlainSecret 'smtp_password.txt' ''
+                    Write-Host '  Se mantiene Mailpit (http://localhost:8025) para los correos. Vuelve a ejecutar .\polymer.cmd google cuando quieras reintentar.' -ForegroundColor Yellow
                 } finally { $smtp.Dispose() }
             }
         }
