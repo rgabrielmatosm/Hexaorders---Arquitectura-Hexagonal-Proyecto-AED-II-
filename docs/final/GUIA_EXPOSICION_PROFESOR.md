@@ -27,7 +27,7 @@ Comprueba que los 13 contenedores están en marcha y sanos y muestra las URL. Te
 En VS Code, abre la carpeta del proyecto y una terminal PowerShell. **No muestres en pantalla** los
 archivos de `secrets\`.
 
-Orden recomendado (≈ 40 min): A → B → C → D → E → F → G → H. Los escenarios solo crean datos **ficticios**
+Orden recomendado (≈ 50 min): A → B → C → D → E → F → G → H → I → J. Los escenarios solo crean datos **ficticios**
 (clientes `demo_xxxx` con correo `@example.test` y sus pedidos); no borran nada.
 
 ---
@@ -184,6 +184,36 @@ Orden recomendado (≈ 40 min): A → B → C → D → E → F → G → H. Los
 
 Cada escenario vuelve a arrancar la dependencia al terminar. Si una ejecución se interrumpe:
 `.\polymer.cmd start` restaura todos los servicios sin tocar datos.
+
+## Escenario I — Pagos: tarjeta, Yape con TTL de 60 s y boleta (v7)
+
+- **Teoría:** el dominio fija la regla (`PaymentPolicy.WALLET_TTL = 60 s`); el puerto `PaymentWindow` tiene dos
+  adaptadores: Redis (clave con TTL, se borra sola) y reloj (sin Redis). La boleta (`Receipt`) calcula base + IGV.
+  El correo con la boleta viaja por el outbox y RabbitMQ (evento `PAYMENT_CONFIRMED`). Ver `GUIA_GOOGLE_Y_PAGOS.md`.
+- **Comando:**
+
+  ```powershell
+  .\polymer.cmd demo -Scenario pagos
+  ```
+
+- **Resultado esperado:** `redis-cli TTL polymer:payment:window:<id>` baja de 60 a -2; confirmar después → 409;
+  QR nuevo aprobado (PAID, boleta B001-…); tarjeta 4000…0002 rechazada (402) y 4111…1111 aprobada; correo
+  «Boleta B001-…» en Mailpit.
+- **Web:** compra con **Tarjeta** o **Yape** en el checkout → página de pago con el QR y la cuenta regresiva →
+  boleta imprimible. Grafana → **POLYMER — Business Operations** → «Pagos en línea por método y resultado».
+
+## Escenario J — Continuar con Google, código por correo y «Recordarme» (v7)
+
+- **Requisito:** tus credenciales de Google Cloud en `secrets\google_client_id.txt` y `google_client_secret.txt`
+  (pasos en `GUIA_GOOGLE_Y_PAGOS.md`, sección 2) y `.\polymer.cmd restart -Services order-api`.
+- **Demostración:** `/login.html` → **Continuar con Google** → elige tu cuenta → POLYMER pide el **código de 6
+  dígitos** (en Mailpit, o en tu Gmail si configuraste el SMTP) → marca **Recordarme durante 30 días** → entra.
+  Cierra sesión y vuelve a entrar con Google: ya no pide el código (dispositivo de confianza).
+- **Teoría:** Google es solo el primer factor (adaptador de entrada `GoogleSignInHandlers`); el núcleo
+  (`SignInService`) decide si pide el código y vincula la cuenta por el `sub` de Google. Grafana →
+  **POLYMER — Security & Audit** → «Sesiones abiertas por método» y «Códigos de verificación por correo».
+- **Sin credenciales de Google:** el CI prueba el mismo flujo con un proveedor OpenID Connect de pruebas
+  (`infra/ci/compose.google-mock.yml`).
 
 ---
 

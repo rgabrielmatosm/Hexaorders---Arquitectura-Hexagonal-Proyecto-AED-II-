@@ -36,6 +36,7 @@ Tienda de tecnología y plataforma de gestión de pedidos con **arquitectura hex
 16. [Idiomas](#16-idiomas)
 17. [Seguridad de contraseñas](#17-seguridad-de-contraseñas)
 18. [Exposición, demostraciones y documentación final](#18-exposición-demostraciones-y-documentación-final)
+19. [Novedades v7: Google, código por correo, pagos, boleta, mapa, horario y video](#19-novedades-v7-google-código-por-correo-pagos-boleta-mapa-horario-y-video)
 
 Anexos: [API](#anexo-a-api) · [Documentación técnica](#anexo-b-documentación-técnica) · [Historial y migración](#anexo-c-historial-y-migración)
 
@@ -334,7 +335,7 @@ Los permisos se comprueban en el servidor, en Spring Security y en el dominio. O
 
 | Tipo | Herramienta | Qué comprueba |
 | --- | --- | --- |
-| Dominio y casos de uso | JUnit 5 + Mockito (131 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
+| Dominio y casos de uso | JUnit 5 + Mockito (163 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
 | **Arquitectura** | ArchUnit (`HexagonalArchitectureTest`) y `test_architecture.py` | El núcleo no depende de frameworks; los adaptadores de entrada solo usan puertos de entrada |
 | Motor de riesgo | pytest (62 pruebas) | Reglas, decimales exactos, validación y métricas |
 | API real | `smoke.py`, `platform_smoke.py`, `store_smoke.py`, `integration_smoke.py` | Pedidos, roles, tienda, carrito, checkout, Redis, RabbitMQ, Mailpit, Loki, Tempo y Grafana |
@@ -490,6 +491,23 @@ Documentos en [`docs/final/`](docs/final/):
 | [`MATRIZ_PRUEBAS.md`](docs/final/MATRIZ_PRUEBAS.md) · [`RESULTADOS_VALIDACION.md`](docs/final/RESULTADOS_VALIDACION.md) | Qué se prueba, dónde y con qué resultado real |
 
 ---
+
+## 19. Novedades v7: Google, código por correo, pagos, boleta, mapa, horario y video
+
+| Novedad | Qué hace | Dónde verlo |
+| --- | --- | --- |
+| **Continuar con Google** | OpenID Connect con Spring Security; vincula o crea la cuenta y pide un **código de 6 dígitos** enviado al correo antes de abrir la sesión | `/login.html` (aparece al configurar `secrets\google_client_id.txt` y `google_client_secret.txt`) |
+| **Verificación por correo** | Cuentas nuevas confirman su correo; verificación en dos pasos opcional; código de 10 min, 5 intentos, solo el hash en la base | `/registro.html`, *Perfil y seguridad* |
+| **Recordarme durante 30 días** | Sesión persistente y dispositivo de confianza (cookies HttpOnly, ficha rotativa, detección de robo) | Casilla en el acceso y en el paso del código |
+| **Pago con tarjeta** | Aprobación inmediata (pasarela de **prueba**: no cobra); Luhn, vencimiento y CVV; solo marca y 4 últimos dígitos | Checkout → `/cliente/pago.html` |
+| **Yape y Plin** | Solicitud con **QR que vence en 60 s** (clave en Redis con TTL; sin Redis, el reloj) y cuenta regresiva sincronizada | `/cliente/pago.html`, `.\polymer.cmd demo -Scenario pagos` |
+| **Boleta** | B001-00000001, base imponible + IGV 18 %; página imprimible y **correo con la boleta** (outbox → RabbitMQ → consumidor) | `/cliente/boleta.html`, Mailpit o tu Gmail |
+| **Portada con video** | Video original de la marca en bucle, silenciado, con pausa y póster si se reduce el movimiento | `/` |
+| **Mapa y horario** | Google Maps incrustado, «Cómo llegar», horario de hoy en hora de Lima con feriados, calendario del mes y **Agregar a Google Calendar** | Portada, Contacto, Empresa, recojo en el checkout, pie |
+
+Configuración (Google, Gmail, dirección real de la tienda, calendario público) y demostración:
+[`docs/final/GUIA_GOOGLE_Y_PAGOS.md`](docs/final/GUIA_GOOGLE_Y_PAGOS.md). Sin configurar nada, todo funciona con
+Mailpit, las pasarelas de prueba y una dirección de demostración.
 
 ## Anexo A. API
 

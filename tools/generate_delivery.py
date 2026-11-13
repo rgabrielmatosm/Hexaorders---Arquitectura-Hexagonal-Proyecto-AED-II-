@@ -56,7 +56,9 @@ INLINE_MARKERS = {
 # BuildKit recibe el Dockerfile en un solo mensaje gRPC (máximo 4 MiB, y el contenido viaja más de una
 # vez): los archivos de texto grandes (catálogos de traducción, catálogo SQL) se incrustan comprimidos
 # con gzip + base64 y una instrucción RUN los restaura byte a byte antes de compilar.
-LARGE_FILE = 64 * 1024
+# v7: umbral de 4 KB (antes 64 KB). Con el código de la v7 el mensaje de order-api llegó a 4,78 MB (límite
+# 4 MiB): comprimir también los archivos medianos deja el Dockerfile en ~1,4 MB y con margen para crecer.
+LARGE_FILE = 4 * 1024
 
 
 # v7: archivos binarios (video y póster de la portada) viajan igual, en gzip + base64, byte a byte.
