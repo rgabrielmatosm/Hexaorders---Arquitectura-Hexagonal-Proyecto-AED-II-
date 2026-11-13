@@ -45,7 +45,53 @@ public final class IntegrationEnvironment implements EnvironmentPostProcessor {
                 throw new IllegalStateException("No se pudo leer " + passwordFile, unreadable);
             }
         }
+        // v7: correo. Mailpit en el perfil full; un relé SMTP real (p. ej. Gmail) si se configura SMTP_HOST y el secreto smtp_password.
+        String smtpHost = env.getProperty("SMTP_HOST", "mailpit");
+        props.put("polymer.integrations.mail.enabled", enabled(mode, smtpHost));
+        props.put("polymer.mail.sandbox", "mailpit".equalsIgnoreCase(smtpHost.trim()));
+        String smtpPassword = secret(env, "SMTP_PASSWORD_FILE");
+        if (!smtpPassword.isEmpty()) {
+            props.put("spring.mail.username", env.getProperty("SMTP_USERNAME", ""));
+            props.put("spring.mail.password", smtpPassword);
+            props.put("spring.mail.properties.mail.smtp.auth", true);
+            props.put("spring.mail.properties.mail.smtp.starttls.enable", env.getProperty("SMTP_STARTTLS", "true"));
+            props.put("spring.mail.properties.mail.smtp.starttls.required", env.getProperty("SMTP_STARTTLS", "true"));
+        }
+        // v7: «Continuar con Google». Sin client id/secret (archivos vacíos) el botón no se muestra.
+        // v8: variables GOOGLE_CLIENT_ID/SECRET si se definen; si no, el JSON descargado de Google Cloud
+        //     (secrets/google-oauth.json → GOOGLE_OAUTH_JSON_FILE); si no existe o está vacío, los archivos de la v7.
+        String jsonFile = env.getProperty("GOOGLE_OAUTH_JSON_FILE", "");
+        GoogleOAuthCredentials.Reading json = GoogleOAuthCredentials.read(jsonFile.isBlank() ? null : Path.of(jsonFile));
+        String googleId;
+        String googleSecret;
+        boolean explicit = !env.getProperty("GOOGLE_CLIENT_ID", "").isBlank();  // p. ej. el proveedor de pruebas del CI
+        if (json.present() && !explicit) {
+            googleId = json.credentials().clientId();
+            googleSecret = json.credentials().clientSecret();
+            props.put("polymer.google.source", "secrets/google-oauth.json");
+            props.put("polymer.google.redirect-uris", String.join(",", json.credentials().redirectUris()));
+        } else {
+            googleId = env.getProperty("GOOGLE_CLIENT_ID", "").isBlank() ? secret(env, "GOOGLE_CLIENT_ID_FILE") : env.getProperty("GOOGLE_CLIENT_ID").strip();
+            googleSecret = env.getProperty("GOOGLE_CLIENT_SECRET", "").isBlank() ? secret(env, "GOOGLE_CLIENT_SECRET_FILE") : env.getProperty("GOOGLE_CLIENT_SECRET").strip();
+            props.put("polymer.google.source", explicit ? "variables GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET"
+                    : "secrets/google_client_id.txt y google_client_secret.txt");
+            props.put("polymer.google.redirect-uris", "");
+        }
+        if (json.problem() != null) props.put("polymer.google.problem", json.problem());
+        props.put("polymer.google.client-id", googleId);
+        props.put("polymer.google.client-secret", googleSecret);
         env.getPropertySources().addFirst(new MapPropertySource("polymer-integrations", props));
+    }
+
+    /** Contenido de un secreto montado como archivo; vacío si la variable no existe o el archivo falta. */
+    private static String secret(ConfigurableEnvironment env, String variable) {
+        String file = env.getProperty(variable);
+        if (file == null || file.isBlank() || !Files.isRegularFile(Path.of(file))) return "";
+        try {
+            return Files.readString(Path.of(file), StandardCharsets.UTF_8).strip();
+        } catch (IOException unreadable) {
+            throw new IllegalStateException("No se pudo leer " + file, unreadable);
+        }
     }
 
     private static boolean enabled(String mode, String host) {

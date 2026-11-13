@@ -5,6 +5,7 @@ import com.polymer.application.exception.ForbiddenOperationException;
 import com.polymer.application.exception.ResourceNotFoundException;
 import com.polymer.application.port.in.AccountUseCases;
 import com.polymer.application.port.in.AuthenticatedUser;
+import com.polymer.application.port.out.AccountSecurity;
 import com.polymer.application.port.out.AuditLog;
 import com.polymer.application.port.out.PasswordBlocklist;
 import com.polymer.application.port.out.PasswordHasher;
@@ -37,13 +38,23 @@ public final class AccountService implements AccountUseCases {
 
     private final PasswordBlocklist blocklist;
     private final UserPreferences preferences;
+    private final AccountSecurity security;
+    private final boolean verifyEmails;
 
     public AccountService(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist, UserPreferences preferences) {
+        this(users, hasher, audit, blocklist, preferences, null, false);
+    }
+
+    /** v7: verifyEmails = hay servidor de correo; las cuentas nuevas y los correos cambiados se confirman con un código. */
+    public AccountService(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist, UserPreferences preferences,
+                          AccountSecurity security, boolean verifyEmails) {
         this.users = users;
         this.hasher = hasher;
         this.audit = audit;
         this.blocklist = blocklist;
         this.preferences = preferences;
+        this.security = security;
+        this.verifyEmails = verifyEmails && security != null;
     }
 
     @Override
@@ -61,6 +72,7 @@ public final class AccountService implements AccountUseCases {
         if (users.usernameExists(username)) throw new BusinessConflictException("DUPLICATE_USERNAME", "Ese nombre de usuario ya existe");
         if (users.emailExists(email.strip().toLowerCase(), null)) throw new BusinessConflictException("DUPLICATE_EMAIL", "Ese correo ya está registrado");
         UserAccount created = users.create(username, displayName.strip(), email.strip().toLowerCase(), hasher.hash(password), EnumSet.of(Role.CUSTOMER));
+        if (verifyEmails) security.setEmailVerified(created.id(), false); // se confirma con el código al iniciar sesión
         audit.record(username, "USER_REGISTERED", "user:" + username, "CUSTOMER");
         return created;
     }
@@ -78,7 +90,9 @@ public final class AccountService implements AccountUseCases {
         UserAccount.validateEmail(email == null ? null : email.strip());
         String normalizedEmail = email.strip().toLowerCase();
         if (users.emailExists(normalizedEmail, user.userId())) throw new BusinessConflictException("DUPLICATE_EMAIL", "Ese correo ya está registrado");
+        boolean emailChanged = !normalizedEmail.equalsIgnoreCase(me(user).email());
         UserAccount updated = users.updateProfile(user.userId(), displayName.strip(), normalizedEmail).orElseThrow();
+        if (emailChanged && verifyEmails) security.setEmailVerified(user.userId(), false); // el correo nuevo se confirma con un código
         audit.record(user.username(), "PROFILE_UPDATED", "user:" + user.username(), "");
         return updated;
     }

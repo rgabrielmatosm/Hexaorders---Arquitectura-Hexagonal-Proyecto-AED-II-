@@ -987,6 +987,52 @@
         "x": 0,
         "y": 42
       }
+    },
+    {
+      "id": 20,
+      "title": "Pagos en línea por método y resultado (1 h)",
+      "type": "timeseries",
+      "description": "v7: tarjeta (inmediato), Yape y Plin (QR de 60 s). outcome = started, paid, declined, expired. Pasarelas de prueba: no hay cobros reales.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method, outcome) (increase(polymer_payments_total[1h]))",
+          "legendFormat": "{{method}} · {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 18,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      }
     }
   ],
   "annotations": {

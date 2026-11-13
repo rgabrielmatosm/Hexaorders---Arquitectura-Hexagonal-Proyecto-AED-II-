@@ -44,9 +44,8 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     check(/intro-(pending|running)/.test(early), `Antes de pintar, la página queda cubierta (clase «${early.trim()}»)`);
     await page.waitForSelector('#polymer-intro', { timeout: 5000 });
     check((await page.$$('.intro__word span')).length === 7, 'El logotipo P·O·L·Y·M·E·R aparece letra por letra (7 letras)');
-    check(await page.isVisible('text=Entrar con sonido'), 'Botón visible «Entrar con sonido» (el audio nunca arranca solo)');
-    check(await page.isVisible('text=Omitir intro'), 'Botón visible «Omitir intro»');
-    check(await page.evaluate(() => document.activeElement?.textContent === 'Omitir intro'), 'El foco está en «Omitir intro» (teclado)');
+    check(await page.locator('#polymer-intro button').count() === 0, 'v9: la intro no muestra botones («Entrar con sonido» / «Omitir intro»)');
+    check(await page.evaluate(() => document.activeElement?.id === 'polymer-intro'), 'El foco queda en la intro (Esc o un clic la abren antes)');
     await page.waitForTimeout(1600);
     await page.screenshot({ path: path.join(OUT, 'p1-intro.png') });
     check(await page.evaluate(() => document.querySelector('#view-root .hero-store, #view-root .product-card') !== null),
@@ -54,7 +53,7 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     await page.waitForSelector('#polymer-intro', { state: 'detached', timeout: 7000 });
     check(true, 'La intro termina sola (≈4 s) y abre el telón');
     check(await page.evaluate(() => sessionStorage.getItem('polymer.intro.seen') === '1'), 'Queda registrada como vista en esta sesión');
-    check(await page.evaluate(() => localStorage.getItem('polymer.sound') !== 'on'), 'Sin interacción no se activa el sonido');
+    check(await page.evaluate(() => localStorage.getItem('polymer.sound') !== 'off'), 'v9: el sonido está activado por defecto (suena desde la primera interacción)');
     await page.screenshot({ path: path.join(OUT, 'p2-portada.png') });
 
     // 2. No se repite al navegar ni al recargar.
@@ -67,14 +66,15 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     check(!(await introVisible(page)), 'No se repite al recargar');
     check(await page.evaluate(() => getComputedStyle(document.body).visibility === 'visible'), 'La página es visible de inmediato en visitas siguientes');
 
-    // 3. Botón de sonido global (apagado por defecto, persistente).
-    const toggle = page.locator('#sound-toggle');
-    check((await toggle.getAttribute('aria-pressed')) === 'false', 'El silencio global está activo por defecto');
+    // 3. v9: interruptor de sonido en el PIE (no en la cabecera), activado por defecto y persistente.
+    check(await page.locator('.topbar #sound-toggle').count() === 0, 'v9: la cabecera ya no tiene el botón de altavoz');
+    const toggle = page.locator('.pm-footer #sound-toggle');
+    check((await toggle.getAttribute('aria-pressed')) === 'true', 'Los sonidos están activados por defecto (interruptor del pie)');
     await toggle.click();
-    check((await toggle.getAttribute('aria-pressed')) === 'true' && await page.evaluate(() => localStorage.getItem('polymer.sound') === 'on'),
-      'El botón de sonido activa los sonidos y recuerda la preferencia');
+    check((await toggle.getAttribute('aria-pressed')) === 'false' && await page.evaluate(() => localStorage.getItem('polymer.sound') === 'off'),
+      'El interruptor del pie silencia los sonidos y recuerda la preferencia');
     await toggle.click();
-    check(await page.evaluate(() => localStorage.getItem('polymer.sound') === 'off'), 'El botón de sonido vuelve a silenciar');
+    check(await page.evaluate(() => localStorage.getItem('polymer.sound') === 'on'), 'El interruptor vuelve a activar los sonidos');
 
     // 4. Pie comercial: 5 columnas, contactos de demostración y enlaces reales.
     await page.goto(`${BASE_URL}/`);
@@ -91,7 +91,10 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     check(footer.text.includes('Tecnología que conecta contigo.') && footer.text.includes('+51 900 000 000') && footer.text.includes('soporte@example.com')
       && footer.text.includes('Libro de reclamaciones') && footer.text.includes('DEMO'), 'Eslogan, contacto de demostración marcado como DEMO y Libro de reclamaciones');
     check(/RUC: no configurado/.test(footer.text) && !/RUC: \d/.test(footer.text), 'No se inventa ningún RUC');
-    check(/próximamente/.test(footer.text) && !/Visa|Mastercard|Yape|Plin/.test(footer.text), 'Los pagos no integrados se muestran como «próximamente» y no se anuncian marcas de pago');
+    // v7: tarjeta, Yape y Plin ya se pagan en el checkout (pasarelas de pruebas): el pie los lista y no anuncia
+    // marcas de tarjeta (Visa, Mastercard) ni métodos «próximamente» que no existan.
+    check(['Tarjeta de crédito o débito', 'Yape', 'Plin', 'Pago contra entrega'].every((m) => footer.text.includes(m))
+      && !/· próximamente/.test(footer.text) && !/Visa|Mastercard/.test(footer.text), 'El pie lista los pagos del checkout (tarjeta, Yape, Plin…) sin anunciar marcas de tarjeta');
     check(footer.social === 6, 'Iconos de Facebook, Instagram, TikTok, YouTube, LinkedIn y WhatsApp');
     const internal = [...new Set(footer.hrefs.filter((h) => h.startsWith(BASE_URL)).map((h) => h.split('#')[0]))];
     for (const href of internal) {
@@ -140,18 +143,19 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     await esc.page.goto(`${BASE_URL}/?intro=1`);
     await esc.page.waitForSelector('#polymer-intro');
     check(true, '«Ver la intro» (?intro=1) la repite a demanda');
-    await esc.page.click('text=Omitir intro');
-    await esc.page.waitForSelector('#polymer-intro', { state: 'detached', timeout: 2500 });
-    check(true, 'El botón «Omitir intro» la cierra');
+    await esc.page.mouse.click(200, 200);
+    await esc.page.waitForSelector('#polymer-intro', { state: 'detached', timeout: 3000 });
+    check(true, 'Un clic en cualquier punto la cierra (sin botones)');
     await esc.context.close();
 
-    // 8. Entrar con sonido: solo tras el clic, sin errores.
+    // 8. v9: sonido por defecto: la bienvenida suena con el primer gesto (política de los navegadores), sin errores.
     const sound = await open(browser, 'sound');
     await sound.page.goto(`${BASE_URL}/`);
-    await sound.page.click('text=Entrar con sonido');
+    await sound.page.waitForSelector('#polymer-intro');
+    await sound.page.mouse.click(300, 300);
     await sound.page.waitForSelector('#polymer-intro', { state: 'detached', timeout: 4000 });
-    check(await sound.page.evaluate(() => localStorage.getItem('polymer.sound') === 'on'), '«Entrar con sonido» activa el sonido de bienvenida (Web Audio) y abre la tienda');
-    check((await sound.page.getAttribute('#sound-toggle', 'aria-pressed')) === 'true', 'El botón de la cabecera refleja que el sonido está activo');
+    check(await sound.page.evaluate(() => localStorage.getItem('polymer.sound') !== 'off'), 'Sonido activado por defecto y la tienda se abre tras el primer clic');
+    check((await sound.page.getAttribute('.pm-footer #sound-toggle', 'aria-pressed')) === 'true', 'El interruptor del pie refleja que el sonido está activo');
     await sound.context.close();
 
     // 9. prefers-reduced-motion: sin intro y sin animaciones de aparición.
@@ -170,7 +174,7 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     await mobile.page.waitForTimeout(1500);
     check(await mobile.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Intro sin desbordamiento horizontal en móvil (390 px)');
     await mobile.page.screenshot({ path: path.join(OUT, 'p4-movil-intro.png') });
-    await mobile.page.tap('text=Omitir intro');
+    await mobile.page.tap('#polymer-intro'); // v9: sin botones: un toque la abre
     await mobile.page.waitForSelector('#polymer-intro', { state: 'detached', timeout: 2500 });
     check(await mobile.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Tienda y pie sin desbordamiento en móvil');
     await mobile.context.close();

@@ -1,11 +1,11 @@
 // POLYMER — intro cinematográfica (≈4 s): textura tecnológica, isotipo que se arma con líneas de luz,
 // letras P·O·L·Y·M·E·R escalonadas, apertura de telón y entrada de la página ya cargada detrás.
-// Reglas: una vez por sesión (sessionStorage), se puede omitir (botón o Esc), no bloquea la navegación,
-// sin sonido salvo que la persona pulse «Entrar con sonido», y sin animación con prefers-reduced-motion
-// (intro-gate.js ni siquiera la activa). Solo transform, opacity y stroke-dashoffset.
+// Reglas: una vez por sesión (sessionStorage), sin botones (v9): suena la bienvenida por defecto (si el navegador
+// aún no lo permite, suena con el primer clic), un clic o Esc la abren antes, no bloquea la navegación y no se
+// muestra con prefers-reduced-motion (intro-gate.js ni siquiera la activa). Solo transform, opacity y stroke-dashoffset.
 
 import { BRAND, INTRO, MARK_GEOMETRY } from './brand.js';
-import { play, setSound } from './audio.js';
+import { play } from './audio.js';
 import { t } from './i18n.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -35,14 +35,6 @@ function buildMark() {
   return { svg, paths: [...paths, signal], nodes: [...circles, core] };
 }
 
-function button(text, cls) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = cls;
-  b.textContent = text;
-  return b;
-}
-
 let running = false;
 
 /** Inicia la intro si intro-gate.js la marcó como pendiente. Devuelve una promesa que no bloquea nada. */
@@ -70,14 +62,13 @@ export function startIntro() {
   word.append(...letters);
   const slogan = document.createElement('p'); slogan.className = 'intro__slogan'; slogan.textContent = BRAND.slogan;
   stage.append(svg, word, slogan);
-  const actions = document.createElement('div'); actions.className = 'intro__actions';
-  const withSound = button(t('Entrar con sonido'), 'intro__btn intro__btn--sound');
-  const skip = button(t('Omitir intro'), 'intro__btn');
-  actions.append(withSound, skip);
-  root.append(left, right, stage, actions);
+  const hint = document.createElement('p'); hint.className = 'visually-hidden'; hint.textContent = t('Pulsa Esc o haz clic para continuar');
+  root.append(left, right, stage, hint);
   document.body.append(root);
   html.classList.remove('intro-pending'); // el telón ya cubre la página
-  skip.focus({ preventScroll: true });
+  root.tabIndex = -1;
+  root.focus({ preventScroll: true });
+  play('welcome'); // v9: sonido por defecto (si el navegador lo bloquea, suena con el primer clic)
 
   const anims = [];
   const run = (node, frames, options) => { const a = node.animate(frames, { fill: 'both', ...options }); anims.push(a); return a; };
@@ -89,7 +80,6 @@ export function startIntro() {
   // 2. Letras P O L Y M E R: desplazamiento + opacidad + desenfoque.
   letters.forEach((s, i) => run(s, [{ opacity: 0, transform: 'translateY(14px)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }], { duration: 620, delay: 1150 + i * 85, easing: ease }));
   run(slogan, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 1900, easing: ease });
-  run(actions, [{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: 250 });
 
   let finished = false;
   let resolveDone;
@@ -103,7 +93,6 @@ export function startIntro() {
     document.removeEventListener('keydown', onKey);
     anims.forEach((a) => { try { a.finish(); } catch { /* ya terminada */ } });
     root.classList.add('is-opening');
-    actions.remove();
     run(stage, [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(1.06)' }], { duration: 420, easing: 'ease-in' });
     run(left, [{ transform: 'translateX(0)' }, { transform: 'translateX(-101%)' }], { duration: 900, delay: 160, easing: 'cubic-bezier(.7,0,.2,1)' });
     const last = run(right, [{ transform: 'translateX(0)' }, { transform: 'translateX(101%)' }], { duration: 900, delay: 160, easing: 'cubic-bezier(.7,0,.2,1)' });
@@ -117,15 +106,7 @@ export function startIntro() {
   }
   function onKey(event) { if (event.key === 'Escape') open(); }
   document.addEventListener('keydown', onKey);
-  skip.addEventListener('click', open);
-  withSound.addEventListener('click', () => {
-    setSound(true);
-    play('welcome', { force: true });
-    withSound.disabled = true;
-    withSound.textContent = t('Sonido activado');
-    window.setTimeout(open, 900);
-  });
-  // Un clic en el fondo también abre (la intro nunca atrapa a la persona).
-  root.addEventListener('click', (event) => { if (event.target === root || event.target.classList.contains('intro__curtain')) open(); });
+  // Un clic en cualquier punto abre (la intro nunca atrapa a la persona). El sonido pendiente suena con ese clic.
+  root.addEventListener('click', () => window.setTimeout(open, 350));
   return done;
 }

@@ -12,4 +12,6 @@ public interface BusinessTelemetry {
     void deliveryScheduled(boolean rescheduled);
     void deliveryConflict();
     void incidentReported(IncidentCategory category);
+    /** v7: intentos de pago en línea por método (CARD, YAPE, PLIN) y resultado (paid, declined, expired, started). */
+    default void payment(String method, String outcome) {}
 }

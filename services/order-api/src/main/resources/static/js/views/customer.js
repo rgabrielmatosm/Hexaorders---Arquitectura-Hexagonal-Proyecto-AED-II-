@@ -9,6 +9,7 @@ import { animatedCheck } from '../motion.js';
 import { link, route } from '../router.js';
 import { session } from '../session.js';
 import { el, formatDateTime, formatRelative, toast } from '../ui.js';
+import { paymentBox } from './shop.js';
 import { locale, t } from '../i18n.js';
 
 const ACTIVE = ['CREATED', 'RISK_APPROVED', 'RISK_REVIEW', 'CONFIRMED', 'PREPARING', 'READY_FOR_DISPATCH', 'IN_TRANSIT'];
@@ -77,6 +78,7 @@ route('/seguimiento/:id', async (root, { id, query }) => {
     failed ? el('div', { class: 'notice-box notice-box--error' }, el('strong', { text: `${CUSTOMER_LIFECYCLE[order.status]}. ` }),
       order.status === 'REJECTED' ? t('No pudimos aprobar este pedido tras la verificación. No se realizó ningún cobro; escríbenos si necesitas ayuda.')
         : t('El pedido fue cancelado. No se realizó ningún cobro.')) : null,
+    paymentBox(order),
     order.status === 'RISK_REVIEW' ? el('div', { class: 'notice-box notice-box--warn' }, el('strong', { text: t('Estamos verificando tu pedido. ') }),
       t('Por seguridad revisamos algunas compras antes de prepararlas. Te avisaremos por correo en cuanto se confirme.')) : null,
     el('div', { class: 'grid-2' },

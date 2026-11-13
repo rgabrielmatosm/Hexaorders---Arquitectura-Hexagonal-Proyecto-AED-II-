@@ -60,6 +60,11 @@ public final class JdbcUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<UserAccount> findByEmail(String email) {
+        return query("WHERE lower(email) = lower(?)", email).stream().findFirst().map(StoredCredentials::account);
+    }
+
+    @Override
     public boolean usernameExists(String username) {
         return Jdbc.run(() -> Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM app_users WHERE lower(username) = lower(?))",
                 Boolean.class, username)));

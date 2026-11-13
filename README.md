@@ -36,6 +36,9 @@ Tienda de tecnología y plataforma de gestión de pedidos con **arquitectura hex
 16. [Idiomas](#16-idiomas)
 17. [Seguridad de contraseñas](#17-seguridad-de-contraseñas)
 18. [Exposición, demostraciones y documentación final](#18-exposición-demostraciones-y-documentación-final)
+19. [Novedades v7: Google, código por correo, pagos, boleta, mapa, horario y video](#19-novedades-v7-google-código-por-correo-pagos-boleta-mapa-horario-y-video)
+20. [v8: enlaces por slice, asistente de Google y guía de la PPT](#20-v8-enlaces-por-slice-asistente-de-google-y-guía-de-la-ppt)
+21. [v9: Google (iniciar sesión vs registrarse), testimonios, sonido e intro](#21-v9-google-iniciar-sesión-vs-registrarse-testimonios-sonido-e-intro)
 
 Anexos: [API](#anexo-a-api) · [Documentación técnica](#anexo-b-documentación-técnica) · [Historial y migración](#anexo-c-historial-y-migración)
 
@@ -193,18 +196,20 @@ Proyecto de Compose **`polymer`** (contenedores `polymer-<servicio>-1`, imágene
 | # | Servicio | Función | Acceso desde el equipo |
 | --- | --- | --- | --- |
 | 1 | `frontend` | Gateway Nginx: archivos estáticos y reenvío a Spring | http://localhost:8080 |
-| 2 | `order-api` | Núcleo hexagonal (Java 21 / Spring Boot) | (a través de `frontend`) |
-| 3 | `risk-engine` | Motor de riesgo (FastAPI) | — (red interna) |
+| 2 | `order-api` | Núcleo hexagonal (Java 21 / Spring Boot) | http://localhost:8081 (directo, sin gateway; la tienda se usa por 8080) |
+| 3 | `risk-engine` | Motor de riesgo (FastAPI) | http://localhost:8000 (`/docs`: prueba `POST /score`) |
 | 4 | `db` | PostgreSQL 17 | — (nunca publicado) |
 | 5 | `prometheus` | Métricas y 9 alertas | http://localhost:9091 |
 | 6 | `grafana` | 8 dashboards (Prometheus, Loki, Tempo) | http://localhost:3000 |
-| 7 | `redis` | Caché del catálogo | — |
+| 7 | `redis` | Caché del catálogo y TTL de 60 s de Yape/Plin | — (privado; escenario `redis`) |
 | 8 | `rabbitmq` | Eventos de negocio y cola de notificaciones con DLQ | http://localhost:15672 (consola) |
 | 9 | `mailpit` | Captura los correos (no envía a Internet) | http://localhost:8025 |
-| 10 | `loki` | Logs centralizados | — |
-| 11 | `tempo` | Trazas distribuidas | — |
-| 12 | `otel-collector` | Recepción OTLP y métricas de Nginx | — |
-| 13 | `alloy` | Recolector de logs de Docker hacia Loki | — |
+| 10 | `loki` | Logs centralizados | — (Grafana → Explore → Loki) |
+| 11 | `tempo` | Trazas distribuidas | — (Grafana → Explore → Tempo) |
+| 12 | `otel-collector` | Recepción OTLP y métricas de Nginx | http://localhost:13133 (estado) |
+| 13 | `alloy` | Recolector de logs de Docker hacia Loki | http://localhost:12345 (flujo de logs) |
+
+Todos los enlaces se publican **solo en 127.0.0.1** (aparecen como enlaces clicables en Docker Desktop). El mapa por slice, con quién lo verifica, está en [`ENLACES.html`](ENLACES.html) (`.\polymer.cmd enlaces`).
 
 **Volúmenes persistentes:** `polymer_postgres_data`, `polymer_grafana_data`, `polymer_prometheus_data`, `polymer_redis_data`, `polymer_rabbitmq_data`, `polymer_loki_data`, `polymer_tempo_data` y `polymer_alloy_data`.
 
@@ -334,7 +339,7 @@ Los permisos se comprueban en el servidor, en Spring Security y en el dominio. O
 
 | Tipo | Herramienta | Qué comprueba |
 | --- | --- | --- |
-| Dominio y casos de uso | JUnit 5 + Mockito (131 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
+| Dominio y casos de uso | JUnit 5 + Mockito (163 pruebas) | Precios y promociones, búsqueda, checkout, transiciones por rol, idempotencia, stock, calendario, notificaciones por idioma, política de contraseñas, rutas localizadas, seguridad |
 | **Arquitectura** | ArchUnit (`HexagonalArchitectureTest`) y `test_architecture.py` | El núcleo no depende de frameworks; los adaptadores de entrada solo usan puertos de entrada |
 | Motor de riesgo | pytest (62 pruebas) | Reglas, decimales exactos, validación y métricas |
 | API real | `smoke.py`, `platform_smoke.py`, `store_smoke.py`, `integration_smoke.py` | Pedidos, roles, tienda, carrito, checkout, Redis, RabbitMQ, Mailpit, Loki, Tempo y Grafana |
@@ -372,7 +377,7 @@ Más detalle en [`docs/OBSERVABILITY_STACK.md`](docs/OBSERVABILITY_STACK.md) y [
 | `order-api` no arranca: «password authentication failed» | `db_password.txt` no coincide con la contraseña con que se creó la base | Restaura el archivo original, o `.\polymer.cmd repair-db-password` (no borra datos) |
 | «Docker no responde» | Docker Desktop cerrado o iniciándose | Ábrelo y espera a *Engine running* |
 | Un contenedor queda *unhealthy* o se reinicia | Poca memoria para los 13 contenedores | Asigna 6 GB o más a Docker (`.wslconfig`, sección 8), o usa `start -Mode basic` |
-| «port is already allocated» (8080, 3000…) | Otro programa, o HexaOrders v6 en marcha | `start` detiene HexaOrders automáticamente; para otros programas, ciérralos o cambia su puerto |
+| «port is already allocated» (8080, 3000…) | Otro contenedor (otro proyecto de Docker) o programa usa un puerto de POLYMER: 8080, 8081, 8000, 3000, 9091, 15672, 8025, 13133 o 12345 | `start` revisa los puertos **antes** de arrancar, dice qué contenedor o programa los usa y ofrece detenerlo (sin borrarlo; `docker start NOMBRE` lo recupera). HexaOrders v6 se detiene solo. Si no aparece ninguno: reinicia Docker Desktop. Manual: `docker ps --filter "publish=3000"` y `docker stop NOMBRE` |
 | Docker crea una **carpeta** `secrets\db_password.txt` | Se arrancó Docker antes de crear los archivos | `.\polymer.cmd secrets` lo detecta y lo corrige sin borrar contenido |
 | No se ve la intro | Ya se vio en esta sesión, o Windows tiene desactivados los *Efectos de animación* | Usa «Ver la intro» en el pie o http://localhost:8080/?intro=1. Con movimiento reducido se omite a propósito |
 | No se oye la bienvenida | El sonido es opcional y está apagado por defecto | Pulsa «Entrar con sonido» o el botón de altavoz de la cabecera |
@@ -490,6 +495,45 @@ Documentos en [`docs/final/`](docs/final/):
 | [`MATRIZ_PRUEBAS.md`](docs/final/MATRIZ_PRUEBAS.md) · [`RESULTADOS_VALIDACION.md`](docs/final/RESULTADOS_VALIDACION.md) | Qué se prueba, dónde y con qué resultado real |
 
 ---
+
+## 19. Novedades v7: Google, código por correo, pagos, boleta, mapa, horario y video
+
+| Novedad | Qué hace | Dónde verlo |
+| --- | --- | --- |
+| **Continuar con Google** | OpenID Connect con Spring Security; vincula o crea la cuenta y pide un **código de 6 dígitos** enviado al correo antes de abrir la sesión | `/login.html` (aparece al configurar `secrets\google_client_id.txt` y `google_client_secret.txt`) |
+| **Verificación por correo** | Cuentas nuevas confirman su correo; verificación en dos pasos opcional; código de 10 min, 5 intentos, solo el hash en la base | `/registro.html`, *Perfil y seguridad* |
+| **Recordarme durante 30 días** | Sesión persistente y dispositivo de confianza (cookies HttpOnly, ficha rotativa, detección de robo) | Casilla en el acceso y en el paso del código |
+| **Pago con tarjeta** | Aprobación inmediata (pasarela de **prueba**: no cobra); Luhn, vencimiento y CVV; solo marca y 4 últimos dígitos | Checkout → `/cliente/pago.html` |
+| **Yape y Plin** | Solicitud con **QR que vence en 60 s** (clave en Redis con TTL; sin Redis, el reloj) y cuenta regresiva sincronizada | `/cliente/pago.html`, `.\polymer.cmd demo -Scenario pagos` |
+| **Boleta** | B001-00000001, base imponible + IGV 18 %; página imprimible y **correo con la boleta** (outbox → RabbitMQ → consumidor) | `/cliente/boleta.html`, Mailpit o tu Gmail |
+| **Portada con video** | Video original de la marca en bucle, silenciado, con pausa y póster si se reduce el movimiento | `/` |
+| **Mapa y horario** | Google Maps incrustado, «Cómo llegar», horario de hoy en hora de Lima con feriados, calendario del mes y **Agregar a Google Calendar** | Portada, Contacto, Empresa, recojo en el checkout, pie |
+
+Configuración (Google, Gmail, dirección real de la tienda, calendario público) y demostración:
+[`docs/final/GUIA_GOOGLE_Y_PAGOS.md`](docs/final/GUIA_GOOGLE_Y_PAGOS.md). Sin configurar nada, todo funciona con
+Mailpit, las pasarelas de prueba y una dirección de demostración.
+
+## 20. v8: enlaces por slice, asistente de Google y guía de la PPT
+
+| Novedad | Uso |
+| --- | --- |
+| **Enlaces por contenedor** | 9 de los 13 contenedores tienen un enlace local (solo `127.0.0.1`) que Docker Desktop muestra como clicable: tienda 8080, núcleo `order-api` 8081, `risk-engine` 8000, Grafana 3000, Prometheus 9091, RabbitMQ 15672, Mailpit 8025, OpenTelemetry 13133 y Alloy 12345. PostgreSQL, Redis, Loki y Tempo siguen privados por diseño |
+| **Mapa de slices** | [`ENLACES.html`](ENLACES.html): 13 slices con **quién lo verifica** (rol y cuenta), botón «Entrar como…», páginas, contenedores con estado en vivo, evidencia (Grafana, Prometheus, RabbitMQ, Mailpit) y escenario de demostración. Campo «Expone» para el nombre de cada integrante |
+| `.\polymer.cmd enlaces` | Comprueba cada enlace, lista los slices con su verificador y abre `ENLACES.html` |
+| `.\polymer.cmd google` | Asistente: pide el ID y el secreto de OAuth de Google y, opcional, tu Gmail con su contraseña de aplicación; los guarda sin mostrarlos, reinicia `order-api`, comprueba la redirección a Google y envía un correo de prueba |
+| **Google con el JSON de Google Cloud** | Guarda el JSON del cliente OAuth como `secrets\google-oauth.json` (Docker secret `google_oauth`; nunca en Git, imágenes, logs ni ZIP) y ejecuta `.\polymer.cmd google`. Producción: `POLYMER_PUBLIC_URL` y, si hace falta, `POLYMER_GOOGLE_REDIRECT_URI` ([guía](docs/final/GUIA_GOOGLE_Y_PAGOS.md)) |
+| **Guía de la PPT** | [`docs/final/GUIA_PPT_EXPOSICION.md`](docs/final/GUIA_PPT_EXPOSICION.md): diapositiva por diapositiva, con el enlace y la captura de cada una |
+
+## 21. v9: Google (iniciar sesión vs registrarse), testimonios, sonido e intro
+
+| Novedad | Qué hace |
+| --- | --- |
+| **Iniciar sesión con Google** | Google muestra **«Elige una cuenta»** (`prompt=select_account`). Si esa cuenta de Google no tiene cuenta POLYMER (ni vinculada ni con el mismo correo) **se rechaza** y la página invita a registrarse |
+| **Registrarse con Google** | Crea la cuenta de cliente y envía el **código de 6 dígitos** al correo (Mailpit o tu Gmail) con la opción **«Recordarme 30 días»**: en ese dispositivo no se vuelve a pedir el código ni la contraseña |
+| **Botón de Google siempre visible** | En el acceso y el registro; si el servidor aún no tiene credenciales, avisa que estará disponible pronto. `start` también encuentra el JSON en **Descargas** (con confirmación) |
+| **Testimonios** (slice nuevo) | Carrusel en la portada y en **Nosotros**: el equipo (foto → perfil de **LinkedIn** → comentario) y los clientes. Formulario «Deja tu testimonio» (clientes con sesión, uno por cuenta, editable); la administración los oculta o muestra. Hexagonal: `Testimonial` (dominio) → `TestimonialUseCases`/`TestimonialService` → `TestimonialRepository`/`JdbcTestimonialRepository`; Flyway **V13** |
+| **Intro y sonido** | Intro sin botones; **sonido activado por defecto** (los navegadores lo permiten desde el primer clic o tecla); sin altavoz en la cabecera ni «Pausar video»: el interruptor de sonido está en el pie |
+| **Más movimiento** | Panel de acceso y registro con órbita animada, ventajas, cifras y un testimonio que rota; brillo en botones, entrada animada de secciones y sonidos suaves al pulsar, añadir al carrito o publicar |
 
 ## Anexo A. API
 

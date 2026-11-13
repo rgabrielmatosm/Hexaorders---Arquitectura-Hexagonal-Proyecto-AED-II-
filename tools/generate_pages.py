@@ -51,6 +51,8 @@ PAGES: list[dict] = [
     dict(path='cliente/pedido-detalle.html', route='/mis-pedidos/:id', title='Detalle del pedido', description='Productos, totales, entrega, pago y cancelación.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
     dict(path='cliente/seguimiento.html', route='/seguimiento/:id', title='Seguimiento', description='Estado de tu pedido paso a paso.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
     dict(path='cliente/perfil.html', route='/perfil', title='Perfil y seguridad', description='Datos personales y cambio de contraseña.', section='cliente', roles=['auth']),
+    dict(path='cliente/pago.html', route='/pago/:id', title='Pago del pedido', description='Paga tu pedido con tarjeta, Yape o Plin.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
+    dict(path='cliente/boleta.html', route='/boleta/:id', title='Boleta de venta', description='Comprobante de tu compra pagada en línea, listo para imprimir.', section='cliente', roles=['CUSTOMER'], parent='/cliente/pedidos.html|Mis pedidos', active='/cliente/pedidos.html'),
     # ---- Administración
     *[dict(path=f'admin/{name}.html', route='/admin/:tab', params={'tab': tab}, title=title, description=desc, section='admin', roles=['ADMIN'])
       for name, tab, title, desc in [
@@ -126,6 +128,8 @@ SLUGS: dict[str, tuple] = {
                                     'meus-pedidos/detalhe', 'meine-bestellungen/detail'),
     'cliente/seguimiento.html': ('seguimiento', 'tracking', 'suivi', 'tracciamento', 'rastreamento', 'sendungsverfolgung'),
     'cliente/perfil.html': ('perfil', 'profile', 'profil', 'profilo', 'perfil', 'profil'),
+    'cliente/pago.html': ('pago', 'payment', 'reglement', 'pagamento', 'pagamento-pedido', 'zahlung'),
+    'cliente/boleta.html': ('boleta', 'receipt', 'recu', 'ricevuta', 'recibo', 'beleg'),
     'admin/dashboard.html': _ADMIN,
     'admin/productos.html': _join(_ADMIN, ('productos', 'products', 'produits', 'prodotti', 'produtos', 'produkte')),
     'admin/categorias.html': _join(_ADMIN, ('categorias', 'categories', 'categories', 'categorie', 'categorias', 'kategorien')),

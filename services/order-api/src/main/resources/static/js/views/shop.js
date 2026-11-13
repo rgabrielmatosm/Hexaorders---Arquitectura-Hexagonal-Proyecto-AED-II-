@@ -1,7 +1,7 @@
 // Tienda: catálogo con filtros, ficha de producto, carrito, checkout, mis pedidos, perfil y acceso.
 // Precios, descuentos, stock, totales, permisos y estados los decide siempre el servidor.
 
-import { ApiError, accountApi, authApi, catalogApi, shopApi } from '../api.js';
+import { ApiError, accountApi, authApi, catalogApi, paymentApi, shopApi, storeApi } from '../api.js';
 import { cart } from '../cart.js';
 import {
   customerBadge, emptyState, errorMessage, field, formError, icon, modal, money, orderRef, paginated, productArt,
@@ -12,6 +12,7 @@ import { link, rerender, route } from '../router.js';
 import { ROLE_LABELS, homeFor, session } from '../session.js';
 import { $$, el, formatDateTime, formatRelative, toast } from '../ui.js';
 import { newPasswordFields, revealToggle } from '../password-strength.js';
+import { authAside, divider, googleButton, googleReturnNotice, providers, rememberCheckbox, verificationPanel } from '../auth-ui.js';
 import { addToCart, availabilityNote, badges, priceBlock, productCard, productRail, skeletonCards } from '../store-ui.js';
 import { lang, locale, localizeHref, localized, t, td } from '../i18n.js';
 
@@ -22,7 +23,8 @@ const head = (eyebrow, title, lead, ...actions) => el('div', { class: 'view__hea
   actions.filter(Boolean).length ? el('div', { class: 'row-actions' }, actions) : null);
 
 export const DELIVERY_LABELS = { STANDARD: t('Envío estándar'), EXPRESS: t('Envío express'), PICKUP: t('Recojo en tienda') };
-export const PAYMENT_LABELS = { CASH_ON_DELIVERY: t('Pago contra entrega'), BANK_TRANSFER: t('Transferencia bancaria'), PAY_IN_STORE: t('Pago en tienda') };
+export const PAYMENT_LABELS = { CARD: t('Tarjeta de crédito o débito'), YAPE: 'Yape', PLIN: 'Plin', CASH_ON_DELIVERY: t('Pago contra entrega'),
+  BANK_TRANSFER: t('Transferencia bancaria'), PAY_IN_STORE: t('Pago en tienda') };
 export { productCard };
 
 // ---- Catálogo -------------------------------------------------------------------------------------
@@ -304,7 +306,7 @@ route('/producto/:id', async (root, { id }) => {
         el('div', { class: 'product-detail__buy' }, soldOut ? null : stepper, add, buy),
         el('ul', { class: 'product-detail__perks' }, [
           ['truck', t('Envío estándar gratis desde S/ 299 · express en 24–48 h')],
-          ['card', t('Pago contra entrega, transferencia o en tienda')],
+          ['card', t('Tarjeta, Yape, Plin o contra entrega')],
           ['shield', t('Producto nuevo y sellado con garantía de marca')],
           ['refresh', t('Cambios por fallas de fábrica hasta 7 días')],
         ].map(([ic, text]) => el('li', {}, icon(ic), el('span', { text })))))),
@@ -431,7 +433,9 @@ route('/checkout', async (root) => {
     (() => { const f = field(t('Dirección'), address); f.classList.add('field--full'); return f; })(), field(t('Ciudad'), city),
     (() => { const f = field(t('Referencias'), instructions); f.classList.add('field--full'); return f; })());
   const pickupNote = el('div', { class: 'notice-box', hidden: true }, el('strong', { text: t('Recojo en tienda: ') }),
-    t('Av. Tecnología 123, Lima. Lunes a sábado de 9:00 a 19:00. Te avisaremos por correo cuando tu pedido esté listo.'));
+    t('Lunes a sábado de 9:00 a 19:00. Te avisaremos por correo cuando tu pedido esté listo.'));
+  storeApi.info().then((store) => pickupNote.append(' ', el('span', { text: store.fullAddress }), ' · ',
+    el('a', { href: store.mapsDirectionsUrl, target: '_blank', rel: 'noopener', text: t('Cómo llegar') }))).catch(() => {});
   const deliveryGroup = el('div', { class: 'choice-list', role: 'radiogroup', 'aria-label': t('Método de entrega') });
   const paymentGroup = el('div', { class: 'choice-list', role: 'radiogroup', 'aria-label': t('Método de pago') });
   const totals = el('div', {}, skeletons(3, 'skeleton--row'));
@@ -458,11 +462,17 @@ route('/checkout', async (root) => {
         refresh();
       });
     }));
-    paymentGroup.replaceChildren(...options.payment.map((p) => {
+    const paymentChoice = (p) => {
       const allowed = p.deliveries.includes(state.delivery);
       return choice('payment', p, state.payment === p.code, allowed ? p.instructions : t('No disponible con {0}', DELIVERY_LABELS[state.delivery].toLowerCase()),
         (code) => { state.payment = code; refresh(); }, !allowed);
-    }));
+    };
+    // v7: pagos en línea (tarjeta inmediata; Yape y Plin con QR de 60 s) y pagos al recibir.
+    paymentGroup.replaceChildren(
+      el('p', { class: 'choice-group__title', text: t('Paga ahora en línea') }), ...options.payment.filter((p) => p.online).map(paymentChoice),
+      el('p', { class: 'choice-group__title', text: t('Paga después') }), ...options.payment.filter((p) => !p.online).map(paymentChoice));
+    const online = options.payment.some((p) => p.code === state.payment && p.online);
+    confirm.textContent = online ? t('Confirmar y pagar') : t('Confirmar pedido');
     const pickup = state.delivery === 'PICKUP';
     addressFields.hidden = pickup;
     pickupNote.hidden = !pickup;
@@ -496,7 +506,10 @@ route('/checkout', async (root) => {
       const payload = { items, deliveryMethod: state.delivery, paymentMethod: state.payment, shipping: pickup ? null : shipping };
       const result = await submitting(confirm, errorNode, () => shopApi.checkout(payload, idempotencyKey));
       cart.forgetLocal();
-      window.location.assign(localizeHref(`/cliente/seguimiento.html?id=${encodeURIComponent(result.data.id)}&nuevo=1`));
+      // v7: con tarjeta, Yape o Plin se paga en el paso siguiente; si no, al seguimiento.
+      const payNow = options.payment.some((p) => p.code === state.payment && p.online);
+      window.location.assign(payNow ? link(`/pago/${result.data.id}`)
+        : localizeHref(`/cliente/seguimiento.html?id=${encodeURIComponent(result.data.id)}&nuevo=1`));
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) toast(t('El stock cambió: revisa tu carrito'), 'warn');
     }
@@ -512,7 +525,7 @@ route('/checkout', async (root) => {
         el('form', { class: 'card form', novalidate: true, 'aria-labelledby': 'shipping-title', onsubmit: (event) => event.preventDefault() },
           el('h2', { class: 'card__title', id: 'shipping-title', text: t('2. Datos de entrega') }), addressFields, pickupNote),
         el('section', { class: 'card' }, el('h2', { class: 'card__title', text: t('3. Método de pago') }), paymentGroup,
-          el('p', { class: 'muted small', text: t('No solicitamos datos de tarjeta ni bancarios en la web.') }))),
+          el('p', { class: 'muted small' }, icon('shield'), t(' Pago con tarjeta, Yape o Plin en el paso siguiente. No guardamos los datos de tu tarjeta.')))),
       el('aside', { class: 'card cart-summary' }, el('h2', { class: 'card__title', text: t('Resumen del pedido') }), totals, confirm, errorNode,
         el('a', { class: 'btn btn--ghost btn--block', href: '/carrito.html', text: t('Volver al carrito') })))));
   renderChoices(data.subtotal);
@@ -586,6 +599,7 @@ route('/mis-pedidos/:id', async (root, { id }) => {
         checkout ? el('div', { class: 'summary-row' }, el('span', { text: DELIVERY_LABELS[checkout.delivery] }), el('span', { text: Number(checkout.shippingCost) ? money(checkout.shippingCost, currency) : t('Gratis') })) : null,
         el('div', { class: 'summary-row summary-row--total' }, el('span', { text: t('Total') }), el('span', { text: money(order.amount, currency) })),
         checkout && checkout.payment ? el('p', { class: 'small' }, el('strong', { text: t('Pago: ') }), PAYMENT_LABELS[checkout.payment]) : null,
+        paymentBox(order),
         el('h3', { class: 'card__title card__title--spaced', text: t('Entrega') }),
         checkout && checkout.delivery === 'PICKUP' ? el('p', { class: 'small', text: t('Recojo en tienda · Av. Tecnología 123, Lima.') })
           : shipping ? el('address', { class: 'address-card' }, el('strong', { text: shipping.recipient }), el('span', { text: shipping.address }),
@@ -593,6 +607,21 @@ route('/mis-pedidos/:id', async (root, { id }) => {
             shipping.instructions ? el('small', { class: 'muted', text: shipping.instructions }) : null)
             : el('p', { class: 'muted small', text: t('Sin dirección registrada.') })))));
 }, { roles: ['CUSTOMER'], title: t('Detalle del pedido') });
+
+/** v7: estado del pago en línea del pedido (pagar ahora, boleta o rechazo). */
+export function paymentBox(order) {
+  const box = el('div', { class: 'payment-box', 'data-testid': 'order-payment' });
+  paymentApi.status(order.id).then((p) => {
+    if (p.status === 'PAID') {
+      box.append(el('div', { class: 'notice-box notice-box--ok' }, el('strong', { text: t('Pagado. ') }), t('Boleta {0}', p.receipt), ' ',
+        el('a', { href: link(`/boleta/${order.id}`), text: t('Ver boleta') })));
+    } else if (p.online && !['CANCELLED', 'REJECTED'].includes(order.status)) {
+      box.append(el('div', { class: 'notice-box notice-box--warn' }, el('strong', { text: t('Pendiente de pago. ') }),
+        t('Completa el pago con tarjeta, Yape o Plin.'), ' ', el('a', { class: 'btn btn--primary btn--sm', href: link(`/pago/${order.id}`), text: t('Pagar ahora') })));
+    }
+  }).catch(() => {});
+  return box;
+}
 
 // ---- Perfil ---------------------------------------------------------------------------------------------
 route('/perfil', async (root) => {
@@ -622,8 +651,38 @@ route('/perfil', async (root) => {
       .then(() => { current.value = ''; next.reset(); }).catch(() => {});
   });
   root.append(view(head(t('Mi cuenta'), t('Perfil y seguridad'), `@${me.username} · ${me.roles.map((r) => ROLE_LABELS[r] || r).join(', ')}`),
-    el('div', { class: 'grid-2-even' }, profileForm, passForm)));
+    el('div', { class: 'grid-2-even' }, profileForm, passForm), securityCard()));
 }, { roles: ['auth'], title: t('Perfil') });
+
+/** v7: verificación en dos pasos por correo, cuenta de Google y dispositivos recordados (30 días). */
+function securityCard() {
+  const card = el('section', { class: 'card form', 'data-testid': 'security-card' }, el('h3', { class: 'card__title', text: t('Inicio de sesión y dispositivos') }),
+    skeletons(2, 'skeleton--row'));
+  Promise.all([accountApi.security(), providers()]).then(([settings, methods]) => {
+    const toggle = el('input', { type: 'checkbox', checked: settings.twoFactor, disabled: !methods.emailVerification });
+    toggle.addEventListener('change', async () => {
+      try {
+        await accountApi.setTwoFactor(toggle.checked);
+        toast(toggle.checked ? t('Verificación en dos pasos activada') : t('Verificación en dos pasos desactivada'), 'ok');
+      } catch (error) { toggle.checked = !toggle.checked; toast(errorMessage(error), 'error'); }
+    });
+    const forget = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', text: t('Olvidar todos mis dispositivos') });
+    forget.addEventListener('click', async () => {
+      await submitting(forget, null, () => accountApi.forgetDevices(), t('Cerramos las sesiones recordadas: te pediremos el código otra vez')).catch(() => {});
+    });
+    card.replaceChildren(el('h3', { class: 'card__title', text: t('Inicio de sesión y dispositivos') }),
+      el('label', { class: 'check-row' }, toggle, el('span', {}, el('strong', { text: t('Verificación en dos pasos por correo') }),
+        el('small', { class: 'muted', text: methods.emailVerification ? t('Al iniciar sesión con tu contraseña en un dispositivo nuevo, te pediremos un código de 6 dígitos enviado a tu correo.')
+          : t('Requiere el servidor de correo (modo completo).') }))),
+      el('ul', { class: 'security-facts' },
+        el('li', {}, icon(settings.emailVerified ? 'shield' : 'alert'), el('span', { text: settings.emailVerified ? t('Correo verificado') : t('Correo pendiente de verificar') })),
+        el('li', {}, el('img', { src: '/img/google-g.svg', alt: '', width: '16', height: '16' }),
+          el('span', { text: settings.googleLinked ? t('Cuenta de Google vinculada') : t('Sin cuenta de Google vinculada') }))),
+      el('p', { class: 'small muted', text: t('«Recordarme durante 30 días» mantiene tu sesión y evita el código en ese dispositivo. Si perdiste un equipo, olvida todos tus dispositivos.') }),
+      forget);
+  }).catch((error) => card.replaceChildren(emptyState(t('No se pudo cargar la seguridad de tu cuenta'), errorMessage(error))));
+  return card;
+}
 
 // ---- Acceso -------------------------------------------------------------------------------------------
 const DEMO = [
@@ -634,69 +693,125 @@ const DEMO = [
 route('/entrar', async (root, { query }) => {
   const nextPath = query.get('next');
   const safeNext = nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : null;
-  if (session.isAuthenticated()) { window.location.replace(safeNext || localizeHref(homeFor(session.user()))); return; }
-  const username = el('input', { autocomplete: 'username', required: true, maxlength: '32' });
-  const password = el('input', { type: 'password', autocomplete: 'current-password', required: true });
-  const errorNode = formError();
-  const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: t('Iniciar sesión') });
-  const form = el('form', { class: 'card form', novalidate: true },
-    el('h2', { class: 'card__title', text: t('Iniciar sesión') }), field(t('Usuario'), username), field(t('Contraseña'), password), submit, errorNode,
-    el('p', { class: 'muted small' }, t('¿Eres nuevo? '), el('a', { href: '/registro.html', text: t('Crea tu cuenta') })));
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    try {
-      const user = await submitting(submit, errorNode, () => session.login(username.value.trim(), password.value));
-      if (localized) accountApi.locale(lang).catch(() => {}); // idioma de sus correos = el de esta página
-      toast(t('Hola, {0}', user.displayName), 'ok');
-      await cart.sync(); // tu carrito de visitante pasa a tu cuenta
-      // Solo rutas internas: evita redirecciones abiertas a otros dominios.
-      window.location.assign(safeNext ? link(safeNext) : localizeHref(homeFor(user)));
-    } catch { /* el error ya se muestra */ }
-  });
+  if (session.isAuthenticated()) { window.location.replace(safeNext ? link(safeNext) : localizeHref(homeFor(session.user()))); return; }
+  const methods = await providers();
+  const container = el('div', {});
+  const finish = async (user, next) => {
+    if (localized) accountApi.locale(lang).catch(() => {}); // idioma de sus correos = el de esta página
+    toast(t('Hola, {0}', user.displayName), 'ok');
+    await cart.sync(); // tu carrito de visitante pasa a tu cuenta
+    // Solo rutas internas: evita redirecciones abiertas a otros dominios.
+    const target = next && next.startsWith('/') && !next.startsWith('//') ? next : safeNext;
+    window.location.assign(target ? link(target) : localizeHref(homeFor(user)));
+  };
+  const showVerification = (data) => {
+    container.replaceChildren(verificationPanel(data, {
+      onDone: (result) => finish(result.user, result.next),
+      onCancel: () => { container.replaceChildren(loginForm()); },
+    }));
+  };
+
+  function loginForm() {
+    const username = el('input', { autocomplete: 'username', required: true, maxlength: '32' });
+    const password = el('input', { type: 'password', autocomplete: 'current-password', required: true });
+    const remember = rememberCheckbox(false);
+    const errorNode = formError();
+    const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: t('Iniciar sesión') });
+    const form = el('form', { class: 'card form', novalidate: true },
+      el('h2', { class: 'card__title', text: t('Iniciar sesión') }),
+      googleButton(t('Iniciar sesión con Google'), safeNext, { intent: 'login', available: methods.google }),
+      divider(t('o con tu usuario')),
+      field(t('Usuario'), username),
+      (() => { const f = field(t('Contraseña'), password); const wrap = el('div', { class: 'pw-input' }); password.replaceWith(wrap); wrap.append(password, revealToggle(password)); return f; })(),
+      remember.element, submit, errorNode,
+      methods.emailVerification ? el('p', { class: 'small muted' }, icon('shield'), t(' Tu cuenta está protegida: si hace falta, te enviaremos un código de 6 dígitos a tu correo.')) : null,
+      el('p', { class: 'muted small' }, t('¿Eres nuevo? '), el('a', { href: '/registro.html', text: t('Crea tu cuenta') })));
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        const result = await submitting(submit, errorNode, () => session.login(username.value.trim(), password.value, { rememberMe: remember.input.checked, next: safeNext }));
+        if (result.verificationRequired) { showVerification(result); return; }
+        await finish(result, safeNext);
+      } catch { /* el error ya se muestra */ }
+    });
+    form.demoUsername = username;
+    form.demoPassword = password;
+    window.setTimeout(() => username.focus(), 0);
+    return form;
+  }
+
   root.append(view(el('div', { class: 'auth' },
-    el('div', { class: 'auth__aside' },
-      el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: t('Bienvenido a POLYMER') }),
-      el('p', { text: t('Inicia sesión para comprar, guardar tu carrito y seguir tus pedidos.') }),
+    authAside('login',
       el('details', { class: 'demo-accounts-box' }, el('summary', { text: t('Cuentas de demostración') }),
-        el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => { username.value = user; password.focus(); } },
-          el('span', {}, el('strong', { text: user }), el('small', { text: ` · ${ROLE_LABELS[role]}` })), el('small', { text: 'usar' })))))),
-    form)));
-  username.focus();
+        el('div', { class: 'demo-accounts' }, DEMO.map(([user, role]) => el('button', { type: 'button', onclick: () => {
+          const form = container.querySelector('form');
+          if (form && form.demoUsername) { form.demoUsername.value = user; form.demoPassword.focus(); }
+        } }, el('span', {}, el('strong', { text: user }), el('small', { text: ` · ${ROLE_LABELS[role]}` })), el('small', { text: 'usar' })))))),
+    container)));
+
+  // Vuelta desde Google: código pendiente, cuenta inexistente, error o sesión ya abierta.
+  if (query.get('verificar')) {
+    try {
+      const pending = await authApi.pending();
+      if (query.get('nueva')) toast(t('Creamos tu cuenta con Google. Confirma el código que te enviamos.'), 'ok');
+      showVerification(pending);
+      return;
+    } catch { toast(t('La verificación ya no está activa: vuelve a iniciar sesión'), 'warn'); }
+  }
+  container.replaceChildren(loginForm());
+  googleReturnNotice(query, container, { onRegister: authApi.googleUrl(null, localizeHref('/registro.html'), 'registro') });
 }, { title: t('Iniciar sesión') });
 
-route('/registro', async (root) => {
+route('/registro', async (root, { query }) => {
+  const methods = await providers();
+  const container = el('div', {});
   const username = el('input', { autocomplete: 'username', maxlength: '32' });
   const displayName = el('input', { autocomplete: 'name', maxlength: '80' });
   const email = el('input', { type: 'email', autocomplete: 'email', maxlength: '254' });
   const password = newPasswordFields({ personal: () => [username.value, displayName.value, email.value] });
+  const remember = rememberCheckbox(false);
   const errorNode = formError();
   const submit = el('button', { type: 'submit', class: 'btn btn--primary btn--block', text: t('Crear cuenta') });
+  const done = async () => {
+    if (localized) await accountApi.locale(lang).catch(() => {});
+    await cart.sync();
+    window.location.assign(localizeHref(cart.count() ? '/carrito.html' : '/cliente/dashboard.html'));
+  };
   const form = el('form', { class: 'card form', novalidate: true }, el('h2', { class: 'card__title', text: t('Crea tu cuenta') }),
+    googleButton(t('Registrarse con Google'), null, { intent: 'registro', available: methods.google }),
+    divider(t('o con tu correo')),
     field(t('Usuario'), username, t('3 a 32 letras, dígitos, guion o guion bajo.')), field(t('Nombre'), displayName),
-    field(t('Correo electrónico'), email), password.element, submit, errorNode,
+    field(t('Correo electrónico'), email, methods.emailVerification ? t('Te enviaremos un código de 6 dígitos para confirmarlo.') : ''),
+    password.element, remember.element, submit, errorNode,
     el('p', { class: 'muted small' }, t('¿Ya tienes cuenta? '), el('a', { href: '/login.html', text: t('Inicia sesión') })));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const problem = password.check();
     if (problem) { showFormError(errorNode, new Error(problem)); password.input.focus(); return; }
     try {
-      await submitting(submit, errorNode, async () => {
+      const result = await submitting(submit, errorNode, async () => {
         await authApi.register({ username: username.value.trim(), displayName: displayName.value.trim(), email: email.value.trim(), password: password.input.value });
-        const logged = await session.login(username.value.trim(), password.input.value);
-        if (localized) await accountApi.locale(lang).catch(() => {});
-        return logged;
+        return session.login(username.value.trim(), password.input.value, { rememberMe: remember.input.checked });
       }, t('Cuenta creada'));
-      await cart.sync();
-      window.location.assign(localizeHref(cart.count() ? '/carrito.html' : '/cliente/dashboard.html'));
+      if (result.verificationRequired) {
+        container.replaceChildren(verificationPanel(result, { onDone: done, onCancel: () => window.location.assign(localizeHref('/login.html')) }));
+        return;
+      }
+      await done();
     } catch { /* el error ya se muestra */ }
   });
-  root.append(view(el('div', { class: 'auth' },
-    el('div', { class: 'auth__aside' }, el('img', { src: '/img/logo.svg', alt: '', width: '56', height: '56' }),
-      el('h2', { text: t('Tu cuenta POLYMER') }),
-      el('ul', { class: 'auth__perks' }, [t('Guarda tu carrito en todos tus dispositivos'), t('Sigue tus pedidos en tiempo real'), t('Compra más rápido con tus datos guardados')]
-        .map((text) => el('li', {}, icon('sparkle'), el('span', { text }))))),
-    form)));
+  container.append(form);
+  root.append(view(el('div', { class: 'auth' }, authAside('registro'), container)));
+  // v9: vuelta de «Registrarse con Google»: código de 6 dígitos (con «Recordarme 30 días») o aviso.
+  if (query.get('verificar')) {
+    try {
+      const pending = await authApi.pending();
+      toast(query.get('nueva') ? t('Creamos tu cuenta con Google. Confirma el código que te enviamos.') : t('Ya tenías una cuenta POLYMER: confirma el código que te enviamos.'), 'ok');
+      container.replaceChildren(verificationPanel(pending, { onDone: done, onCancel: () => window.location.assign(localizeHref('/registro.html')) }));
+      return;
+    } catch { toast(t('La verificación ya no está activa: vuelve a iniciar sesión'), 'warn'); }
+  }
+  googleReturnNotice(query, container);
   username.focus();
 }, { title: t('Registro') });
 

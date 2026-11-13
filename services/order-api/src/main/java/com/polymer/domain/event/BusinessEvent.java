@@ -60,4 +60,12 @@ public record BusinessEvent(String eventId, EventType type, int schemaVersion, I
         attributes.put("windowEnd", Objects.requireNonNull(windowEnd, "windowEnd").toString());
         return new BusinessEvent("delivery-change-" + changeId, EventType.DELIVERY_SCHEDULED, SCHEMA_VERSION, at, orderId, attributes);
     }
+
+    /** v7: pago aprobado. eventId determinista (el id del pago): una reentrega no envía dos boletas. */
+    public static BusinessEvent fromPayment(UUID paymentId, UUID orderId, String method, String receipt, Instant paidAt) {
+        Map<String, String> attributes = new LinkedHashMap<>();
+        attributes.put("method", Objects.requireNonNull(method, "method"));
+        attributes.put("receipt", Objects.requireNonNull(receipt, "receipt"));
+        return new BusinessEvent("payment-" + paymentId, EventType.PAYMENT_CONFIRMED, SCHEMA_VERSION, paidAt, orderId, attributes);
+    }
 }

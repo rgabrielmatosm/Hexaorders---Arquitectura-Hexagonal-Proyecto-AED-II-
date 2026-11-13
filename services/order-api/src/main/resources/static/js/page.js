@@ -14,6 +14,7 @@ import './views/home.js';
 import './views/info.js';
 import './views/shop.js';
 import './views/customer.js';
+import './views/payment.js';
 import './views/admin.js';
 import './views/operations.js';
 import './views/logistics.js';

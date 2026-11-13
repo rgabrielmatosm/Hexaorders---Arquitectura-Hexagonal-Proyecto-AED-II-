@@ -1,5 +1,9 @@
 .env
 secrets/
+# Credenciales OAuth de Google: NUNCA en Git (ni la descarga original ni copias).
+**/google-oauth*.json
+**/client_secret*.json
+**/*.apps.googleusercontent.com.json
 .env.*
 !.env.example
 .tools/

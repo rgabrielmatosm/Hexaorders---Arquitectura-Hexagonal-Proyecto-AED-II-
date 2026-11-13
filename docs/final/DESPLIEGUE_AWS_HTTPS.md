@@ -119,6 +119,15 @@ cómputo si el uso es continuo.
 - **Secrets Manager** (≈ 0,40 USD/secreto/mes) aporta rotación automática, pero la rotación de
   PostgreSQL/Grafana/RabbitMQ debe hacerse con `change-password`, que actualiza el servicio **y** el
   archivo. Para este proyecto basta Parameter Store.
+- **«Continuar con Google» en producción (v8):** crea en Google Cloud un cliente OAuth **distinto** del local
+  (tipo *Aplicación web*), con origen `https://TU_DOMINIO` y URI de retorno
+  `https://TU_DOMINIO/login/oauth2/code/google`; publica la app (o añade usuarios de prueba). En la instancia:
+  copia su JSON a `secrets/google-oauth.json` por un canal privado (por ejemplo `aws ssm put-parameter --type
+  SecureString --value file://google-oauth.json` y `get-parameter … > secrets/google-oauth.json`; nunca por Git),
+  y en `.env`: `POLYMER_PUBLIC_URL=https://TU_DOMINIO`. Si el proxy no conservara el host,
+  `POLYMER_GOOGLE_REDIRECT_URI=https://TU_DOMINIO/login/oauth2/code/google`. `pwsh tools/polymer.ps1 google -AssumeYes`
+  comprueba que la URI de producción está registrada en el JSON y que el botón redirige a Google; `order-api`
+  también avisa en su log si falta.
 - Recuerda: el archivo de `secrets/` y la contraseña **guardada dentro del volumen** del servicio deben
   coincidir. Para cambiarla: `pwsh tools/polymer.ps1 change-password -Service db|grafana|rabbitmq`.
 

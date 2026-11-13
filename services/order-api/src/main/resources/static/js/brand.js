@@ -47,8 +47,9 @@ export const SOCIAL_FALLBACK = '/empresa.html#redes';
 
 // Métodos de pago: solo los del checkout funcionan. Los demás se muestran como «no disponibles».
 export const PAYMENTS = Object.freeze({
-  available: [t('Pago contra entrega'), t('Transferencia bancaria'), t('Pago en tienda')],
-  notIntegrated: [t('Tarjetas de crédito y débito'), t('Billeteras digitales')],
+  // v7: tarjeta (inmediato), Yape y Plin (QR de 60 s) se pagan en línea con pasarelas de PRUEBAS (no cobran).
+  available: [t('Tarjeta de crédito o débito'), 'Yape', 'Plin', t('Pago contra entrega'), t('Transferencia bancaria'), t('Pago en tienda')],
+  notIntegrated: [],
 });
 
 // Intro cinematográfica: una vez por sesión del navegador. La duración no incluye la apertura del telón.

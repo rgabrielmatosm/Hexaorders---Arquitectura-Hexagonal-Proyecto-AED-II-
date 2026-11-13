@@ -150,10 +150,10 @@ public final class ShopController {
             return new CheckoutOptions(Arrays.stream(DeliveryMethod.values())
                     .map(d -> new DeliveryOption(d.name(), d.label(), d.eta(), d.baseCost(), d.freeFrom(), d.needsAddress())).toList(),
                     Arrays.stream(PaymentMethod.values()).map(p -> new PaymentOption(p.name(), p.label(), p.instructions(),
-                            Arrays.stream(DeliveryMethod.values()).filter(p::allowedWith).map(Enum::name).toList())).toList(), "PEN");
+                            Arrays.stream(DeliveryMethod.values()).filter(p::allowedWith).map(Enum::name).toList(), p.online())).toList(), "PEN");
         }
     }
 
     public record DeliveryOption(String code, String label, String eta, BigDecimal cost, BigDecimal freeFrom, boolean needsAddress) {}
-    public record PaymentOption(String code, String label, String instructions, List<String> deliveries) {}
+    public record PaymentOption(String code, String label, String instructions, List<String> deliveries, boolean online) {}
 }

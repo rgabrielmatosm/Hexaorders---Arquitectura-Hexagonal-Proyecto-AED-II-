@@ -61,7 +61,11 @@ services:
       otel-collector:
         condition: service_healthy
         required: false
-    networks: [compute, telemetry]
+    # v8 · Enlace del contenedor (Docker Desktop → 8000:8000): documentación interactiva de POST /score.
+    # Solo en 127.0.0.1 (no se expone a la red); «edge» es la red no interna que permite publicar el puerto.
+    ports:
+      - '127.0.0.1:8000:8000'
+    networks: [compute, telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
     cap_drop: [ALL]
@@ -100,10 +104,31 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: hexaorders
       RABBITMQ_PASSWORD_FILE: /run/secrets/rabbitmq_password
-      SMTP_HOST: mailpit
-      SMTP_PORT: '1025'
+      # v7: correo. Por defecto Mailpit (captura local). Para enviar a Gmail u otro buzón real: POLYMER_SMTP_* en .env
+      # y la contraseña de aplicación en secrets/smtp_password.txt (vacío = sin autenticación). Ver docs/final/GUIA_GOOGLE_Y_PAGOS.md.
+      SMTP_HOST: ${POLYMER_SMTP_HOST:-mailpit}
+      SMTP_PORT: ${POLYMER_SMTP_PORT:-1025}
+      SMTP_USERNAME: ${POLYMER_SMTP_USERNAME:-}
+      SMTP_STARTTLS: ${POLYMER_SMTP_STARTTLS:-true}
+      SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+      POLYMER_MAIL_FROM: ${POLYMER_MAIL_FROM:-Polymer <no-reply@polymer.local>}
+      # v7: «Continuar con Google» (OpenID Connect). Vacíos = botón oculto. Origen público para los enlaces de los correos.
+      # v8: el JSON del cliente OAuth descargado de Google Cloud (secrets/google-oauth.json, nunca en Git ni en la imagen).
+      GOOGLE_OAUTH_JSON_FILE: /run/secrets/google_oauth
+      GOOGLE_CLIENT_ID_FILE: /run/secrets/google_client_id
+      GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+      # v8 · Producción (AWS con HTTPS): POLYMER_PUBLIC_URL=https://tu-dominio y, si el proxy no conserva el host,
+      # POLYMER_GOOGLE_REDIRECT_URI=https://tu-dominio/login/oauth2/code/google (registrada en Google Cloud).
+      POLYMER_GOOGLE_REDIRECT_URI: ${POLYMER_GOOGLE_REDIRECT_URI:-}
+      POLYMER_PUBLIC_URL: ${POLYMER_PUBLIC_URL:-http://localhost:8080}
+      # v7: tienda física (mapa de Google Maps, horario de hoy) y calendario público opcional de Google Calendar.
+      POLYMER_STORE_ADDRESS: ${POLYMER_STORE_ADDRESS:-Av. Javier Prado Este 4200}
+      POLYMER_STORE_DISTRICT: ${POLYMER_STORE_DISTRICT:-Santiago de Surco}
+      POLYMER_STORE_LATITUDE: ${POLYMER_STORE_LATITUDE:--12.0853}
+      POLYMER_STORE_LONGITUDE: ${POLYMER_STORE_LONGITUDE:--76.9753}
+      POLYMER_GOOGLE_CALENDAR_ID: ${POLYMER_GOOGLE_CALENDAR_ID:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    secrets: [db_password, demo_password, rabbitmq_password]
+    secrets: [db_password, demo_password, rabbitmq_password, google_oauth, google_client_id, google_client_secret, smtp_password]
     depends_on:
       db:
         condition: service_healthy
@@ -122,8 +147,14 @@ services:
       otel-collector:
         condition: service_healthy
         required: false
-    # v5: ya no se publica en el host; el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
-    networks: [gateway, data, compute, telemetry, cache, messaging]
+    # v5: el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
+    # v8 · Enlace del contenedor (Docker Desktop → 8081:8080): el núcleo hexagonal respondiendo SIN el gateway
+    # (misma tienda y misma API; útil para mostrar que el gateway solo es un adaptador de borde). Solo 127.0.0.1.
+    # «Continuar con Google» se usa siempre por 8080 (la URL de retorno registrada en Google).
+    # v7: «egress» = salida a Internet SOLO para order-api (Google OpenID Connect y un SMTP real).
+    ports:
+      - '127.0.0.1:8081:8080'
+    networks: [gateway, data, compute, telemetry, cache, messaging, egress]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
     cap_drop: [ALL]
@@ -368,7 +399,10 @@ services:
     depends_on:
       tempo:
         condition: service_healthy
-    networks: [telemetry]
+    # v8 · Enlace del contenedor (13133): estado del recolector OpenTelemetry. Solo 127.0.0.1.
+    ports:
+      - '127.0.0.1:13133:13133'
+    networks: [telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
     cap_drop: [ALL]
@@ -398,7 +432,10 @@ services:
     volumes:
       - alloy_data:/var/lib/polymer-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks: [telemetry]
+    # v8 · Enlace del contenedor (12345): interfaz de Alloy con el flujo de logs Docker → Loki. Solo 127.0.0.1.
+    ports:
+      - '127.0.0.1:12345:12345'
+    networks: [telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
     cap_drop: [ALL]
@@ -428,6 +465,8 @@ networks:
     internal: true
   messaging:
     internal: true
+  # v7: salida a Internet de order-api (tokens de Google y relé SMTP). Ningún otro servicio la usa.
+  egress: {}
 
 # `down` conserva estos volúmenes; `down -v` elimina los datos.
 volumes:
@@ -453,3 +492,13 @@ secrets:
     file: ./secrets/demo_password.txt
   rabbitmq_password:
     file: ./secrets/rabbitmq_password.txt
+  # v7: opcionales; polymer.cmd los crea VACÍOS si no existen (vacío = integración desactivada).
+  # v8: JSON del cliente OAuth de Google (Google Auth Platform → Clientes → Aplicación web → Descargar JSON).
+  google_oauth:
+    file: ./secrets/google-oauth.json
+  google_client_id:
+    file: ./secrets/google_client_id.txt
+  google_client_secret:
+    file: ./secrets/google_client_secret.txt
+  smtp_password:
+    file: ./secrets/smtp_password.txt

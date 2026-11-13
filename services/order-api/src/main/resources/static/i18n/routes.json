@@ -177,6 +177,22 @@
    "pt": "perfil",
    "de": "profil"
   },
+  "/cliente/pago.html": {
+   "es": "pago",
+   "en": "payment",
+   "fr": "reglement",
+   "it": "pagamento",
+   "pt": "pagamento-pedido",
+   "de": "zahlung"
+  },
+  "/cliente/boleta.html": {
+   "es": "boleta",
+   "en": "receipt",
+   "fr": "recu",
+   "it": "ricevuta",
+   "pt": "recibo",
+   "de": "beleg"
+  },
   "/admin/dashboard.html": {
    "es": "admin",
    "en": "admin",
@@ -506,6 +522,22 @@
    "description": "Datos personales y cambio de contraseña.",
    "roles": [
     "auth"
+   ],
+   "indexable": false
+  },
+  "/cliente/pago.html": {
+   "title": "Pago del pedido",
+   "description": "Paga tu pedido con tarjeta, Yape o Plin.",
+   "roles": [
+    "CUSTOMER"
+   ],
+   "indexable": false
+  },
+  "/cliente/boleta.html": {
+   "title": "Boleta de venta",
+   "description": "Comprobante de tu compra pagada en línea, listo para imprimir.",
+   "roles": [
+    "CUSTOMER"
    ],
    "indexable": false
   },

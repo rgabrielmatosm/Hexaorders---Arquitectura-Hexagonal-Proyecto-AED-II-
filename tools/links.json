@@ -1,0 +1,272 @@
+{
+  "containers": [
+    {
+      "id": "frontend",
+      "name": "frontend (gateway Nginx)",
+      "url": "http://localhost:8080/",
+      "check": "http://127.0.0.1:8080/",
+      "mode": "basic"
+    },
+    {
+      "id": "order-api",
+      "name": "order-api (núcleo hexagonal, Java)",
+      "url": "http://localhost:8081/",
+      "check": "http://127.0.0.1:8081/api/catalog/categories",
+      "mode": "basic"
+    },
+    {
+      "id": "risk-engine",
+      "name": "risk-engine (microservicio Python)",
+      "url": "http://localhost:8000/docs",
+      "check": "http://127.0.0.1:8000/health/ready",
+      "mode": "basic"
+    },
+    {
+      "id": "db",
+      "name": "db (PostgreSQL 17)",
+      "url": null,
+      "check": null,
+      "mode": "basic"
+    },
+    {
+      "id": "prometheus",
+      "name": "prometheus",
+      "url": "http://localhost:9091/targets",
+      "check": "http://127.0.0.1:9091/-/ready",
+      "mode": "basic"
+    },
+    {
+      "id": "grafana",
+      "name": "grafana",
+      "url": "http://localhost:3000/d/polymer",
+      "check": "http://127.0.0.1:3000/api/health",
+      "mode": "basic"
+    },
+    {
+      "id": "redis",
+      "name": "redis",
+      "url": null,
+      "check": null,
+      "mode": "full"
+    },
+    {
+      "id": "rabbitmq",
+      "name": "rabbitmq",
+      "url": "http://localhost:15672/#/queues/%2F/hexaorders.notifications",
+      "check": "http://127.0.0.1:15672/",
+      "mode": "full"
+    },
+    {
+      "id": "mailpit",
+      "name": "mailpit",
+      "url": "http://localhost:8025/",
+      "check": "http://127.0.0.1:8025/",
+      "mode": "full"
+    },
+    {
+      "id": "loki",
+      "name": "loki",
+      "url": "http://localhost:3000/explore",
+      "check": null,
+      "mode": "full"
+    },
+    {
+      "id": "tempo",
+      "name": "tempo",
+      "url": "http://localhost:3000/explore",
+      "check": null,
+      "mode": "full"
+    },
+    {
+      "id": "otel-collector",
+      "name": "otel-collector",
+      "url": "http://localhost:13133/",
+      "check": "http://127.0.0.1:13133/",
+      "mode": "full"
+    },
+    {
+      "id": "alloy",
+      "name": "alloy",
+      "url": "http://localhost:12345/",
+      "check": "http://127.0.0.1:12345/-/ready",
+      "mode": "full"
+    }
+  ],
+  "slices": [
+    {
+      "id": "hexagonal",
+      "name": "Arquitectura hexagonal: núcleo, puertos y adaptadores",
+      "verifier": "Observabilidad",
+      "account": "observador",
+      "login": "/arquitectura/overview.html",
+      "containers": [
+        "order-api",
+        "frontend",
+        "risk-engine",
+        "db"
+      ]
+    },
+    {
+      "id": "catalogo",
+      "name": "Catálogo, búsqueda y ofertas",
+      "verifier": "Visitante",
+      "account": "—",
+      "login": null,
+      "containers": [
+        "frontend",
+        "order-api",
+        "db",
+        "redis"
+      ]
+    },
+    {
+      "id": "checkout",
+      "name": "Carrito, checkout y evaluación de riesgo",
+      "verifier": "Cliente",
+      "account": "cliente",
+      "login": "/checkout.html",
+      "containers": [
+        "frontend",
+        "order-api",
+        "risk-engine",
+        "db"
+      ]
+    },
+    {
+      "id": "pagos",
+      "name": "v7 · Pago en línea (tarjeta, Yape, Plin) y boleta",
+      "verifier": "Cliente",
+      "account": "cliente",
+      "login": "/cliente/pedidos.html",
+      "containers": [
+        "order-api",
+        "redis",
+        "db",
+        "rabbitmq",
+        "mailpit"
+      ]
+    },
+    {
+      "id": "acceso",
+      "name": "v7 · Acceso con Google, código por correo y «Recordarme 30 días»",
+      "verifier": "Cliente",
+      "account": "cliente (o tu cuenta de Google)",
+      "login": "/login.html",
+      "containers": [
+        "order-api",
+        "mailpit",
+        "db"
+      ]
+    },
+    {
+      "id": "tienda",
+      "name": "v7 · Tienda física: Google Maps, horario de hoy y Google Calendar",
+      "verifier": "Visitante",
+      "account": "—",
+      "login": null,
+      "containers": [
+        "frontend",
+        "order-api"
+      ]
+    },
+    {
+      "id": "seguimiento",
+      "name": "Mis pedidos y seguimiento",
+      "verifier": "Cliente",
+      "account": "cliente",
+      "login": "/cliente/dashboard.html",
+      "containers": [
+        "order-api",
+        "db"
+      ]
+    },
+    {
+      "id": "operaciones",
+      "name": "Operaciones: pedidos y revisión de riesgo",
+      "verifier": "Operador de pedidos",
+      "account": "operador",
+      "login": "/operaciones/dashboard.html",
+      "containers": [
+        "order-api",
+        "risk-engine",
+        "db",
+        "rabbitmq"
+      ]
+    },
+    {
+      "id": "logistica",
+      "name": "Logística: calendario, entregas y asignaciones",
+      "verifier": "Logística",
+      "account": "logistica · logistica2",
+      "login": "/logistica/dashboard.html",
+      "containers": [
+        "order-api",
+        "db",
+        "rabbitmq"
+      ]
+    },
+    {
+      "id": "admin",
+      "name": "Administración: catálogo, inventario, promociones, usuarios y auditoría",
+      "verifier": "Administrador",
+      "account": "admin",
+      "login": "/admin/dashboard.html",
+      "containers": [
+        "order-api",
+        "db",
+        "redis"
+      ]
+    },
+    {
+      "id": "notificaciones",
+      "name": "Notificaciones asíncronas (outbox → RabbitMQ → correo)",
+      "verifier": "Observabilidad",
+      "account": "observador (o admin)",
+      "login": null,
+      "containers": [
+        "order-api",
+        "rabbitmq",
+        "mailpit",
+        "db"
+      ]
+    },
+    {
+      "id": "monitoreo",
+      "name": "Monitoreo y observabilidad",
+      "verifier": "Observabilidad",
+      "account": "observador",
+      "login": "/monitoreo/dashboard.html",
+      "containers": [
+        "prometheus",
+        "grafana",
+        "loki",
+        "tempo",
+        "otel-collector",
+        "alloy"
+      ]
+    },
+    {
+      "id": "testimonios",
+      "name": "v9 · Testimonios: equipo (LinkedIn) y clientes",
+      "verifier": "Cliente",
+      "account": "cliente (y admin para moderar)",
+      "login": "/nosotros.html#deja-tu-testimonio",
+      "containers": [
+        "frontend",
+        "order-api",
+        "db"
+      ]
+    },
+    {
+      "id": "contacto",
+      "name": "Contacto y libro de reclamaciones",
+      "verifier": "Visitante",
+      "account": "— (lo revisa admin)",
+      "login": null,
+      "containers": [
+        "order-api",
+        "db"
+      ]
+    }
+  ]
+}

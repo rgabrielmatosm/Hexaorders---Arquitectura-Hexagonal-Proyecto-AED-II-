@@ -1,7 +1,7 @@
 // Administración (ADMIN): panel, productos, inventario, pedidos, usuarios y roles, incidencias,
 // auditoría y reportes. Todas las cifras proceden de PostgreSQL a través de la API.
 
-import { adminApi, incidentsApi, operationsApi } from '../api.js';
+import { adminApi, incidentsApi, operationsApi, testimonialsApi } from '../api.js';
 import {
   LIFECYCLE, TRANSITION_VERBS, barChart, channelBadge, downloadCsv, emptyState, errorMessage, field, formError, kpi as kpiTile,
   lifecycleBadge, modal, money, paginated, searchBox, skeletons, submitting,
@@ -107,6 +107,30 @@ async function panel(root) {
   } catch (error) {
     messages.lastElementChild.replaceChildren(emptyState(t('No se pudieron cargar los mensajes'), errorMessage(error)));
   }
+  // v9: moderación de testimonios del carrusel (mostrar u ocultar).
+  const reviews = el('article', { class: 'card card--spaced', 'data-testid': 'admin-testimonials' }, el('h3', { class: 'card__title', text: t('Testimonios del carrusel') }),
+    el('div', {}, skeletons(2, 'skeleton--row')));
+  body.append(reviews);
+  const paintReviews = async () => {
+    try {
+      const list = await testimonialsApi.adminList();
+      reviews.lastElementChild.replaceChildren(list.length ? paginated(list, (page) => table([t('Autor'), t('Tipo'), t('Estrellas'), t('Testimonio'), t('Visible')],
+        page.map((item) => {
+          const toggle = el('button', { type: 'button', class: `btn btn--sm ${item.visible ? 'btn--ghost' : 'btn--primary'}`, text: item.visible ? t('Ocultar') : t('Mostrar') });
+          toggle.addEventListener('click', async () => {
+            toggle.disabled = true;
+            try { await testimonialsApi.setVisible(item.id, !item.visible); toast(item.visible ? t('Testimonio oculto') : t('Testimonio visible'), 'ok'); await paintReviews(); }
+            catch (error) { toast(errorMessage(error), 'error'); toggle.disabled = false; }
+          });
+          return el('tr', {}, el('td', { text: item.name }), el('td', {}, el('span', { class: 'badge badge--neutral', text: item.kind === 'TEAM' ? t('Equipo') : t('Cliente') })),
+            el('td', { class: 'mono', text: item.rating ? '★'.repeat(item.rating) : '—' }), el('td', { class: 'small', text: item.comment }), el('td', {}, toggle));
+        })), { pageSize: 5, label: 'testimonios' })
+        : emptyState(t('Sin testimonios'), t('Los testimonios de los clientes aparecerán aquí.'), 'users'));
+    } catch (error) {
+      reviews.lastElementChild.replaceChildren(emptyState(t('No se pudieron cargar los testimonios'), errorMessage(error)));
+    }
+  };
+  await paintReviews();
 }
 
 // ---- Productos e inventario --------------------------------------------------------

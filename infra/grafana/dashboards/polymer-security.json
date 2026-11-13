@@ -441,6 +441,98 @@
       }
     },
     {
+      "id": 10,
+      "title": "Sesiones abiertas por método (15 min)",
+      "type": "timeseries",
+      "description": "v7: password (contraseña sin código), google (dispositivo de confianza), verified (tras el código por correo), remembered («Recordarme 30 días»).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method) (increase(polymer_auth_sessions_total[15m]))",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 18,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      }
+    },
+    {
+      "id": 11,
+      "title": "Códigos de verificación por correo (15 min)",
+      "type": "timeseries",
+      "description": "v7: requested (enviados), succeeded (correctos), failed (incorrectos o vencidos). Muchos failed = posible ataque de fuerza bruta (5 intentos por código).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (increase(polymer_auth_verifications_total[15m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "fillOpacity": 18,
+            "lineWidth": 2,
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      }
+    },
+    {
       "id": 9,
       "title": "Auditoría detallada",
       "type": "text",
@@ -452,7 +544,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 29
       }
     }
   ],

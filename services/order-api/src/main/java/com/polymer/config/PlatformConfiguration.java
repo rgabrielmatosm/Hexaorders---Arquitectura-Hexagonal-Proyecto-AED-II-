@@ -152,6 +152,16 @@ public class PlatformConfiguration {
         return new com.polymer.application.service.ContactService(messages, audit, clock);
     }
 
+    /** v9 · Testimonios: caso de uso + adaptador JDBC (puerto de salida TestimonialRepository). */
+    @Bean com.polymer.application.port.out.TestimonialRepository testimonialRepository(JdbcTemplate jdbc) {
+        return new com.polymer.adapter.out.persistence.JdbcTestimonialRepository(jdbc);
+    }
+
+    @Bean com.polymer.application.port.in.TestimonialUseCases testimonialUseCases(com.polymer.application.port.out.TestimonialRepository testimonials,
+                                                                                    UserRepository users, AuditLog audit, Clock clock) {
+        return new com.polymer.application.service.TestimonialService(testimonials, users, audit, clock);
+    }
+
     /** Prometheus is reached through the Docker network (service name), never through localhost. */
     @Bean
     com.polymer.application.port.out.MonitoringPort monitoringPort(RestClient.Builder builder,
@@ -169,8 +179,9 @@ public class PlatformConfiguration {
     @Bean PasswordBlocklist passwordBlocklist() { return new ClasspathPasswordBlocklist(); }
     @Bean UserPreferences userPreferences(JdbcTemplate jdbc) { return new JdbcUserPreferences(jdbc); }
     @Bean AccountUseCases accountUseCases(UserRepository users, PasswordHasher hasher, AuditLog audit, PasswordBlocklist blocklist,
-                                          UserPreferences preferences) {
-        return new AccountService(users, hasher, audit, blocklist, preferences);
+                                          UserPreferences preferences, com.polymer.application.port.out.AccountSecurity security,
+                                          SignInConfiguration.MailSenderHolder mail) {
+        return new AccountService(users, hasher, audit, blocklist, preferences, security, mail.sender() != null);
     }
 
     /** Creates the demo accounts once, from the demo_password secret; never modifies existing users. */

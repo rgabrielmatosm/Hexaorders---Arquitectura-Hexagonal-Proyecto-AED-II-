@@ -22,6 +22,9 @@ public final class JdbcEventOutbox implements EventOutbox {
     private static final String PENDING_DELIVERY = "FROM delivery_changes c JOIN deliveries d ON d.id = c.delivery_id "
             + "WHERE c.id > (SELECT delivery_changes_after FROM event_relay_watermark) "
             + "AND NOT EXISTS (SELECT 1 FROM outbox_published p WHERE p.event_id = 'delivery-change-' || c.id) ";
+    // v7: pagos aprobados (tabla nueva: todas sus filas son posteriores a la migración, no necesitan marca de agua).
+    private static final String PENDING_PAYMENT = "FROM payments p WHERE p.status = 'PAID' "
+            + "AND NOT EXISTS (SELECT 1 FROM outbox_published x WHERE x.event_id = 'payment-' || p.id) ";
     private final JdbcTemplate jdbc;
 
     public JdbcEventOutbox(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -38,6 +41,11 @@ public final class JdbcEventOutbox implements EventOutbox {
                 (rs, n) -> BusinessEvent.fromDeliveryChange(rs.getLong("id"), rs.getObject("order_id", UUID.class), rs.getString("action"),
                         Jdbc.instant(rs.getTimestamp("new_start")), Jdbc.instant(rs.getTimestamp("new_end")),
                         Jdbc.instant(rs.getTimestamp("changed_at"))), limit)));
+        events.addAll(Jdbc.run(() -> jdbc.query(
+                "SELECT p.id, p.order_id, p.method, p.receipt_series, p.receipt_number, p.paid_at " + PENDING_PAYMENT + "ORDER BY p.paid_at LIMIT ?",
+                (rs, n) -> BusinessEvent.fromPayment(rs.getObject("id", UUID.class), rs.getObject("order_id", UUID.class), rs.getString("method"),
+                        rs.getString("receipt_series") + "-" + String.format("%08d", rs.getLong("receipt_number")),
+                        Jdbc.instant(rs.getTimestamp("paid_at"))), limit)));
         events.sort(Comparator.comparing(BusinessEvent::occurredAt).thenComparing(BusinessEvent::eventId));
         return events.size() > limit ? List.copyOf(events.subList(0, limit)) : events;
     }
@@ -49,6 +57,6 @@ public final class JdbcEventOutbox implements EventOutbox {
 
     @Override
     public long pendingCount() {
-        return Jdbc.run(() -> jdbc.queryForObject("SELECT (SELECT count(*) " + PENDING_STATUS + ") + (SELECT count(*) " + PENDING_DELIVERY + ")", Long.class));
+        return Jdbc.run(() -> jdbc.queryForObject("SELECT (SELECT count(*) " + PENDING_STATUS + ") + (SELECT count(*) " + PENDING_DELIVERY + ") + (SELECT count(*) " + PENDING_PAYMENT + ")", Long.class));
     }
 }

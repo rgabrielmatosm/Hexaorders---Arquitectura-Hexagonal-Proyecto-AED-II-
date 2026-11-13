@@ -142,7 +142,7 @@ export async function send(method, url, body, { headers = {}, retry = true } = {
     await refreshCsrf();
     return send(method, url, body, { headers, retry: false });
   }
-  if (response.status === 401 && url !== '/api/auth/login') {
+  if (response.status === 401 && url !== '/api/auth/login' && !url.startsWith('/api/auth/verify')) {
     window.dispatchEvent(new CustomEvent('polymer:unauthenticated'));
   }
   if (!response.ok) {
@@ -162,9 +162,43 @@ const qs = (params) => {
 
 export const authApi = {
   me: () => get('/api/auth/me'),
-  login: (username, password) => post('/api/auth/login', { username, password }),
+  /** v7: 200 = sesión abierta; 202 = falta el código de 6 dígitos enviado por correo (verificationRequired). */
+  login: (username, password, rememberMe = false, next = null) => post('/api/auth/login', { username, password, rememberMe, next }),
   logout: () => post('/api/auth/logout'),
   register: (payload) => post('/api/auth/register', payload),
+  /** v7: métodos de acceso disponibles (Google configurado, verificación por correo). */
+  providers: () => get('/api/auth/providers'),
+  pending: () => get('/api/auth/verify'),
+  verify: (code, rememberMe) => post('/api/auth/verify', { code, rememberMe }),
+  resend: () => post('/api/auth/verify/resend'),
+  cancelVerification: () => send('POST', '/api/auth/verify/cancel', {}).then((r) => r.data),
+  /** URL de inicio de «Continuar con Google» (navegación completa, no fetch). */
+  googleUrl: (next, from, intent) => `/api/auth/google${qs({ next, from, intent })}`,
+};
+
+/** v9: testimonios del carrusel (público), el tuyo (cliente con sesión) y su moderación (ADMIN). */
+export const testimonialsApi = {
+  list: () => get('/api/testimonials'),
+  mine: () => get('/api/testimonials/mine'),
+  submit: (draft) => put('/api/testimonials/mine', draft),
+  adminList: () => get('/api/admin/testimonials'),
+  setVisible: (id, visible) => put(`/api/admin/testimonials/${encodeURIComponent(id)}/visibility`, { visible }),
+};
+
+/** v7: tienda física (mapa de Google Maps, horario de hoy, Google Calendar). Público. */
+export const storeApi = {
+  info: () => get('/api/store'),
+  today: () => get('/api/store/today'),
+};
+
+/** v7: pago en línea de un pedido (tarjeta, Yape, Plin) y su boleta. 402 = pago rechazado (body = estado). */
+export const paymentApi = {
+  status: (orderId) => get(`/api/shop/orders/${encodeURIComponent(orderId)}/payment`),
+  card: (orderId, card) => post(`/api/shop/orders/${encodeURIComponent(orderId)}/payment/card`, card),
+  wallet: (orderId, method) => post(`/api/shop/orders/${encodeURIComponent(orderId)}/payment/wallet`, { method }),
+  confirm: (orderId, paymentId, phone, approvalCode) =>
+    post(`/api/shop/orders/${encodeURIComponent(orderId)}/payment/wallet/${encodeURIComponent(paymentId)}/confirm`, { phone, approvalCode }),
+  receipt: (orderId) => get(`/api/shop/orders/${encodeURIComponent(orderId)}/receipt`),
 };
 
 // ---- Datos del catálogo en el idioma de la página -----------------------------------------------
@@ -271,6 +305,10 @@ export const accountApi = {
   password: (currentPassword, newPassword) => send('PUT', '/api/account/password', { currentPassword, newPassword }),
   /** Idioma preferido (correos de notificación). */
   locale: (language) => send('PUT', '/api/account/locale', { language }),
+  /** v7: verificación en dos pasos, correo verificado, Google vinculado. */
+  security: () => get('/api/account/security'),
+  setTwoFactor: (twoFactor) => put('/api/account/security', { twoFactor }),
+  forgetDevices: () => send('POST', '/api/account/security/forget-devices', {}).then((r) => r.data),
 };
 
 export const adminApi = {

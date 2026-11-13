@@ -6,6 +6,7 @@ from time import perf_counter
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from opentelemetry import trace
 from prometheus_client import CollectorRegistry, Counter, Histogram, CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -90,6 +91,12 @@ def create_app(score_risk: ScoreRiskPort) -> FastAPI:
         duration.observe(perf_counter() - started)
         evaluations.labels(decision=result.decision.value).inc()
         return ScoreResponse(score=result.score, decision=result.decision.value)
+
+    @app.get("/", include_in_schema=False)
+    def home() -> RedirectResponse:
+        # Enlace del contenedor (127.0.0.1:8000 en Docker Desktop): abre la documentación interactiva
+        # del adaptador HTTP para probar POST /score sin pasar por order-api.
+        return RedirectResponse(url="/docs", status_code=307)
 
     @app.get("/health/live", include_in_schema=False)
     def live() -> dict[str, str]:

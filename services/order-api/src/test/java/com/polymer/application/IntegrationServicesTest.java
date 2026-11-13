@@ -195,6 +195,7 @@ class IntegrationServicesTest {
         assertThat(messages.getAllValues()).allSatisfy(m -> assertThat(m.subject()).startsWith("").isNotBlank().doesNotContain("null"));
         assertThat(messages.getAllValues()).anySatisfy(m -> assertThat(m.subject()).contains("rechazado"));
         assertThat(messages.getAllValues()).anySatisfy(m -> assertThat(m.subject()).contains("Entrega programada"));
-        assertThat(EventType.values()).hasSize(5);
+        // v7: PAYMENT_CONFIRMED envía la boleta (PaymentsAndReceiptsTest).
+        assertThat(EventType.values()).hasSize(6);
     }
 }

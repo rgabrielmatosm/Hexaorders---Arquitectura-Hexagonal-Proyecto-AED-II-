@@ -50,6 +50,15 @@ PowerShell 5.1). Ninguna funcionalidad se marca como verificada solo porque exis
 | Guía de despliegue en Google Cloud (`docs/despliegue-cloud.md`) | 🟡 | No ejecutada |
 | Despliegue en AWS con HTTPS (`infra/aws/`) | 🟡 | Plantilla de Nginx del host probada localmente (301, TLS, HSTS, 403 por IP); no desplegado (requiere aprobación, cuenta y dominio) |
 | Docker Desktop en un Windows real | 🟡 | El CI de Windows no ejecuta contenedores Linux; el mismo script se ejecuta en Linux con Docker |
+| v7 · Continuar con Google (OpenID Connect) | ✅ | `SignInServiceTest`, `SignInWebTest`, `v7-e2e.js` con `mock-oauth2-server` en CI [43384929823](https://github.com/rgabrielmatosm/Polymer-Tech-Proyecto-AED-II/actions/runs/43384929823) |
+| v7 · Código de 6 dígitos por correo (registro e inicio de sesión) | ✅ | `SignInServiceTest`, `platform_smoke.py`, `integration_smoke.py`, `i18n-e2e.js` (78), `v7-e2e.js` |
+| v7 · «Recordarme 30 días» (ficha rotatoria, detección de robo) | ✅ | `SignInServiceTest`, `SignInWebTest`, `v7-e2e.js` (cookies de 30,0 días, sesión recuperada) |
+| v7 · Pago con tarjeta al instante (pasarela de pruebas) | ✅ | `PaymentsAndReceiptsTest`, `store_smoke.py`, `v7-e2e.js`, escenario `pagos` |
+| v7 · Yape/Plin con QR de 60 s (TTL en Redis) | ✅ | `PaymentsAndReceiptsTest`, `v7-e2e.js` (vence a los 60 s reales), escenario `pagos` (TTL 60 → -2, 9 evidencias) |
+| v7 · Boleta con IGV y envío por correo (outbox → RabbitMQ → SMTP) | ✅ | `integration_smoke.py`, `v7-e2e.js` en CI (correo de la boleta), escenario `pagos` |
+| v7 · Portada con video, Google Maps, horario de hoy, calendario y Google Calendar | ✅ | `v7-e2e.js`, `pages-e2e.js` (295, incluida la vista móvil de 390 px) |
+| v7 · Inicio de sesión con los servidores reales de Google y envío a un Gmail real | 🟡 | Requiere tus credenciales (`GUIA_GOOGLE_Y_PAGOS.md`); el flujo está probado con un proveedor OIDC de pruebas |
+| v7 · Cobro real con tarjeta / Yape / Plin | ⚪ | Pasarelas de PRUEBAS a propósito (no cobran); los puertos `CardGateway` y `WalletGateway` permiten conectar una pasarela real |
 | Circuit breaker | ⚪ | No existe (ni Resilience4j ni equivalente). No se añade: ver `DEMOSTRACION_MICROSERVICIOS.md` |
 | Exportador de métricas de Redis (`redis_exporter`) | ⚪ | No existe: las métricas de caché son las de la aplicación (`polymer_cache_requests_total`) |
 | Alertmanager / envío de alertas | ⚪ | Las 9 reglas se evalúan en Prometheus; no hay notificaciones (documentado en `docs/arquitectura.md`) |
@@ -67,6 +76,9 @@ PowerShell 5.1). Ninguna funcionalidad se marca como verificada solo porque exis
 | 5 | Ventana de duplicado en el consumidor: correo enviado y caída antes de registrar `processed_events` | Baja (entrega al menos una vez) | Documentado (ya lo estaba en `ASYNCHRONOUS_EVENTS.md`) |
 | 6 | **La caché Redis nunca servía el árbol de categorías**: `Category.isMain()` se escribe como `"main"` y el mismo `ObjectMapper` lo rechazaba al leer; cada *hit* contaba un `error` y activaba 30 s de *back-off* (`bypass`). Los productos no estaban afectados, por eso `integration_smoke.py` veía aciertos | Media (rendimiento: el catálogo iba siempre a PostgreSQL) | 🔴 → **corregido** en `RedisCatalogCache` (ignora propiedades desconocidas al leer; `hit` solo tras leer bien; entrada ilegible = `miss` que se sobrescribe, sin *back-off*) y prueba de regresión `redisCacheReadsBackWhatItWroteIncludingDerivedAccessors` (falla sin la corrección). Lo detectó el escenario `redis` en el CI |
 | 7 | Errores en el script de escenarios nuevo detectados por el CI (referencia `$ComposeFile:` y contraseña del cliente ficticio con su usuario) | — | **Corregidos** antes de la verificación final |
+| 8 | v7: el contexto de construcción de `order-api` superaba 4 MiB (BuildKit) | Alta (el CI no construía) | **Corregido** (`LARGE_FILE` = 4 KB en `generate_delivery.py`) |
+| 9 | v7: la portada se desplazaba horizontalmente en móviles de 390 px (mapa y horario) | Media (experiencia móvil) | **Corregido** en `store.css` (`minmax(0, 1fr)`, ajuste de línea); detectado por `pages-e2e.js` en CI |
+| 10 | v7: la URL de retorno de Google perdía `:8080` detrás del gateway | Alta (Google rechazaría el retorno) | **Corregido** (`X-Forwarded-Port` en `infra/frontend/nginx.conf`) |
 
 ## 3. Servicios y su integración
 
