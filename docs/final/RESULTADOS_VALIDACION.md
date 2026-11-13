@@ -27,6 +27,26 @@ el stack completo se valida en el CI.
 | `bash -n` de `infra/aws/*.sh` | Sintaxis correcta (no ejecutados: requieren la instancia) |
 | Auditoría de secretos en Git | Ningún archivo de secretos rastreado ni en el historial (50 commits); solo valores efímeros del CI y plantillas |
 
+## 1 bis. v7 · Local (13/11/2026): stack real sin Docker
+
+Entorno: PostgreSQL 16 y Redis 7 instalados en el contenedor, motor de riesgo Python (uvicorn), `order-api`
+(jar), el gateway con `infra/frontend/nginx.conf` real, un receptor SMTP con la API de búsqueda de Mailpit y el
+mismo proveedor OpenID Connect de pruebas que usa el CI (`mock-oauth2-server` 2.1.10). Sin RabbitMQ, Prometheus
+ni Grafana (por eso el correo de la boleta y los pasos de monitoreo se validan en el CI).
+
+| Prueba | Resultado observado |
+| --- | --- |
+| `mvn test` (order-api) | **163 pruebas, 0 fallos** (131 anteriores + 32 nuevas: dominio, casos de uso y web de la v7); 8 reglas ArchUnit en verde con el código nuevo |
+| Prueba de regresión del dominio | `SignInServiceTest` encontró y se corrigió un desempate: con dos solicitudes creadas en el mismo instante la vista podía mostrar la anulada; ahora prioriza aprobado → pendiente → más reciente |
+| Flyway V11 y V12 sobre una base nueva | Aplicadas al arrancar (`order-api` arranca en 6 s) |
+| `v7-e2e.js` | **34 comprobaciones** (con `SKIP_RECEIPT_MAIL=1` por no haber RabbitMQ): video servido con Range (206), pausa, mapa, horario de hoy, calendario, Google Calendar; Google + código + «Recordarme» (cookies de 30,0 días, sesión recuperada sin la cookie de sesión, segundo acceso sin código); tarjeta rechazada y aprobada; boleta con IGV; Yape vencido **a los 60 s reales** y QR nuevo aprobado; registro con código; móvil |
+| `i18n-e2e.js` | **77 comprobaciones** (incluye el registro en inglés con el paso del código) |
+| `intro-e2e.js` | **41 comprobaciones** |
+| `pages-e2e.js` | **284 comprobaciones** de páginas × roles (incluidas `/cliente/pago.html` y `/cliente/boleta.html`: 200 para el cliente, 403 para el personal); se detiene en los pasos que consultan Prometheus (no instalado aquí) |
+| Errores encontrados y corregidos por estas pruebas | (1) URL de retorno de Google sin `:8080` detrás del gateway → el gateway envía `X-Forwarded-Port`; (2) el botón de pausa del video quedaba bajo las tarjetas de promoción; (3) faltaban las rutas lógicas `/pago/:id` y `/boleta/:id` en el router |
+| Validaciones estáticas | `generate_pages --check` (47 páginas), `check_frontend`, `check_i18n` (2663 textos × 5 idiomas), `check_observability` (8 dashboards, 2 paneles nuevos), `generate_delivery --check`, `validate_delivery` |
+| Entregable autosuficiente | Restauración simulada de los heredocs: `services/order-api/src` y el video idénticos byte a byte |
+
 ## 2. CI con Docker real
 
 Ejecución **[43324523676](https://github.com/rgabrielmatosm/Hexaorders---Arquitectura-Hexagonal-Proyecto-AED-II-/actions/runs/43324523676)** del workflow `Verify POLYMER` sobre el commit `016f521` (rama

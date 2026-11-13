@@ -72,8 +72,8 @@ hace fallar `CORE_HAS_NO_FRAMEWORK_OR_INFRASTRUCTURE` con
 | --- | --- | --- |
 | **Dominio** | Reglas de negocio puras, sin tecnología | `domain/OrderStatus.java` (umbral de revisión), `domain/Order.java`, `domain/fulfillment/TransitionPolicy.java` (ciclo de vida por rol), `domain/catalog/PriceTag.java` (promociones), `domain/identity/PasswordPolicy.java` |
 | **Caso de uso** | Orquesta una operación del negocio: valida, consulta puertos, aplica el dominio | `application/service/CommerceService.java` (`placeOrder`), `CatalogService`, `OperationsService`, `LogisticsService`, `AccountService`… |
-| **Puerto de entrada** | Interfaz con lo que el sistema **ofrece** | `application/port/in/CommerceUseCases.java`, `CatalogUseCases.java`, `OrderUseCases.java`… (13 interfaces y 6 registros de datos) |
-| **Puerto de salida** | Interfaz con lo que el núcleo **necesita** del exterior | `application/port/out/RiskAssessmentPort.java`, `CommerceOrderRepository.java`, `CatalogCache.java`, `EventPublisher.java`, `EventOutbox.java`, `MailSender.java`… (25 interfaces y 2 registros) |
+| **Puerto de entrada** | Interfaz con lo que el sistema **ofrece** | `application/port/in/CommerceUseCases.java`, `CatalogUseCases.java`, `OrderUseCases.java`, v7: `SignInUseCases.java`, `PaymentUseCases.java`, `StoreUseCases.java`… (16 interfaces y 12 registros de datos) |
+| **Puerto de salida** | Interfaz con lo que el núcleo **necesita** del exterior | `application/port/out/RiskAssessmentPort.java`, `CommerceOrderRepository.java`, `CatalogCache.java`, `EventPublisher.java`, `EventOutbox.java`, `MailSender.java`, v7: `CardGateway.java`, `WalletGateway.java`, `PaymentWindow.java`, `DeviceTokens.java`… (33 interfaces y 2 registros) |
 | **Adaptador de entrada** | Traduce un estímulo externo (HTTP, mensaje, temporizador) a una llamada a un puerto de entrada | `adapter/in/web/ShopController.java`, `adapter/in/messaging/BusinessEventListener.java`, `adapter/in/scheduling/EventRelayScheduler.java` |
 | **Adaptador de salida** | Implementa un puerto de salida con una tecnología concreta | `adapter/out/persistence/JdbcCommerceOrderRepository.java`, `adapter/out/cache/RedisCatalogCache.java`, `adapter/out/messaging/RabbitMqEventPublisher.java`, `adapter/out/http/HttpRiskAssessmentAdapter.java`, `adapter/out/fixed/FixedRiskAssessmentAdapter.java` |
 | **Inversión de dependencias** | El núcleo define la interfaz y la tecnología la implementa; el núcleo nunca importa la tecnología | `CommerceService` recibe un `RiskAssessmentPort` en su constructor y no sabe si detrás hay HTTP o un puntaje fijo |
@@ -241,3 +241,19 @@ No hay reintentos ni puntaje por defecto: un pedido nunca se aprueba sin evaluac
 El motor Python tiene su propio hexágono (`services/risk-engine/risk_engine/`): `domain/risk.py`
 (reglas, solo biblioteca estándar), `application/score_risk.py` y `application/ports.py`, y
 `adapters/http.py` (FastAPI). Lo comprueba `services/risk-engine/tests/test_architecture.py`.
+
+## v7 · Tres casos que muestran la hexagonal con funcionalidades nuevas
+
+1. **Un puerto, dos adaptadores según la infraestructura**: `PaymentWindow` (ventana de 60 s de Yape/Plin) se
+   implementa con `RedisPaymentWindow` (clave con TTL) en el perfil completo y con `ClockPaymentWindow` en el modo
+   básico. `StoreAndPaymentConfiguration` elige; `PaymentService` no cambia. La regla «60 segundos» vive en el
+   dominio (`PaymentPolicy.WALLET_TTL`), no en Redis.
+2. **Adaptador de entrada nuevo sin tocar el núcleo de pedidos**: «Continuar con Google» es un adaptador de
+   entrada (`GoogleSignInHandlers`, Spring Security OAuth2) que traduce el token a `ExternalIdentity` y llama a
+   `SignInUseCases`. La decisión de pedir el código, vincular o crear la cuenta es del núcleo (`SignInService`).
+3. **Pasarelas sustituibles**: `CardGateway` y `WalletGateway` tienen adaptadores de **prueba**
+   (`SandboxCardGateway`, `SandboxWalletGateway`). Pasar a Niubiz, Izipay o Culqi es escribir otro adaptador del
+   mismo puerto; `PaymentService`, la interfaz y las pruebas del dominio no cambian.
+
+Detalle y configuración: [`GUIA_GOOGLE_Y_PAGOS.md`](GUIA_GOOGLE_Y_PAGOS.md).
+
