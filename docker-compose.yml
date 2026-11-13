@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 92fe3ecf023ada121a72b9e48d214df420a168e94e5a9acdcd42fb11ed95ffba
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo bf49476e34e3d90c3cf385e01830206bc7fb7f4955695a6414e6e43937358863
 # POLYMER — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -125,41 +125,44 @@ services:
         COPY <<'__init__.py' <<'http.py.gz.b64' <<'tracing.py' risk_engine/adapters/
         """Frameworks and observability live outside the core."""
         __init__.py
-        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
+        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
+        9uRQ4NTAg5P/A7uvDkwpFQAA
         http.py.gz.b64
         """Driven adapter for distributed tracing (OpenTelemetry → OTLP/HTTP → otel-collector → Tempo).
         
@@ -283,104 +286,30 @@ services:
             score = 75 if amount >= Decimal("1000") else 40 if amount >= Decimal("500") else 10
             return RiskResult(score, Decision.REVIEW if score >= 70 else Decision.APPROVED)
         risk.py
-        COPY <<'test_api.py' <<'test_architecture.py' <<'test_domain.py' <<'test_tracing.py' tests/
-        import pytest
-        from fastapi.testclient import TestClient
-        
-        from risk_engine.adapters.http import create_app
-        from risk_engine.application.score_risk import ScoreRisk
-        
-        
-        @pytest.fixture
-        def client():
-            with TestClient(create_app(ScoreRisk())) as test_client:
-                yield test_client
-        
-        
-        @pytest.mark.parametrize("amount", ["1500.00", 1500.0, 1500])
-        def test_score_accepts_decimal_string_and_number(client, amount):
-            response = client.post("/score", json={"customerId": "customer_01", "amount": amount})
-            assert response.status_code == 200
-            assert response.json() == {"score": 75, "decision": "REVIEW"}
-        
-        
-        @pytest.mark.parametrize(
-            "payload",
-            [
-                {},
-                {"customerId": "client"},
-                {"customerId": "client", "amount": "0"},
-                {"customerId": "client", "amount": "-1"},
-                {"customerId": "client", "amount": "1000000.01"},
-                {"customerId": "client", "amount": "1.001"},
-                {"customerId": "client", "amount": "1.000"},
-                {"customerId": "client", "amount": "NaN"},
-                {"customerId": "client", "amount": "Infinity"},
-                {"customerId": "client", "amount": "text"},
-                {"customerId": "client", "amount": True},
-                {"customerId": "client", "amount": None},
-                {"customerId": "client", "amount": []},
-                {"customerId": "client", "amount": {}},
-                {"customerId": "", "amount": "1"},
-                {"customerId": "a" * 65, "amount": "1"},
-                {"customerId": "hello world", "amount": "1"},
-                {"customerId": "á", "amount": "1"},
-                {"customerId": "client\n", "amount": "1"},
-                {"customerId": 12, "amount": "1"},
-                {"customerId": "client", "amount": "1", "currency": "PEN"},
-                ["client", "1"],
-            ],
-        )
-        def test_invalid_requests_return_422(client, payload):
-            assert client.post("/score", json=payload).status_code == 422
-        
-        
-        @pytest.mark.parametrize(
-            "body",
-            [
-                '{"customerId":"client","amount":1.00000000000000000000001}',
-                '{"customerId":"client","amount":999.999999999999999999999}',
-                '{"customerId":"client","amount":NaN}',
-                '{"customerId":"client","amount":Infinity}',
-                '{bad json',
-                '',
-            ],
-        )
-        def test_json_parser_never_silently_rounds_or_accepts_non_json_numbers(client, body):
-            assert client.post("/score", content=body, headers={"Content-Type": "application/json"}).status_code == 422
-        
-        
-        def test_rejects_unexpected_media_type(client):
-            assert client.post("/score", content='{"customerId":"client","amount":1}').status_code == 415
-        
-        
-        def test_health_and_observability_match_business_outcomes(client):
-            for path in ("/health/live", "/health/ready"):
-                assert client.get(path).json() == {"status": "UP"}
-            client.post("/score", json={"customerId": "client", "amount": "100"})
-            client.post("/score", json={"customerId": "client", "amount": "1000"})
-            client.post("/score", json={"customerId": "client", "amount": "0"})
-            metrics = client.get("/metrics")
-            assert metrics.status_code == 200
-            assert 'risk_evaluations_total{decision="APPROVED"} 1.0' in metrics.text
-            assert 'risk_evaluations_total{decision="REVIEW"} 1.0' in metrics.text
-            assert "risk_evaluation_duration_seconds_count 2.0" in metrics.text
-        
-        
-        def test_openapi_exposes_input_and_output_contract(client):
-            operation = client.get("/openapi.json").json()["paths"]["/score"]["post"]
-            assert operation["requestBody"]["content"]["application/json"]["schema"]["required"] == ["customerId", "amount"]
-            assert "200" in operation["responses"]
-        
-        
-        def test_rejected_requests_are_counted_without_affecting_evaluations(client):
-            client.post("/score", content="{}", headers={"Content-Type": "text/plain"})
-            client.post("/score", json={"customerId": "x", "amount": 0})
-            metrics = client.get("/metrics").text
-            assert 'risk_requests_rejected_total{reason="unsupported_media_type"} 1.0' in metrics
-            assert 'risk_requests_rejected_total{reason="invalid_payload"} 1.0' in metrics
-            assert 'risk_evaluations_total{decision="APPROVED"} 0.0' in metrics
-        test_api.py
+        COPY <<'test_api.py.gz.b64' <<'test_architecture.py' <<'test_domain.py' <<'test_tracing.py' tests/
+        H4sIAAAAAAAC/61XzW7jNhC++ykEXmwVXllOmy4SwEDbbQrkkg3SdHtwDYIW6ZgbiVRJKolr+GH6
+        LH2xDklJlmyvbW2rg01RM9/8D4c8y6UyQb4yTJveQsksWBBtSM4ju5OknAkTcE/1CDsf3E7Pkyqu
+        nzETT1ywiFCSG6Z0tDQmrzgSxYhhmOT5AYY8T3lCDJci0olUDNuvFeevducBNnq93g9evWjB30yh
+        WI+yReA1G4TXvQCeV26WDfUGW7mDGmgQhmFAdGChsGf3zPZZcZbS5qeG2Iyo5ygnimTMKP4XGyCS
+        yUIYNAymaHwZx1Ecw9qv/P8sdEo6PG8bSRKWG40pS3hGUqwBSjxhIigWRTZnauDlDgMPXhqmmM6l
+        0CyYlBZHudRmgEYOFaR+1lJM1igptJEZU7cUXQf1G47HQFKpe11Cb0IHTbRm4OhKQgRRN4XGiaQg
+        bRJcxPFBMitwEFqKNfJKXAfvL0GKtUxDMK0CDzefbm9+R5tjXnToKCerVBKKhu51WgdkvRlu17vm
+        OU+g0xRN21HcleHduCvHOHZPFHfnhBz6KqbOVt2Ru64st2LBBTerrnyGvXWN0qMqWDeOOyk6ckxn
+        3ejXmyP0OxE5Zi5BwTfB95fnMyxZmsrgVaqUdhDzz98diL25f4jzWcYXXdF3sYe2QSnFRLKyG/c3
+        rYScNrjGaOY/wF+jo3LxQlJOsWJ/FvCuYQHngsDfXVzUXbTsK2UbLZvYkRZa0e+2QcA83cTmkq72
+        Oli/7Y3arNoXrnwPPONNf3g+ytXVVXR16OmEAl2hE33VEtpMc0KdN5ub/UMRtEQY/AhRwYK9wK/m
+        KUhIV1iBAKqxVPWRKYDWMfiDUtcxtm4/J8CJFAa2J5Z+GCwZoYACh+YHv//ucZUzV6DbiWRkBaLN
+        F9KhtkOxzywBFQvB3nJYMYozRjnBBiBLPbtoeDpnNv19ncaXTZ3AvtQs3WQh5yDzhcx5CqHCGTHJ
+        Es8LDdOXBg8XJgFBuq3mQiqoHZimuAhAQQ82SvmLVbN+h/EKMj7czk9t656YGViQsD0tOLWto3+7
+        h9HAsnWZaQ6ft6icZv470v8FVeO4HpHo7ehm3YJG5TZqTWHl5okhrO/nZ+h+hctSjY00JF1Xo9cE
+        /Xh///Dx083PaBNAe+nbKFbQ9jTuBlZNcSeh0A4UpoXyC80gtak1CLwTXEQx2sNppK7MmYCrB4Zi
+        kpppaPR5YXwmF8YubZ0okph2zgKbF7fr6hLPZSGqknGKbGpqNJtWwYWVDTaaNW2qQaeoPGd+sl0e
+        aMtitcu9jgF7OlmyjNiV5eOKUTSzsZw2c2ebMS2hCALuPNSS7idv0Hi/9bDGKUjgmuH8DJv2QiSt
+        7xYLoLI3jUag29473pHQeoOO9UwbwlGeEi6+onzeWpUTn1k3X8jkxjRQesbnM/QqKxsVQhe5vVu2
+        mvR+dndHruaR6i5zBuSZNRzv4LQSQEqDUy6eXdkAzJJBwcAVHOoD2jWmMikycJ+T0g75/q3SuxjC
+        sZAwc76CpRQyF462yS8k1eysG+O38fuDZGXyTFEqfan4ekAj0FCj3uHjo/wanuiIVYJZJ3Uo/d6/
+        IAyKs/gQAAA=
+        test_api.py.gz.b64
         """The dependency rule is executable, not just a folder naming convention."""
         
         import ast
@@ -487,6 +416,7 @@ services:
             assert all("secret-customer" not in str(dict(span.attributes or {})) for span in spans)
             assert all(span.resource.attributes["service.name"] == "risk-engine" for span in spans)
         test_tracing.py
+        RUN cd tests && base64 -d test_api.py.gz.b64 | gunzip > test_api.py && rm test_api.py.gz.b64
         RUN python -m pytest -q -p no:cacheprovider && touch /tmp/tests-passed
         
         FROM base AS runtime
@@ -506,41 +436,44 @@ services:
         COPY <<'__init__.py' <<'http.py.gz.b64' <<'tracing.py' risk_engine/adapters/
         """Frameworks and observability live outside the core."""
         __init__.py
-        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
+        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
+        9uRQ4NTAg5P/A7uvDkwpFQAA
         http.py.gz.b64
         """Driven adapter for distributed tracing (OpenTelemetry → OTLP/HTTP → otel-collector → Tempo).
         
@@ -677,7 +610,11 @@ services:
       otel-collector:
         condition: service_healthy
         required: false
-    networks: [compute, telemetry]
+    # v8 · Enlace del contenedor (Docker Desktop → 8000:8000): documentación interactiva de POST /score.
+    # Solo en 127.0.0.1 (no se expone a la red); «edge» es la red no interna que permite publicar el puerto.
+    ports:
+      - '127.0.0.1:8000:8000'
+    networks: [compute, telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
     cap_drop: [ALL]
@@ -22038,8 +21975,13 @@ services:
       otel-collector:
         condition: service_healthy
         required: false
-    # v5: ya no se publica en el host; el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
-    # v7: «egress» = salida a Internet SOLO para order-api (Google OpenID Connect y un SMTP real); no publica puertos.
+    # v5: el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
+    # v8 · Enlace del contenedor (Docker Desktop → 8081:8080): el núcleo hexagonal respondiendo SIN el gateway
+    # (misma tienda y misma API; útil para mostrar que el gateway solo es un adaptador de borde). Solo 127.0.0.1.
+    # «Continuar con Google» se usa siempre por 8080 (la URL de retorno registrada en Google).
+    # v7: «egress» = salida a Internet SOLO para order-api (Google OpenID Connect y un SMTP real).
+    ports:
+      - '127.0.0.1:8081:8080'
     networks: [gateway, data, compute, telemetry, cache, messaging, egress]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
@@ -39155,7 +39097,10 @@ services:
     depends_on:
       tempo:
         condition: service_healthy
-    networks: [telemetry]
+    # v8 · Enlace del contenedor (13133): estado del recolector OpenTelemetry. Solo 127.0.0.1.
+    ports:
+      - '127.0.0.1:13133:13133'
+    networks: [telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
     cap_drop: [ALL]
@@ -39258,7 +39203,10 @@ services:
     volumes:
       - alloy_data:/var/lib/polymer-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks: [telemetry]
+    # v8 · Enlace del contenedor (12345): interfaz de Alloy con el flujo de logs Docker → Loki. Solo 127.0.0.1.
+    ports:
+      - '127.0.0.1:12345:12345'
+    networks: [telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
     cap_drop: [ALL]

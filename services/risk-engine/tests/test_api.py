@@ -95,3 +95,11 @@ def test_rejected_requests_are_counted_without_affecting_evaluations(client):
     assert 'risk_requests_rejected_total{reason="invalid_payload"} 1.0' in metrics
     assert 'risk_evaluations_total{decision="APPROVED"} 0.0' in metrics
 
+
+
+def test_root_link_opens_the_interactive_documentation(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"
+    assert client.get("/docs").status_code == 200
+    assert "/score" in client.get("/openapi.json").json()["paths"]

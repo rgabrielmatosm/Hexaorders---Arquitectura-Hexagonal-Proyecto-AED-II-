@@ -61,7 +61,11 @@ services:
       otel-collector:
         condition: service_healthy
         required: false
-    networks: [compute, telemetry]
+    # v8 · Enlace del contenedor (Docker Desktop → 8000:8000): documentación interactiva de POST /score.
+    # Solo en 127.0.0.1 (no se expone a la red); «edge» es la red no interna que permite publicar el puerto.
+    ports:
+      - '127.0.0.1:8000:8000'
+    networks: [compute, telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=32m']
     cap_drop: [ALL]
@@ -138,8 +142,13 @@ services:
       otel-collector:
         condition: service_healthy
         required: false
-    # v5: ya no se publica en el host; el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
-    # v7: «egress» = salida a Internet SOLO para order-api (Google OpenID Connect y un SMTP real); no publica puertos.
+    # v5: el navegador entra por el gateway (frontend) en 127.0.0.1:8080.
+    # v8 · Enlace del contenedor (Docker Desktop → 8081:8080): el núcleo hexagonal respondiendo SIN el gateway
+    # (misma tienda y misma API; útil para mostrar que el gateway solo es un adaptador de borde). Solo 127.0.0.1.
+    # «Continuar con Google» se usa siempre por 8080 (la URL de retorno registrada en Google).
+    # v7: «egress» = salida a Internet SOLO para order-api (Google OpenID Connect y un SMTP real).
+    ports:
+      - '127.0.0.1:8081:8080'
     networks: [gateway, data, compute, telemetry, cache, messaging, egress]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=64m']
@@ -385,7 +394,10 @@ services:
     depends_on:
       tempo:
         condition: service_healthy
-    networks: [telemetry]
+    # v8 · Enlace del contenedor (13133): estado del recolector OpenTelemetry. Solo 127.0.0.1.
+    ports:
+      - '127.0.0.1:13133:13133'
+    networks: [telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
     cap_drop: [ALL]
@@ -415,7 +427,10 @@ services:
     volumes:
       - alloy_data:/var/lib/polymer-alloy  # directorio propio: el de la imagen base no es escribible sin capacidades
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks: [telemetry]
+    # v8 · Enlace del contenedor (12345): interfaz de Alloy con el flujo de logs Docker → Loki. Solo 127.0.0.1.
+    ports:
+      - '127.0.0.1:12345:12345'
+    networks: [telemetry, edge]
     read_only: true
     tmpfs: ['/tmp:rw,noexec,nosuid,size=16m']
     cap_drop: [ALL]

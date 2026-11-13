@@ -37,6 +37,7 @@ Tienda de tecnología y plataforma de gestión de pedidos con **arquitectura hex
 17. [Seguridad de contraseñas](#17-seguridad-de-contraseñas)
 18. [Exposición, demostraciones y documentación final](#18-exposición-demostraciones-y-documentación-final)
 19. [Novedades v7: Google, código por correo, pagos, boleta, mapa, horario y video](#19-novedades-v7-google-código-por-correo-pagos-boleta-mapa-horario-y-video)
+20. [v8: enlaces por slice, asistente de Google y guía de la PPT](#20-v8-enlaces-por-slice-asistente-de-google-y-guía-de-la-ppt)
 
 Anexos: [API](#anexo-a-api) · [Documentación técnica](#anexo-b-documentación-técnica) · [Historial y migración](#anexo-c-historial-y-migración)
 
@@ -194,18 +195,20 @@ Proyecto de Compose **`polymer`** (contenedores `polymer-<servicio>-1`, imágene
 | # | Servicio | Función | Acceso desde el equipo |
 | --- | --- | --- | --- |
 | 1 | `frontend` | Gateway Nginx: archivos estáticos y reenvío a Spring | http://localhost:8080 |
-| 2 | `order-api` | Núcleo hexagonal (Java 21 / Spring Boot) | (a través de `frontend`) |
-| 3 | `risk-engine` | Motor de riesgo (FastAPI) | — (red interna) |
+| 2 | `order-api` | Núcleo hexagonal (Java 21 / Spring Boot) | http://localhost:8081 (directo, sin gateway; la tienda se usa por 8080) |
+| 3 | `risk-engine` | Motor de riesgo (FastAPI) | http://localhost:8000 (`/docs`: prueba `POST /score`) |
 | 4 | `db` | PostgreSQL 17 | — (nunca publicado) |
 | 5 | `prometheus` | Métricas y 9 alertas | http://localhost:9091 |
 | 6 | `grafana` | 8 dashboards (Prometheus, Loki, Tempo) | http://localhost:3000 |
-| 7 | `redis` | Caché del catálogo | — |
+| 7 | `redis` | Caché del catálogo y TTL de 60 s de Yape/Plin | — (privado; escenario `redis`) |
 | 8 | `rabbitmq` | Eventos de negocio y cola de notificaciones con DLQ | http://localhost:15672 (consola) |
 | 9 | `mailpit` | Captura los correos (no envía a Internet) | http://localhost:8025 |
-| 10 | `loki` | Logs centralizados | — |
-| 11 | `tempo` | Trazas distribuidas | — |
-| 12 | `otel-collector` | Recepción OTLP y métricas de Nginx | — |
-| 13 | `alloy` | Recolector de logs de Docker hacia Loki | — |
+| 10 | `loki` | Logs centralizados | — (Grafana → Explore → Loki) |
+| 11 | `tempo` | Trazas distribuidas | — (Grafana → Explore → Tempo) |
+| 12 | `otel-collector` | Recepción OTLP y métricas de Nginx | http://localhost:13133 (estado) |
+| 13 | `alloy` | Recolector de logs de Docker hacia Loki | http://localhost:12345 (flujo de logs) |
+
+Todos los enlaces se publican **solo en 127.0.0.1** (aparecen como enlaces clicables en Docker Desktop). El mapa por slice, con quién lo verifica, está en [`ENLACES.html`](ENLACES.html) (`.\polymer.cmd enlaces`).
 
 **Volúmenes persistentes:** `polymer_postgres_data`, `polymer_grafana_data`, `polymer_prometheus_data`, `polymer_redis_data`, `polymer_rabbitmq_data`, `polymer_loki_data`, `polymer_tempo_data` y `polymer_alloy_data`.
 
@@ -508,6 +511,16 @@ Documentos en [`docs/final/`](docs/final/):
 Configuración (Google, Gmail, dirección real de la tienda, calendario público) y demostración:
 [`docs/final/GUIA_GOOGLE_Y_PAGOS.md`](docs/final/GUIA_GOOGLE_Y_PAGOS.md). Sin configurar nada, todo funciona con
 Mailpit, las pasarelas de prueba y una dirección de demostración.
+
+## 20. v8: enlaces por slice, asistente de Google y guía de la PPT
+
+| Novedad | Uso |
+| --- | --- |
+| **Enlaces por contenedor** | 9 de los 13 contenedores tienen un enlace local (solo `127.0.0.1`) que Docker Desktop muestra como clicable: tienda 8080, núcleo `order-api` 8081, `risk-engine` 8000, Grafana 3000, Prometheus 9091, RabbitMQ 15672, Mailpit 8025, OpenTelemetry 13133 y Alloy 12345. PostgreSQL, Redis, Loki y Tempo siguen privados por diseño |
+| **Mapa de slices** | [`ENLACES.html`](ENLACES.html): 13 slices con **quién lo verifica** (rol y cuenta), botón «Entrar como…», páginas, contenedores con estado en vivo, evidencia (Grafana, Prometheus, RabbitMQ, Mailpit) y escenario de demostración. Campo «Expone» para el nombre de cada integrante |
+| `.\polymer.cmd enlaces` | Comprueba cada enlace, lista los slices con su verificador y abre `ENLACES.html` |
+| `.\polymer.cmd google` | Asistente: pide el ID y el secreto de OAuth de Google y, opcional, tu Gmail con su contraseña de aplicación; los guarda sin mostrarlos, reinicia `order-api`, comprueba la redirección a Google y envía un correo de prueba |
+| **Guía de la PPT** | [`docs/final/GUIA_PPT_EXPOSICION.md`](docs/final/GUIA_PPT_EXPOSICION.md): diapositiva por diapositiva, con el enlace y la captura de cada una |
 
 ## Anexo A. API
 

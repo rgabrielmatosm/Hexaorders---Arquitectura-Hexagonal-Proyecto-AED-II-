@@ -121,6 +121,30 @@ jobs:
           ./tools/demo/polymer-demo.ps1 -Scenario adaptador @common
           ./tools/demo/polymer-demo.ps1 -Scenario desactivar-demo @common
           ./tools/demo/polymer-demo.ps1 -Scenario preparar @common
+      # v8: enlace local de cada contenedor (los mismos que muestra Docker Desktop) y slices con su verificador.
+      - name: v8 · Enlaces por contenedor y por slice (polymer.ps1 enlaces)
+        env:
+          COMPOSE_PROJECT_NAME: polymer-verify
+        run: |
+          python tools/generate_links.py --check
+          ./tools/polymer.ps1 enlaces -WorkDir (Join-Path $env:RUNNER_TEMP 'polymer-delivery') -NoBrowser
+          # El núcleo responde sin el gateway (8081) y risk-engine abre su documentación interactiva (8000).
+          $catalog = Invoke-RestMethod -Uri 'http://127.0.0.1:8081/api/catalog/categories' -TimeoutSec 15
+          if (@($catalog).Count -lt 1) { throw 'order-api (8081) no devolvió categorías' }
+          $docs = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/' -TimeoutSec 15
+          if ($docs.Content -notmatch 'swagger') { throw 'risk-engine (8000) no abrió /docs' }
+      # v8: asistente de Google sin interacción con un ID de cliente FICTICIO: guarda los secretos, reinicia
+      # order-api y comprueba que el botón se activa y redirige a accounts.google.com (no inicia sesión real).
+      - name: v8 · Asistente de Google (polymer.ps1 google, ID de cliente ficticio)
+        env:
+          COMPOSE_PROJECT_NAME: polymer-verify
+        run: |
+          $work = Join-Path $env:RUNNER_TEMP 'polymer-delivery'
+          $secret = Join-Path $env:RUNNER_TEMP 'google-secret.txt'
+          [System.IO.File]::WriteAllText($secret, 'GOCSPX-ci-only-not-a-real-secret')
+          ./tools/polymer.ps1 google -WorkDir $work -AssumeYes -GoogleClientId '123456789012-ciexample.apps.googleusercontent.com' -GoogleSecretFile $secret
+          Remove-Item $secret
+          ./tools/polymer.ps1 enlaces -WorkDir $work -NoBrowser
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

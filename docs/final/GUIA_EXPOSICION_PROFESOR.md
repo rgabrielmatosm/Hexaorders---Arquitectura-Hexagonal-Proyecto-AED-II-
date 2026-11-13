@@ -6,6 +6,9 @@ se detiene en cada paso hasta pulsar Enter; con `-NoPause` corre seguido.
 
 ## 0. Antes de empezar (10 minutos antes)
 
+> v8: `.\polymer.cmd enlaces` comprueba el enlace de cada contenedor y abre `ENLACES.html` (slices con quién los
+> verifica). Para armar la PPT: [`GUIA_PPT_EXPOSICION.md`](GUIA_PPT_EXPOSICION.md).
+
 ```powershell
 .\polymer.cmd start
 ```

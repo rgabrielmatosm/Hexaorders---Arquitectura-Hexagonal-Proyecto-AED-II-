@@ -103,7 +103,7 @@ flowchart TB
 | `messaging` | order-api, rabbitmq, mailpit | AMQP y SMTP |
 | `telemetry` | prometheus, grafana, otel-collector, tempo, loki, alloy, order-api, risk-engine, frontend, rabbitmq | Métricas, trazas y logs |
 
-**order-api ya no publica puertos.** El navegador entra por el gateway, en el mismo `127.0.0.1:8080` de siempre. PostgreSQL, Redis, el AMQP de RabbitMQ, Loki, Tempo y el collector no se publican en el host.
+La tienda entra por el gateway, en el mismo `127.0.0.1:8080` de siempre. **v8 · Enlaces de verificación:** cada contenedor con interfaz web publica además un enlace **solo en 127.0.0.1** (clicable en Docker Desktop): `order-api` 8081 (núcleo sin gateway), `risk-engine` 8000 (`/docs`), Grafana 3000, Prometheus 9091, RabbitMQ 15672, Mailpit 8025, OpenTelemetry Collector 13133 y Alloy 12345. PostgreSQL, Redis, el AMQP de RabbitMQ, Loki y Tempo **no** se publican; se verifican desde Grafana, `polymer.cmd demo` o la pestaña *Exec* de Docker Desktop. La lista cerrada la comprueba `tools/validate_delivery.py`. Mapa por slice: `ENLACES.html` (`polymer.cmd enlaces`).
 
 ## 3. Modos y perfiles
 

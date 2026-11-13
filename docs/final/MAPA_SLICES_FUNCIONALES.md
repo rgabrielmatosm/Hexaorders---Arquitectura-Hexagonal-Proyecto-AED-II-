@@ -21,6 +21,27 @@ Las 45 páginas también existen en `/en/`, `/fr/`, `/it/`, `/pt/` y `/de/` con 
 (`adapter/in/web/i18n/LocalizedPagesController`). La documentación técnica está separada del sitio
 comercial: solo la ven `observador` y `admin`.
 
+## Enlaces y verificadores por slice (v8)
+
+[`ENLACES.html`](../../ENLACES.html) (generado por `tools/generate_links.py`; `.\polymer.cmd enlaces` lo abre y comprueba
+cada enlace) muestra, para cada slice: **quién lo verifica** (rol y cuenta de demostración), el botón «Entrar como…»
+(login con `?next=` a su página), las páginas, los **contenedores** que intervienen con su enlace local y estado en vivo,
+la evidencia (dashboard de Grafana, consulta de Prometheus, cola de RabbitMQ, Mailpit) y el escenario de
+`polymer.cmd demo`. Enlace de cada contenedor (solo `127.0.0.1`, clicable en Docker Desktop):
+
+| Contenedor | Enlace | Slices que lo usan como evidencia |
+| --- | --- | --- |
+| `frontend` | http://localhost:8080 | Todos (tienda y portales por rol) |
+| `order-api` | http://localhost:8081 (núcleo sin gateway) | Arquitectura hexagonal; todos los de negocio |
+| `risk-engine` | http://localhost:8000 → `/docs` | Checkout y riesgo, Operaciones |
+| `grafana` | http://localhost:3000 | Monitoreo y uno por slice (`polymer`, `polymer-business`, `polymer-risk`, `polymer-logistics`, `polymer-security`, `polymer-integrations`…) |
+| `prometheus` | http://localhost:9091 | Monitoreo, pagos, caché |
+| `rabbitmq` | http://localhost:15672 | Notificaciones asíncronas, pagos (boleta) |
+| `mailpit` | http://localhost:8025 | Acceso (código de 6 dígitos), pagos (boleta), notificaciones |
+| `otel-collector` | http://localhost:13133 | Monitoreo (trazas) |
+| `alloy` | http://localhost:12345 | Monitoreo (logs) |
+| `db`, `redis`, `loki`, `tempo` | Privados por diseño | Se demuestran con `polymer.cmd demo` (postgres, redis), Grafana → Explore (Loki, Tempo) o *Exec* en Docker Desktop |
+
 ## Slices
 
 | Slice | Rol | Página | Endpoints | Controlador | Puerto de entrada → servicio | Puertos de salida | Adaptadores de salida | Tablas | Eventos / métricas |

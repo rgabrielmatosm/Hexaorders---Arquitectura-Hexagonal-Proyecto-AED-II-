@@ -50,11 +50,20 @@ for name, service in document['services'].items():
     for dependency, condition in (service.get('depends_on') or {}).items():
         if dependency in FULL and name not in FULL:
             assert condition.get('required') is False, f'{name}: la dependencia {dependency} debe ser opcional (required: false)'
-# Solo el gateway publica la aplicación; las bases de datos y brokers nunca se publican.
+# La tienda entra por el gateway; cada interfaz web tiene un enlace local de verificación y AMQP nunca se publica.
 published = {name: service.get('ports', []) for name, service in document['services'].items() if service.get('ports')}
 assert '127.0.0.1:8080:8080' in published.get('frontend', []), 'El gateway debe publicar 127.0.0.1:8080'
-for name in ['order-api', 'db', 'redis', 'risk-engine', 'loki', 'tempo', 'otel-collector', 'alloy']:
+# Los datos (PostgreSQL, Redis) y los almacenes de telemetría (Loki, Tempo) nunca se publican.
+for name in ['db', 'redis', 'loki', 'tempo']:
     assert name not in published, f'{name} no debe publicar puertos en el host'
+# v8 · Enlaces de verificación por contenedor (Docker Desktop): lista cerrada, solo en 127.0.0.1.
+LINKS = {
+    'frontend': ['127.0.0.1:8080:8080'], 'order-api': ['127.0.0.1:8081:8080'], 'risk-engine': ['127.0.0.1:8000:8000'],
+    'prometheus': ['127.0.0.1:9091:9090'], 'grafana': ['127.0.0.1:3000:3000'], 'rabbitmq': ['127.0.0.1:15672:15672'],
+    'mailpit': ['127.0.0.1:8025:8025'], 'otel-collector': ['127.0.0.1:13133:13133'], 'alloy': ['127.0.0.1:12345:12345'],
+}
+for name, ports in published.items():
+    assert [str(port) for port in ports] == LINKS.get(name), f'{name}: puertos publicados {ports}; permitidos {LINKS.get(name)}'
 for name, ports in published.items():
     assert all(str(port).startswith('127.0.0.1:') for port in ports), f'{name}: publicar solo en 127.0.0.1'
 assert all(str(port) != '127.0.0.1:5672:5672' for port in published.get('rabbitmq', [])), 'AMQP no se publica'

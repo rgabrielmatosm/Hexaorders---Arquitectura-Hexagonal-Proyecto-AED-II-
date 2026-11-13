@@ -21,6 +21,15 @@ OAuth, SMTP, Redis ni PostgreSQL.
 
 ## 2. Configurar «Continuar con Google» (gratis)
 
+> **Forma rápida (v8):** con POLYMER en marcha ejecuta `.\polymer.cmd google`. El asistente te muestra los
+> pasos de Google Cloud, pide el **ID de cliente** y el **secreto** (oculto) y, si quieres, tu **Gmail** y su
+> **contraseña de aplicación** (oculta). Los guarda en `secrets\` y `.env` sin mostrarlos, reinicia `order-api`,
+> comprueba que el botón redirige a `accounts.google.com` con tu ID y envía un correo de prueba a tu Gmail.
+> Los pasos manuales equivalentes son los de abajo.
+>
+> Registra **las dos** URI de retorno: `http://localhost:8080/login/oauth2/code/google` y
+> `http://127.0.0.1:8080/login/oauth2/code/google`, y entra a la tienda con la misma dirección que registraste.
+
 1. Entra a <https://console.cloud.google.com/> con tu cuenta de Google y crea un proyecto (p. ej. «POLYMER»).
 2. **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo *Externo*; nombre de la app «POLYMER»;
    tu correo como soporte y contacto. En **Usuarios de prueba** añade tu Gmail (mientras la app esté en

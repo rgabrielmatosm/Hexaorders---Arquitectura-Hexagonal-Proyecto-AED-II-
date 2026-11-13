@@ -36,6 +36,12 @@
                    postgres|riesgo|riesgo-caida|adaptador|observabilidad|pagos|todo   [-NoPause]
       demo-on      Modo demostración (solo configuración de order-api): TTL corto de la caché
                    (-DemoTtl 20) y, con -FixedRisk, el adaptador de riesgo fijo. demo-off lo desactiva.
+      enlaces      v8 · Mapa de enlaces por slice: comprueba el enlace local de cada contenedor (el mismo que
+                   muestra Docker Desktop), lista quién verifica cada slice (rol y cuenta) y abre ENLACES.html.
+                   -NoBrowser: solo la comprobación.
+      google       v8 · Asistente de Google: pide el ID y el secreto de cliente de OAuth («Continuar con Google»)
+                   y, opcional, tu Gmail y su contraseña de aplicación (códigos y boletas a tu bandeja). Los guarda
+                   en secrets\ y .env sin mostrarlos, reinicia order-api y comprueba que Google responde.
       logs         Últimas 100 líneas de log de cada servicio.
       stop         Detiene los servicios conservando los datos (-RemoveData los elimina).
       secrets      Solo crea en secrets\ las contraseñas que falten (aleatorias). Nunca sobrescribe.
@@ -69,6 +75,10 @@
 .EXAMPLE
     .\polymer.cmd import-secrets -SecretsFrom "$env:USERPROFILE\Downloads\HexaOrders-v6"
 .EXAMPLE
+    .\polymer.cmd google
+.EXAMPLE
+    .\polymer.cmd enlaces
+.EXAMPLE
     .\polymer.cmd start -Mode basic
 .EXAMPLE
     .\polymer.cmd stop -RemoveData
@@ -80,7 +90,7 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet('help', 'start', 'status', 'logs', 'stop', 'secrets', 'k8s-secrets', 'repair-db-password',
                  'import-secrets', 'migrate', 'change-password', 'check', 'test', 'smoke', 'verify', 'diagnose', 'cleanup',
-                 'health', 'rebuild', 'restart', 'demo', 'demo-on', 'demo-off')]
+                 'health', 'rebuild', 'restart', 'demo', 'demo-on', 'demo-off', 'enlaces', 'google')]
     [string]$Command = 'help',
 
     # v5: full = 13 contenedores (perfil "full" de Compose); basic = 6 contenedores esenciales.
@@ -131,7 +141,16 @@ param(
     # demo-on: TTL corto (segundos) de la caché del catálogo y, con -FixedRisk, adaptador de riesgo fijo.
     [int]$DemoTtl = 20,
     [switch]$FixedRisk,
-    [int]$FixedScore = 10
+    [int]$FixedScore = 10,
+
+    # google: valores para uso no interactivo (CI). Sin ellos el asistente los pide (los secretos, ocultos).
+    [string]$GoogleClientId,
+    [string]$GoogleSecretFile,
+    [string]$GmailAddress,
+    [string]$GmailPasswordFile,
+
+    # enlaces: no abrir ENLACES.html en el navegador.
+    [switch]$NoBrowser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -264,6 +283,7 @@ function Show-Urls {
     } else {
         Write-Host '  Modo básico: Redis, RabbitMQ, Mailpit, Loki, Tempo y OpenTelemetry no están en marcha.'
     }
+    Write-Host '  Enlaces por slice: ENLACES.html (doble clic) o .\polymer.cmd enlaces  ·  Google y Gmail: .\polymer.cmd google'
 }
 
 # ---------------------------------------------------------------- contraseña de PostgreSQL
@@ -855,6 +875,185 @@ function Invoke-Health {
     Write-Host "`nTodo sano: $count contenedores y las interfaces responden." -ForegroundColor Green
 }
 
+# ---------------------------------------------------------------- v8 · enlaces por slice
+
+function Invoke-Links {
+    # Fuente: tools/links.json (generado por tools/generate_links.py junto con ENLACES.html).
+    $data = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $PSScriptRoot 'links.json') | ConvertFrom-Json
+    $dockerReady = [bool](Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $ComposeFile)
+    $state = @{}
+    $problems = @()
+    Write-Host ''
+    Write-Host ('{0,-16} {1,-9} {2}' -f 'CONTENEDOR', 'ESTADO', 'ENLACE (Docker Desktop / navegador)') -ForegroundColor Cyan
+    foreach ($c in @($data.containers)) {
+        if (-not $c.check) {
+            $state[$c.id] = 'privado'
+            Write-Host ('{0,-16} {1,-9} {2}' -f $c.id, 'privado', 'sin puerto publicado por diseño (ver ENLACES.html)') -ForegroundColor DarkGray
+            continue
+        }
+        $code = Get-HttpGetStatus $c.check
+        if ($code -ge 200 -and $code -lt 400) {
+            $state[$c.id] = 'ok'
+            Write-Host ('{0,-16} {1,-9} {2}' -f $c.id, "HTTP $code", $c.url) -ForegroundColor Green
+        } elseif ($c.mode -eq 'full' -and $dockerReady -and -not (Test-ServiceRunning $c.id)) {
+            $state[$c.id] = 'apagado'
+            Write-Host ('{0,-16} {1,-9} {2}' -f $c.id, 'apagado', 'no está en marcha (modo básico): .\polymer.cmd start') -ForegroundColor Yellow
+        } else {
+            $state[$c.id] = 'error'
+            $problems += "$($c.id): $($c.check) respondió HTTP $code"
+            Write-Host ('{0,-16} {1,-9} {2}' -f $c.id, "HTTP $code", $c.url) -ForegroundColor Red
+        }
+    }
+    Write-Host ''
+    Write-Host 'SLICES: quién verifica y con qué contenedores' -ForegroundColor Cyan
+    $n = 0
+    foreach ($s in @($data.slices)) {
+        $n++
+        $marks = @(foreach ($id in @($s.containers)) {
+            $label = if ($state.ContainsKey($id) -and $state[$id] -ne 'error') { $state[$id] } else { 'ERROR' }
+            "$id [$label]"
+        }) -join ', '
+        $entry = if ($s.login) { "http://localhost:8080/login.html?next=$($s.login)" } else { 'http://localhost:8080/' }
+        Write-Host ('{0:D2}. {1}' -f $n, $s.name)
+        Write-Host "    Verifica: $($s.verifier) (cuenta: $($s.account))  ->  $entry"
+        Write-Host "    Contenedores: $marks" -ForegroundColor $(if ($marks -match 'ERROR') { 'Red' } else { 'Gray' })
+    }
+    Write-Host ''
+    Write-Host "Contraseña de las cuentas: $(Join-Path (Join-Path $WorkDir 'secrets') 'demo_password.txt') (no se muestra)."
+    $page = Join-Path $RepoRoot 'ENLACES.html'
+    if (-not $NoBrowser -and -not $AssumeYes -and -not $InGitHub) {
+        try { Start-Process $page; Write-Host "Abierto en el navegador: $page" } catch { Write-Host "Abre en el navegador: $page" }
+    } else { Write-Host "Mapa visual: $page" }
+    if ($problems) { throw "Enlaces que no responden:`n  - $($problems -join "`n  - ")`nArranca o revisa con: .\polymer.cmd start · .\polymer.cmd health" }
+    Write-Host 'Todos los enlaces publicados responden.' -ForegroundColor Green
+}
+
+# ---------------------------------------------------------------- v8 · asistente de Google
+
+function Write-PlainSecret([string]$FileName, [string]$Value) {
+    $dir = Join-Path $WorkDir 'secrets'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $path = Join-Path $dir $FileName
+    [System.IO.File]::WriteAllText($path, $Value, (New-Object System.Text.UTF8Encoding($false)))
+    if (-not $OnWindows) { & chmod 644 $path }
+}
+
+function Set-DotEnvValues([System.Collections.IDictionary]$Values) {
+    # Actualiza o añade claves en .env (junto a docker-compose.yml) sin tocar las demás líneas.
+    $path = Join-Path $WorkDir '.env'
+    $lines = New-Object System.Collections.Generic.List[string]
+    if (Test-Path -LiteralPath $path) { foreach ($line in [System.IO.File]::ReadAllLines($path)) { $lines.Add($line) } }
+    foreach ($key in $Values.Keys) {
+        $text = "$key=$($Values[$key])"
+        $index = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match "^\s*$([regex]::Escape($key))\s*=") { $index = $i; break } }
+        if ($index -ge 0) { $lines[$index] = $text } else { $lines.Add($text) }
+    }
+    [System.IO.File]::WriteAllText($path, (($lines -join "`n") + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Get-RedirectLocation([string]$Uri) {
+    # Location de una redirección sin seguirla (PowerShell 5.1 y 7).
+    $request = [System.Net.HttpWebRequest]::Create($Uri)
+    $request.AllowAutoRedirect = $false
+    $request.Timeout = 15000
+    try { $response = $request.GetResponse() }
+    catch [System.Net.WebException] { $response = $_.Exception.Response; if (-not $response) { return '' } }
+    try { return [string]$response.Headers['Location'] } finally { $response.Close() }
+}
+
+function Invoke-GoogleSetup {
+    Write-Step 'Asistente de Google: «Continuar con Google» y correos a tu Gmail'
+    $interactive = -not $AssumeYes
+    $secretsDir = Join-Path $WorkDir 'secrets'
+    $idPath = Join-Path $secretsDir 'google_client_id.txt'
+    if ($interactive -and -not $GoogleClientId) {
+        Write-Host @'
+
+  1) Abre https://console.cloud.google.com/apis/credentials (crea un proyecto, por ejemplo «POLYMER»).
+  2) «Pantalla de consentimiento de OAuth»: tipo Externo; añade tu Gmail en «Usuarios de prueba».
+  3) «Crear credenciales» -> «ID de cliente de OAuth» -> «Aplicación web». En «URI de redireccionamiento
+     autorizados» añade estas dos:
+        http://localhost:8080/login/oauth2/code/google
+        http://127.0.0.1:8080/login/oauth2/code/google
+  4) Pega aquí el ID de cliente y el secreto (el secreto no se ve mientras lo escribes).
+
+'@
+    }
+    $id = $GoogleClientId
+    if (-not $id -and $interactive) { $id = (Read-Host 'ID de cliente de OAuth (Enter = conservar el actual)').Trim() }
+    if ($id) {
+        if ($id -notmatch '^[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$') {
+            throw 'Ese no parece un ID de cliente de Google (números-letras.apps.googleusercontent.com). No se cambió nada.'
+        }
+        $secret = ''
+        if ($GoogleSecretFile) { $secret = ([System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $GoogleSecretFile))).Trim() }
+        elseif ($interactive) { $secret = (ConvertFrom-Secure (Read-Host 'Secreto del cliente' -AsSecureString)).Trim() }
+        if ($secret -notmatch '^[A-Za-z0-9_\-]{10,128}$') { throw 'El secreto del cliente está vacío o no es válido. No se cambió nada.' }
+        Write-PlainSecret 'google_client_id.txt' $id
+        Write-PlainSecret 'google_client_secret.txt' $secret
+        Write-Host '  Guardados secrets\google_client_id.txt y secrets\google_client_secret.txt (no se muestran).' -ForegroundColor Green
+    }
+
+    $gmail = $GmailAddress
+    if (-not $gmail -and $interactive) {
+        Write-Host ''
+        Write-Host '  Correos reales (opcional): códigos de 6 dígitos y boletas en tu bandeja de Gmail. Requiere la'
+        Write-Host '  verificación en 2 pasos y una contraseña de aplicación: https://myaccount.google.com/apppasswords'
+        $gmail = (Read-Host '  Tu Gmail (Enter = seguir usando Mailpit en http://localhost:8025)').Trim()
+    }
+    $appPassword = ''
+    if ($gmail) {
+        if ($gmail -notmatch '^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$') { throw 'Correo no válido. No se cambió la configuración de correo.' }
+        if ($GmailPasswordFile) { $appPassword = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $GmailPasswordFile)) }
+        elseif ($interactive) { $appPassword = ConvertFrom-Secure (Read-Host '  Contraseña de aplicación (16 letras; puedes pegarla con espacios)' -AsSecureString) }
+        $appPassword = $appPassword -replace '\s', ''
+        if ($appPassword -notmatch '^[A-Za-z]{16}$') { throw 'La contraseña de aplicación de Google tiene 16 letras. No se cambió la configuración de correo.' }
+        Write-PlainSecret 'smtp_password.txt' $appPassword
+        Set-DotEnvValues ([ordered]@{ POLYMER_SMTP_HOST = 'smtp.gmail.com'; POLYMER_SMTP_PORT = '587'; POLYMER_SMTP_USERNAME = $gmail
+                                       POLYMER_SMTP_STARTTLS = 'true'; POLYMER_MAIL_FROM = "'POLYMER <$gmail>'" })
+        Write-Host '  Gmail configurado en .env y secrets\smtp_password.txt (la contraseña no se muestra).' -ForegroundColor Green
+        if ($interactive) {
+            $answer = Read-Host '  ¿Enviar ahora un correo de prueba a tu Gmail para comprobar la contraseña? [S/n]'
+            if ($answer -notmatch '^[nN]') {
+                $smtp = New-Object System.Net.Mail.SmtpClient('smtp.gmail.com', 587)
+                $smtp.EnableSsl = $true
+                $smtp.Credentials = New-Object System.Net.NetworkCredential($gmail, $appPassword)
+                try {
+                    $smtp.Send($gmail, $gmail, 'POLYMER: Gmail configurado', 'Este correo confirma que POLYMER puede enviar los códigos de verificación y las boletas a tu Gmail.')
+                    Write-Host '  Correo de prueba enviado: revisa tu bandeja.' -ForegroundColor Green
+                } catch {
+                    throw "Gmail rechazó la contraseña de aplicación o la conexión ($($_.Exception.InnerException.Message)). Revisa la verificación en 2 pasos y crea otra contraseña de aplicación."
+                } finally { $smtp.Dispose() }
+            }
+        }
+    }
+
+    Assert-Docker
+    if (-not (Test-Path -LiteralPath $ComposeFile) -or -not (Test-ServiceRunning 'order-api')) {
+        Write-Host 'POLYMER no está en marcha: la configuración se aplicará al arrancar con .\polymer.cmd start' -ForegroundColor Yellow
+        return
+    }
+    Restart-OrderApi
+    Write-Step 'Comprobar «Continuar con Google»'
+    $providers = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/api/auth/providers' -UseBasicParsing -TimeoutSec 15
+    $configured = (Test-Path -LiteralPath $idPath) -and ([System.IO.File]::ReadAllText($idPath).Trim() -ne '')
+    if (-not $configured) {
+        Write-Host '  Google sin configurar (secrets\google_client_id.txt vacío): el botón queda oculto. Ejecuta de nuevo .\polymer.cmd google.' -ForegroundColor Yellow
+        return
+    }
+    if (-not $providers.google) { throw 'order-api no activó Google. Revisa .\polymer.cmd logs (busca «Continuar con Google»).' }
+    $location = Get-RedirectLocation 'http://127.0.0.1:8080/oauth2/authorization/google'
+    $expectedId = [uri]::EscapeDataString([System.IO.File]::ReadAllText($idPath).Trim())
+    if (-not $location.StartsWith('https://accounts.google.com/') -or $location -notmatch [regex]::Escape("client_id=$expectedId") -or
+        $location -notmatch 'login(%2F|/)oauth2(%2F|/)code(%2F|/)google') {
+        throw 'La redirección a Google no es la esperada. Revisa el ID de cliente.'
+    }
+    Write-Host '  OK: el botón «Continuar con Google» está activo y redirige a accounts.google.com con tu ID de cliente.' -ForegroundColor Green
+    Write-Host '  Pruébalo en http://localhost:8080/login.html (usa la misma URL que registraste en Google).'
+    if ($providers.emailVerification) { Write-Host '  Código de 6 dígitos por correo: activo.' -ForegroundColor Green }
+}
+
 function Invoke-Rebuild {
     # Reconstruye las imágenes (los Dockerfiles ejecutan los tests) y recrea SOLO esos servicios.
     # Nunca borra volúmenes: los datos de PostgreSQL, RabbitMQ, Grafana… se conservan.
@@ -939,6 +1138,8 @@ function Invoke-Check {
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_catalog.py'), '--check')
     Write-Step 'Marca POLYMER: los SVG del logotipo coinciden con tools/generate_brand.py'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_brand.py'), '--check')
+    Write-Step 'Mapa de enlaces por slice (ENLACES.html y tools/links.json al día)'
+    Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'generate_links.py'), '--check')
     Write-Step 'Idiomas: catálogos en, fr, it, pt y de completos y con marcadores coherentes'
     Invoke-Python @((Join-Path (Join-Path $RepoRoot 'tools') 'check_i18n.py'))
 }
@@ -1096,6 +1297,8 @@ try {
         'demo'        { Invoke-DemoScript $Scenario }
         'demo-on'     { Invoke-DemoScript 'activar-demo' @{ DemoTtl = $DemoTtl; FixedRisk = [bool]$FixedRisk; FixedScore = $FixedScore } }
         'demo-off'    { Invoke-DemoScript 'desactivar-demo' }
+        'enlaces'     { Invoke-Links }
+        'google'      { Invoke-GoogleSetup }
     }
     if ($InGitHub -and $Command -ne 'verify') { Write-Host '::endgroup::' }
     exit 0
