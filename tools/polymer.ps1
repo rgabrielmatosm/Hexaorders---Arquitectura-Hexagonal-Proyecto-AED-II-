@@ -144,6 +144,7 @@ param(
     [int]$FixedScore = 10,
 
     # google: valores para uso no interactivo (CI). Sin ellos el asistente los pide (los secretos, ocultos).
+    [string]$GoogleJsonFile,
     [string]$GoogleClientId,
     [string]$GoogleSecretFile,
     [string]$GmailAddress,
@@ -780,6 +781,7 @@ function Invoke-Start {
     Import-LegacySecrets
     Assert-DatabaseSecretMatchesVolume
     Initialize-WorkDir
+    Sync-GoogleOAuthOnStart
     Stop-LegacyStack
     Invoke-VolumeMigration
     Write-Step 'Validar docker-compose.yml'
@@ -962,37 +964,150 @@ function Get-RedirectLocation([string]$Uri) {
     try { return [string]$response.Headers['Location'] } finally { $response.Close() }
 }
 
+function Get-GoogleOAuthJsonPath { return (Join-Path (Join-Path $WorkDir 'secrets') 'google-oauth.json') }
+
+function Test-NonEmptyFile([string]$Path) { return (Test-Path -LiteralPath $Path -PathType Leaf) -and ((Get-Item -LiteralPath $Path).Length -gt 2) }
+
+function Read-GoogleOAuthJson([string]$Path) {
+    # Valida el JSON de Google Cloud SIN mostrar sus valores. Devuelve un resumen sin el secreto.
+    try { $doc = [System.IO.File]::ReadAllText($Path).TrimStart([char]0xFEFF) | ConvertFrom-Json }
+    catch { throw "El archivo de credenciales de Google no es un JSON válido ($Path). Descárgalo de nuevo desde Google Cloud." }
+    if (-not $doc.web) {
+        if ($doc.installed) { throw 'Ese JSON es de una app de escritorio. En Google Cloud crea un cliente OAuth de tipo «Aplicación web» y descarga su JSON.' }
+        throw 'Ese JSON no tiene la sección «web» (cliente OAuth de tipo «Aplicación web»).'
+    }
+    $id = "$($doc.web.client_id)".Trim()
+    if ($id -notmatch '^[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$') { throw 'El JSON no tiene un web.client_id válido.' }
+    if (-not "$($doc.web.client_secret)".Trim()) { throw 'El JSON no tiene web.client_secret.' }
+    return [pscustomobject]@{ ClientId = $id; Project = "$($doc.web.project_id)"; RedirectUris = @($doc.web.redirect_uris | ForEach-Object { "$_".Trim() }) }
+}
+
+function Find-GoogleOAuthDownload([switch]$IncludeDownloads) {
+    # Busca el JSON descargado de Google (client_secret_*.json) para copiarlo a secrets\google-oauth.json.
+    $folders = @((Join-Path $WorkDir 'secrets'), $WorkDir)
+    if ($IncludeDownloads) {
+        $userHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+        if ($userHome) { $folders += (Join-Path $userHome 'Downloads') }
+    }
+    foreach ($folder in $folders) {
+        if (-not (Test-Path -LiteralPath $folder -PathType Container)) { continue }
+        $found = @(Get-ChildItem -LiteralPath $folder -File -Filter 'client_secret*.json' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending)
+        if ($found.Count -gt 0) { return $found[0].FullName }
+    }
+    return $null
+}
+
+function Backup-GoogleConfiguration {
+    # Copia de seguridad de la configuración que el asistente puede cambiar (nunca se muestra su contenido).
+    $secretsDir = Join-Path $WorkDir 'secrets'
+    $targets = @('google-oauth.json', 'google_client_id.txt', 'google_client_secret.txt', 'smtp_password.txt') | ForEach-Object { Join-Path $secretsDir $_ }
+    $targets += (Join-Path $WorkDir '.env')
+    $existing = @($targets | Where-Object { Test-NonEmptyFile $_ })
+    if (-not $existing) { return }
+    $backup = Join-Path (Join-Path $secretsDir 'backup') ('google-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Force -Path $backup | Out-Null
+    foreach ($file in $existing) { Copy-Item -LiteralPath $file -Destination (Join-Path $backup ([System.IO.Path]::GetFileName($file))) -Force }
+    Write-Host "  Copia de seguridad de la configuración anterior: $backup" -ForegroundColor DarkGray
+}
+
+function Sync-GoogleOAuthOnStart {
+    # start: usa secrets\google-oauth.json; si falta, adopta una descarga client_secret_*.json dejada en secrets\ o en
+    # la carpeta del proyecto. Nunca muestra valores ni detiene el arranque: sin credenciales, el botón queda oculto.
+    $jsonPath = Get-GoogleOAuthJsonPath
+    if (-not (Test-NonEmptyFile $jsonPath)) {
+        $download = Find-GoogleOAuthDownload
+        if ($download) {
+            try { [void](Read-GoogleOAuthJson $download); Copy-Item -LiteralPath $download -Destination $jsonPath -Force
+                  if (-not $OnWindows) { & chmod 644 $jsonPath }
+                  Write-Host '  Google: credenciales descargadas copiadas a secrets\google-oauth.json (no se muestran).' -ForegroundColor Green }
+            catch { Write-Host "  Google: $($_.Exception.Message)" -ForegroundColor Yellow }
+        }
+    }
+    if (Test-NonEmptyFile $jsonPath) {
+        try { [void](Read-GoogleOAuthJson $jsonPath); Write-Host '  «Continuar con Google»: credenciales de secrets\google-oauth.json.' -ForegroundColor Green }
+        catch { Write-Host "  «Continuar con Google» desactivado: $($_.Exception.Message)" -ForegroundColor Yellow }
+    } elseif (-not (Test-NonEmptyFile (Join-Path (Join-Path $WorkDir 'secrets') 'google_client_id.txt'))) {
+        Write-Host '  «Continuar con Google» desactivado: guarda el JSON del cliente OAuth como secrets\google-oauth.json y ejecuta .\polymer.cmd google' -ForegroundColor DarkGray
+    }
+}
+
 function Invoke-GoogleSetup {
     Write-Step 'Asistente de Google: «Continuar con Google» y correos a tu Gmail'
     $interactive = -not $AssumeYes
     $secretsDir = Join-Path $WorkDir 'secrets'
+    New-Item -ItemType Directory -Force -Path $secretsDir | Out-Null
     $idPath = Join-Path $secretsDir 'google_client_id.txt'
-    if ($interactive -and -not $GoogleClientId) {
-        Write-Host @'
+    $jsonPath = Get-GoogleOAuthJsonPath
+    $backedUp = $false
 
-  1) Abre https://console.cloud.google.com/apis/credentials (crea un proyecto, por ejemplo «POLYMER»).
-  2) «Pantalla de consentimiento de OAuth»: tipo Externo; añade tu Gmail en «Usuarios de prueba».
-  3) «Crear credenciales» -> «ID de cliente de OAuth» -> «Aplicación web». En «URI de redireccionamiento
-     autorizados» añade estas dos:
+    # 1) JSON de Google Cloud: -GoogleJsonFile, secrets\google-oauth.json o una descarga client_secret_*.json.
+    $source = $null
+    if ($GoogleJsonFile) { $source = (Resolve-Path -LiteralPath $GoogleJsonFile).Path }
+    elseif (-not (Test-NonEmptyFile $jsonPath) -and -not $GoogleClientId) {
+        $download = Find-GoogleOAuthDownload -IncludeDownloads
+        if ($download) {
+            Write-Host "  Encontré credenciales de Google descargadas: $([System.IO.Path]::GetFileName($download).Substring(0, 14))….json en $([System.IO.Path]::GetDirectoryName($download))"
+            $use = if ($interactive) { Read-Host '  ¿Copiarlas a secrets\google-oauth.json y usarlas? [S/n]' } else { 's' }
+            if ($use -notmatch '^[nN]') { $source = $download }
+        }
+    }
+    if ($source) {
+        [void](Read-GoogleOAuthJson $source)  # valida antes de copiar
+        if (-not $backedUp) { Backup-GoogleConfiguration; $backedUp = $true }
+        if ([System.IO.Path]::GetFullPath($source) -ne [System.IO.Path]::GetFullPath($jsonPath)) { Copy-Item -LiteralPath $source -Destination $jsonPath -Force }
+        if (-not $OnWindows) { & chmod 644 $jsonPath }
+        Write-Host '  Credenciales copiadas a secrets\google-oauth.json (excluido de Git; no se muestran).' -ForegroundColor Green
+        if ($source -match 'Downloads') { Write-Host '  Puedes borrar la copia de Descargas: POLYMER ya usa la de secrets\.' -ForegroundColor DarkGray }
+    }
+
+    $oauth = $null
+    if (Test-NonEmptyFile $jsonPath) {
+        $oauth = Read-GoogleOAuthJson $jsonPath
+        $masked = '…' + $oauth.ClientId.Substring([Math]::Max(0, $oauth.ClientId.IndexOf('.') - 4))
+        Write-Host "  Cliente OAuth de tipo «Aplicación web» detectado (proyecto $($oauth.Project), ID $masked)." -ForegroundColor Green
+        $publicUrl = $null
+        $envFile = Join-Path $WorkDir '.env'
+        if (Test-Path -LiteralPath $envFile) {
+            $line = @([System.IO.File]::ReadAllLines($envFile) | Where-Object { $_ -match '^\s*POLYMER_PUBLIC_URL\s*=' }) | Select-Object -Last 1
+            if ($line) { $publicUrl = ($line -replace '^\s*POLYMER_PUBLIC_URL\s*=\s*', '').Trim().Trim("'").Trim('"') }
+        }
+        $required = @('http://localhost:8080/login/oauth2/code/google', 'http://127.0.0.1:8080/login/oauth2/code/google')
+        if ($publicUrl -and $publicUrl -notmatch '^https?://(localhost|127\.0\.0\.1)(:8080)?/?$') { $required += ($publicUrl.TrimEnd('/') + '/login/oauth2/code/google') }
+        foreach ($uri in $required) {
+            if ($oauth.RedirectUris -contains $uri) { Write-Host "    [ok] URI de retorno registrada: $uri" -ForegroundColor Green }
+            else { Write-Host "    [falta] $uri  -> añádela en Google Cloud (Clientes -> URI de redireccionamiento autorizados) y descarga el JSON de nuevo" -ForegroundColor Yellow }
+        }
+    } else {
+        if ($interactive -and -not $GoogleClientId) {
+            Write-Host @'
+
+  No encontré secrets\google-oauth.json. Para crearlo:
+  1) https://console.cloud.google.com/auth/clients  (proyecto propio, por ejemplo «POLYMER-TECH»).
+  2) «Público» (pantalla de consentimiento): tipo Externo; añade tu Gmail en «Usuarios de prueba».
+  3) «Clientes» -> «Crear cliente» -> «Aplicación web». URI de redireccionamiento autorizados:
         http://localhost:8080/login/oauth2/code/google
         http://127.0.0.1:8080/login/oauth2/code/google
-  4) Pega aquí el ID de cliente y el secreto (el secreto no se ve mientras lo escribes).
+  4) Descarga el JSON y guárdalo como secrets\google-oauth.json (o déjalo en Descargas y vuelve a
+     ejecutar .\polymer.cmd google). También puedes pegar abajo el ID y el secreto a mano.
 
 '@
-    }
-    $id = $GoogleClientId
-    if (-not $id -and $interactive) { $id = (Read-Host 'ID de cliente de OAuth (Enter = conservar el actual)').Trim() }
-    if ($id) {
-        if ($id -notmatch '^[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$') {
-            throw 'Ese no parece un ID de cliente de Google (números-letras.apps.googleusercontent.com). No se cambió nada.'
         }
-        $secret = ''
-        if ($GoogleSecretFile) { $secret = ([System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $GoogleSecretFile))).Trim() }
-        elseif ($interactive) { $secret = (ConvertFrom-Secure (Read-Host 'Secreto del cliente' -AsSecureString)).Trim() }
-        if ($secret -notmatch '^[A-Za-z0-9_\-]{10,128}$') { throw 'El secreto del cliente está vacío o no es válido. No se cambió nada.' }
-        Write-PlainSecret 'google_client_id.txt' $id
-        Write-PlainSecret 'google_client_secret.txt' $secret
-        Write-Host '  Guardados secrets\google_client_id.txt y secrets\google_client_secret.txt (no se muestran).' -ForegroundColor Green
+        # Alternativa v7: ID y secreto escritos a mano (archivos .txt).
+        $id = $GoogleClientId
+        if (-not $id -and $interactive) { $id = (Read-Host 'ID de cliente de OAuth (Enter = omitir)').Trim() }
+        if ($id) {
+            if ($id -notmatch '^[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$') {
+                throw 'Ese no parece un ID de cliente de Google (números-letras.apps.googleusercontent.com). No se cambió nada.'
+            }
+            $secret = ''
+            if ($GoogleSecretFile) { $secret = ([System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $GoogleSecretFile))).Trim() }
+            elseif ($interactive) { $secret = (ConvertFrom-Secure (Read-Host 'Secreto del cliente' -AsSecureString)).Trim() }
+            if ($secret -notmatch '^[A-Za-z0-9_\-]{10,128}$') { throw 'El secreto del cliente está vacío o no es válido. No se cambió nada.' }
+            if (-not $backedUp) { Backup-GoogleConfiguration; $backedUp = $true }
+            Write-PlainSecret 'google_client_id.txt' $id
+            Write-PlainSecret 'google_client_secret.txt' $secret
+            Write-Host '  Guardados secrets\google_client_id.txt y secrets\google_client_secret.txt (no se muestran).' -ForegroundColor Green
+        }
     }
 
     $gmail = $GmailAddress
@@ -1009,6 +1124,7 @@ function Invoke-GoogleSetup {
         elseif ($interactive) { $appPassword = ConvertFrom-Secure (Read-Host '  Contraseña de aplicación (16 letras; puedes pegarla con espacios)' -AsSecureString) }
         $appPassword = $appPassword -replace '\s', ''
         if ($appPassword -notmatch '^[A-Za-z]{16}$') { throw 'La contraseña de aplicación de Google tiene 16 letras. No se cambió la configuración de correo.' }
+        if (-not $backedUp) { Backup-GoogleConfiguration; $backedUp = $true }
         Write-PlainSecret 'smtp_password.txt' $appPassword
         Set-DotEnvValues ([ordered]@{ POLYMER_SMTP_HOST = 'smtp.gmail.com'; POLYMER_SMTP_PORT = '587'; POLYMER_SMTP_USERNAME = $gmail
                                        POLYMER_SMTP_STARTTLS = 'true'; POLYMER_MAIL_FROM = "'POLYMER <$gmail>'" })
@@ -1037,14 +1153,14 @@ function Invoke-GoogleSetup {
     Restart-OrderApi
     Write-Step 'Comprobar «Continuar con Google»'
     $providers = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/api/auth/providers' -UseBasicParsing -TimeoutSec 15
-    $configured = (Test-Path -LiteralPath $idPath) -and ([System.IO.File]::ReadAllText($idPath).Trim() -ne '')
-    if (-not $configured) {
-        Write-Host '  Google sin configurar (secrets\google_client_id.txt vacío): el botón queda oculto. Ejecuta de nuevo .\polymer.cmd google.' -ForegroundColor Yellow
+    $expectedClient = if ($oauth) { $oauth.ClientId } elseif (Test-NonEmptyFile $idPath) { [System.IO.File]::ReadAllText($idPath).Trim() } else { '' }
+    if (-not $expectedClient) {
+        Write-Host '  Google sin configurar (falta secrets\google-oauth.json): el botón queda oculto. Ejecuta de nuevo .\polymer.cmd google.' -ForegroundColor Yellow
         return
     }
     if (-not $providers.google) { throw 'order-api no activó Google. Revisa .\polymer.cmd logs (busca «Continuar con Google»).' }
     $location = Get-RedirectLocation 'http://127.0.0.1:8080/oauth2/authorization/google'
-    $expectedId = [uri]::EscapeDataString([System.IO.File]::ReadAllText($idPath).Trim())
+    $expectedId = [uri]::EscapeDataString($expectedClient)
     if (-not $location.StartsWith('https://accounts.google.com/') -or $location -notmatch [regex]::Escape("client_id=$expectedId") -or
         $location -notmatch 'login(%2F|/)oauth2(%2F|/)code(%2F|/)google') {
         throw 'La redirección a Google no es la esperada. Revisa el ID de cliente.'

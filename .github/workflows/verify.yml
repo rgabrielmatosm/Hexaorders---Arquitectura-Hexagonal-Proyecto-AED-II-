@@ -133,17 +133,29 @@ jobs:
           if (@($catalog).Count -lt 1) { throw 'order-api (8081) no devolvió categorías' }
           $docs = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/' -TimeoutSec 15
           if ($docs.Content -notmatch 'swagger') { throw 'risk-engine (8000) no abrió /docs' }
-      # v8: asistente de Google sin interacción con un ID de cliente FICTICIO: guarda los secretos, reinicia
-      # order-api y comprueba que el botón se activa y redirige a accounts.google.com (no inicia sesión real).
-      - name: v8 · Asistente de Google (polymer.ps1 google, ID de cliente ficticio)
+      # v8: asistente de Google sin interacción con un JSON de cliente OAuth FICTICIO (mismo formato que descarga
+      # Google Cloud): lo copia a secrets/google-oauth.json, reinicia order-api y comprueba que el botón se activa y
+      # redirige a accounts.google.com con ese ID (no inicia sesión real). El secreto no debe aparecer en los logs.
+      - name: v8 · Asistente de Google con secrets/google-oauth.json (JSON ficticio)
         env:
           COMPOSE_PROJECT_NAME: polymer-verify
         run: |
           $work = Join-Path $env:RUNNER_TEMP 'polymer-delivery'
-          $secret = Join-Path $env:RUNNER_TEMP 'google-secret.txt'
-          [System.IO.File]::WriteAllText($secret, 'GOCSPX-ci-only-not-a-real-secret')
-          ./tools/polymer.ps1 google -WorkDir $work -AssumeYes -GoogleClientId '123456789012-ciexample.apps.googleusercontent.com' -GoogleSecretFile $secret
-          Remove-Item $secret
+          $download = Join-Path $env:RUNNER_TEMP 'client_secret_ci.apps.googleusercontent.com.json'
+          $fake = 'GOCSPX-ci-only-not-a-real-secret'
+          $json = @{ web = @{ client_id = '123456789012-ciexample.apps.googleusercontent.com'; project_id = 'polymer-ci'; client_secret = $fake
+                     auth_uri = 'https://accounts.google.com/o/oauth2/auth'; token_uri = 'https://oauth2.googleapis.com/token'
+                     redirect_uris = @('http://localhost:8080/login/oauth2/code/google', 'http://127.0.0.1:8080/login/oauth2/code/google') } }
+          [System.IO.File]::WriteAllText($download, ($json | ConvertTo-Json -Depth 4))
+          $output = ./tools/polymer.ps1 google -WorkDir $work -AssumeYes -GoogleJsonFile $download 6>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0) { throw 'polymer.ps1 google falló' }
+          if ($output -match [regex]::Escape($fake)) { throw 'El asistente mostró el secreto' }
+          if (-not (Test-Path (Join-Path $work 'secrets/google-oauth.json'))) { throw 'No se creó secrets/google-oauth.json' }
+          $logs = docker compose -f (Join-Path $work 'docker-compose.yml') logs order-api 2>&1 | Out-String
+          if ($logs -match [regex]::Escape($fake)) { throw 'El secreto aparece en los logs de order-api' }
+          if ($logs -notmatch 'credenciales: secrets/google-oauth.json') { throw 'order-api no usó secrets/google-oauth.json' }
+          Remove-Item $download
           ./tools/polymer.ps1 enlaces -WorkDir $work -NoBrowser
       - name: Upload UI screenshots
         if: always()

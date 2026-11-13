@@ -21,14 +21,25 @@ OAuth, SMTP, Redis ni PostgreSQL.
 
 ## 2. Configurar «Continuar con Google» (gratis)
 
-> **Forma rápida (v8):** con POLYMER en marcha ejecuta `.\polymer.cmd google`. El asistente te muestra los
-> pasos de Google Cloud, pide el **ID de cliente** y el **secreto** (oculto) y, si quieres, tu **Gmail** y su
-> **contraseña de aplicación** (oculta). Los guarda en `secrets\` y `.env` sin mostrarlos, reinicia `order-api`,
-> comprueba que el botón redirige a `accounts.google.com` con tu ID y envía un correo de prueba a tu Gmail.
-> Los pasos manuales equivalentes son los de abajo.
+> **Forma recomendada (v8): el JSON de Google Cloud.**
 >
-> Registra **las dos** URI de retorno: `http://localhost:8080/login/oauth2/code/google` y
-> `http://127.0.0.1:8080/login/oauth2/code/google`, y entra a la tienda con la misma dirección que registraste.
+> 1. En Google Cloud → **Google Auth Platform**: en *Público* añade tu Gmail como **usuario de prueba**; en
+>    *Clientes* crea un cliente **Aplicación web** con estas URI de redireccionamiento autorizadas:
+>    `http://localhost:8080/login/oauth2/code/google` y `http://127.0.0.1:8080/login/oauth2/code/google`
+>    (orígenes de JavaScript: `http://localhost:8080` y `http://127.0.0.1:8080`).
+> 2. Descarga el JSON del cliente y guárdalo como **`secrets\google-oauth.json`** (o déjalo en Descargas).
+> 3. Ejecuta `.\polymer.cmd google`: detecta el archivo, lo valida **sin mostrar sus valores**, comprueba las URI
+>    de retorno, hace una copia de seguridad de la configuración anterior en `secrets\backup\`, reinicia
+>    `order-api` y verifica que «Continuar con Google» redirige a `accounts.google.com` con tu cliente.
+>    `.\polymer.cmd start` también lo detecta en cada arranque.
+>
+> El JSON viaja como Docker secret (`google_oauth` → `/run/secrets/google_oauth`): no entra en la imagen
+> (`.dockerignore` excluye todo), ni en Git (`.gitignore`: `google-oauth*.json`, `client_secret*.json`), ni en los
+> ZIP (`git archive` solo incluye archivos versionados), ni en los logs (solo se registra su origen). Si falta,
+> `order-api` escribe en su log cómo configurarlo y el botón queda oculto.
+>
+> Alternativa v7: pegar el ID y el secreto en `secrets\google_client_id.txt` y `google_client_secret.txt` (el
+> asistente también los pide si no hay JSON). Si existen ambos, se usa el JSON.
 
 1. Entra a <https://console.cloud.google.com/> con tu cuenta de Google y crea un proyecto (p. ej. «POLYMER»).
 2. **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo *Externo*; nombre de la app «POLYMER»;

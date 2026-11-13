@@ -101,8 +101,9 @@ foreach ($item in $secrets) {
 }
 
 # v7: integraciones opcionales. Se crean VACÍAS (vacío = desactivada) para que Docker Compose pueda montarlas;
-# nunca se sobrescriben. Google: secrets\google_client_id.txt y google_client_secret.txt; Gmail/SMTP: smtp_password.txt.
-$optional = @('google_client_id.txt', 'google_client_secret.txt', 'smtp_password.txt')
+# nunca se sobrescriben. Google: secrets\google-oauth.json (v8: el JSON descargado de Google Cloud) o
+# google_client_id.txt y google_client_secret.txt (v7); Gmail/SMTP: smtp_password.txt.
+$optional = @('google-oauth.json', 'google_client_id.txt', 'google_client_secret.txt', 'smtp_password.txt')
 foreach ($file in $optional) {
     $path = Join-Path $secretsDir $file
     if (Test-Path -LiteralPath $path -PathType Container) {

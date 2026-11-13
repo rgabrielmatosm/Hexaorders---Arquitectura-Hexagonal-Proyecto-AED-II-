@@ -100,10 +100,26 @@ public class SignInConfiguration {
                               @Value("${POLYMER_GOOGLE_TOKEN_URI:https://oauth2.googleapis.com/token}") String tokenUri,
                               @Value("${POLYMER_GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}") String jwkSetUri,
                               @Value("${POLYMER_GOOGLE_ISSUER_URI:https://accounts.google.com}") String issuerUri,
-                              @Value("${POLYMER_GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}") String userInfoUri) {
+                              @Value("${POLYMER_GOOGLE_USER_INFO_URI:https://openidconnect.googleapis.com/v1/userinfo}") String userInfoUri,
+                              @Value("${POLYMER_GOOGLE_REDIRECT_URI:}") String fixedRedirectUri,
+                              @Value("${POLYMER_PUBLIC_URL:http://localhost:8080}") String publicUrl,
+                              @Value("${polymer.google.source:}") String source,
+                              @Value("${polymer.google.redirect-uris:}") String registeredUris,
+                              @Value("${polymer.google.problem:}") String problem) {
+        if (!problem.isBlank()) LOG.warn("«Continuar con Google»: {}", problem);
         if (clientId.isBlank() || clientSecret.isBlank()) {
-            LOG.info("«Continuar con Google» no configurado (secrets/google_client_id.txt y google_client_secret.txt vacíos)");
+            LOG.info("«Continuar con Google» no configurado. Para activarlo: descarga el JSON del cliente OAuth "
+                    + "(Google Cloud → Google Auth Platform → Clientes → Aplicación web), guárdalo como secrets/google-oauth.json "
+                    + "y ejecuta .\\polymer.cmd google (guía: docs/final/GUIA_GOOGLE_Y_PAGOS.md)");
             return new GoogleClient(null);
+        }
+        // v8 · URI de retorno: dinámica ({baseUrl}: sirve para localhost y 127.0.0.1) o fija para producción (AWS con HTTPS).
+        String redirectUri = fixedRedirectUri.isBlank() ? "{baseUrl}/login/oauth2/code/{registrationId}" : fixedRedirectUri.strip();
+        String expected = fixedRedirectUri.isBlank() ? GoogleOAuthCredentials.callbackFor(publicUrl) : fixedRedirectUri.strip();
+        java.util.List<String> registered = registeredUris.isBlank() ? java.util.List.of() : java.util.List.of(registeredUris.split(","));
+        if (!registered.isEmpty() && !registered.contains(expected)) {
+            LOG.warn("«Continuar con Google»: el JSON no registra la URI de retorno {} (POLYMER_PUBLIC_URL). Añádela en Google Cloud "
+                    + "→ Clientes → URI de redireccionamiento autorizados y descarga el JSON de nuevo; si no, Google responderá redirect_uri_mismatch", expected);
         }
         ClientRegistration.Builder builder = ClientRegistration.withRegistrationId("google")
                 .clientName("Google")
@@ -111,7 +127,7 @@ public class SignInConfiguration {
                 .clientSecret(clientSecret)
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .redirectUri(redirectUri)
                 .scope("openid", "profile", "email")
                 .authorizationUri(authorizationUri)
                 .tokenUri(tokenUri)
@@ -119,7 +135,7 @@ public class SignInConfiguration {
                 .userNameAttributeName(IdTokenClaimNames.SUB);
         if (!issuerUri.isBlank()) builder.issuerUri(issuerUri);
         if (!userInfoUri.isBlank()) builder.userInfoUri(userInfoUri);
-        LOG.info("«Continuar con Google» activado");
+        LOG.info("«Continuar con Google» activado (credenciales: {}; {} URI de retorno registradas)", source, registered.size());
         return new GoogleClient(builder.build());
     }
 

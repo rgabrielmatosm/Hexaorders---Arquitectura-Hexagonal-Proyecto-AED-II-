@@ -520,6 +520,7 @@ Mailpit, las pasarelas de prueba y una dirección de demostración.
 | **Mapa de slices** | [`ENLACES.html`](ENLACES.html): 13 slices con **quién lo verifica** (rol y cuenta), botón «Entrar como…», páginas, contenedores con estado en vivo, evidencia (Grafana, Prometheus, RabbitMQ, Mailpit) y escenario de demostración. Campo «Expone» para el nombre de cada integrante |
 | `.\polymer.cmd enlaces` | Comprueba cada enlace, lista los slices con su verificador y abre `ENLACES.html` |
 | `.\polymer.cmd google` | Asistente: pide el ID y el secreto de OAuth de Google y, opcional, tu Gmail con su contraseña de aplicación; los guarda sin mostrarlos, reinicia `order-api`, comprueba la redirección a Google y envía un correo de prueba |
+| **Google con el JSON de Google Cloud** | Guarda el JSON del cliente OAuth como `secrets\google-oauth.json` (Docker secret `google_oauth`; nunca en Git, imágenes, logs ni ZIP) y ejecuta `.\polymer.cmd google`. Producción: `POLYMER_PUBLIC_URL` y, si hace falta, `POLYMER_GOOGLE_REDIRECT_URI` ([guía](docs/final/GUIA_GOOGLE_Y_PAGOS.md)) |
 | **Guía de la PPT** | [`docs/final/GUIA_PPT_EXPOSICION.md`](docs/final/GUIA_PPT_EXPOSICION.md): diapositiva por diapositiva, con el enlace y la captura de cada una |
 
 ## Anexo A. API

@@ -69,7 +69,9 @@ for name, ports in published.items():
 assert all(str(port) != '127.0.0.1:5672:5672' for port in published.get('rabbitmq', [])), 'AMQP no se publica'
 for name, definition in document['secrets'].items():
     # Compose solo admite secretos de archivo en servicios read_only.
-    assert set(definition) == {'file'} and definition['file'] == f'./secrets/{name}.txt', f'Secreto {name}: usar ./secrets/{name}.txt'
+    # v8: única excepción, el JSON que descarga Google Cloud (excluido de Git por .gitignore).
+    expected_file = './secrets/google-oauth.json' if name == 'google_oauth' else f'./secrets/{name}.txt'
+    assert set(definition) == {'file'} and definition['file'] == expected_file, f'Secreto {name}: usar {expected_file}'
 DOCKER_SOCKET = '/var/run/docker.sock:/var/run/docker.sock:ro'
 for name, service in document['services'].items():
     for mount in service.get('volumes', []):

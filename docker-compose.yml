@@ -1,4 +1,4 @@
-# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo bf49476e34e3d90c3cf385e01830206bc7fb7f4955695a6414e6e43937358863
+# AUTOGENERADO: python tools/generate_delivery.py — SHA256 cuerpo 88c3d863dc433e227c5c5194ab91f495b8cf3859021ecd0e7862150e6d75cccf
 # POLYMER — entregar docker-compose.yml, generado desde este archivo.
 # Docker Compose >= 2.23.1 + BuildKit + contenedores Linux.
 # Arquitectura: las dependencias del código apuntan hacia domain/application.
@@ -5636,7 +5636,38 @@ services:
         sZakI9aXK/8D26PRQXUSAAA=
         VerificationTexts.java.gz.b64
         RUN cd src/main/java/com/polymer/application/service && base64 -d AccountService.java.gz.b64 | gunzip > AccountService.java && rm AccountService.java.gz.b64 && base64 -d AdministrationService.java.gz.b64 | gunzip > AdministrationService.java && rm AdministrationService.java.gz.b64 && base64 -d CartService.java.gz.b64 | gunzip > CartService.java && rm CartService.java.gz.b64 && base64 -d CatalogService.java.gz.b64 | gunzip > CatalogService.java && rm CatalogService.java.gz.b64 && base64 -d CommerceService.java.gz.b64 | gunzip > CommerceService.java && rm CommerceService.java.gz.b64 && base64 -d LogisticsService.java.gz.b64 | gunzip > LogisticsService.java && rm LogisticsService.java.gz.b64 && base64 -d NotificationComposer.java.gz.b64 | gunzip > NotificationComposer.java && rm NotificationComposer.java.gz.b64 && base64 -d NotificationTexts.java.gz.b64 | gunzip > NotificationTexts.java && rm NotificationTexts.java.gz.b64 && base64 -d OperationsService.java.gz.b64 | gunzip > OperationsService.java && rm OperationsService.java.gz.b64 && base64 -d PaymentService.java.gz.b64 | gunzip > PaymentService.java && rm PaymentService.java.gz.b64 && base64 -d PromotionService.java.gz.b64 | gunzip > PromotionService.java && rm PromotionService.java.gz.b64 && base64 -d ReceiptTexts.java.gz.b64 | gunzip > ReceiptTexts.java && rm ReceiptTexts.java.gz.b64 && base64 -d SignInService.java.gz.b64 | gunzip > SignInService.java && rm SignInService.java.gz.b64 && base64 -d StoreService.java.gz.b64 | gunzip > StoreService.java && rm StoreService.java.gz.b64 && base64 -d VerificationTexts.java.gz.b64 | gunzip > VerificationTexts.java && rm VerificationTexts.java.gz.b64
-        COPY <<'HexagonalConfiguration.java.gz.b64' <<'IntegrationConfiguration.java.gz.b64' <<'IntegrationEnvironment.java.gz.b64' <<'ObservedPortsConfiguration.java' <<'PageErrorConfiguration.java' <<'PlatformConfiguration.java.gz.b64' <<'SecurityConfiguration.java.gz.b64' <<'SignInConfiguration.java.gz.b64' <<'StoreAndPaymentConfiguration.java.gz.b64' <<'TracingConfiguration.java' <<'WebPagesConfiguration.java' src/main/java/com/polymer/config/
+        COPY <<'GoogleOAuthCredentials.java.gz.b64' <<'HexagonalConfiguration.java.gz.b64' <<'IntegrationConfiguration.java.gz.b64' <<'IntegrationEnvironment.java.gz.b64' <<'ObservedPortsConfiguration.java' <<'PageErrorConfiguration.java' <<'PlatformConfiguration.java.gz.b64' <<'SecurityConfiguration.java.gz.b64' <<'SignInConfiguration.java.gz.b64' <<'StoreAndPaymentConfiguration.java.gz.b64' <<'TracingConfiguration.java' <<'WebPagesConfiguration.java' src/main/java/com/polymer/config/
+        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
+        EAAA
+        GoogleOAuthCredentials.java.gz.b64
         H4sIAAAAAAAC/7VX3U4bORS+5ymsaFV5uuDQ0kpVEFogBJFuKVESdi+RM3OSGGbsqe2BpIin2CfY
         B+jVPgIvtseeTJhJJsBW2lxk/HP+fH4+H6c8vOETIKFKWKrieQKahUqOxWR/a0skqdK2sscjnlr8
         qsyysZhBxE7df1+YmyNjwJgEpD3KifZfEjC1NmVn+Pdz7AlYLULDzkWoFU5AX+gI9BBicFvzFwWk
@@ -5703,38 +5734,45 @@ services:
         DGT9nyHYOYNRvR8Pjsih/xUA4gwa0KnIJXBfcLnRb6WFA4Ks9f9RaN62i/cHQyPkWpE3qkzZvb92
         Xjt/AUBWratiGwAA
         IntegrationConfiguration.java.gz.b64
-        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
+        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
+        fgXURsmqhBkAAA==
         IntegrationEnvironment.java.gz.b64
         package com.polymer.config;
         
@@ -5924,45 +5962,55 @@ services:
         EvKVFkMCBRbBlE28UBn1qZXv3mXXUQFlOseDE7OfA3mtz+9bBth539p/34KEPjH744iKy/etbRhA
         jdgRPBHbwvOxY05OGMQh11gBCpgLM50mczKu6ejcLA37Zut/CWZdZKEsAAA=
         SecurityConfiguration.java.gz.b64
-        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
+        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
         SignInConfiguration.java.gz.b64
         H4sIAAAAAAAC/71Y3W7bNhS+91McBLuQM09Jt3VdHRSI6xipCyc2bGdFelMcS7TDViI1knKSFX2Y
         PUCvdjGgl8uL7ZCSbMk/+fGAGbBFkTz/3zk8dILBJ5wxCGTsJzK6jZnyAymmfHZUq/E4kcpU1jDE
@@ -6044,7 +6092,7 @@ services:
             }
         }
         WebPagesConfiguration.java
-        RUN cd src/main/java/com/polymer/config && base64 -d HexagonalConfiguration.java.gz.b64 | gunzip > HexagonalConfiguration.java && rm HexagonalConfiguration.java.gz.b64 && base64 -d IntegrationConfiguration.java.gz.b64 | gunzip > IntegrationConfiguration.java && rm IntegrationConfiguration.java.gz.b64 && base64 -d IntegrationEnvironment.java.gz.b64 | gunzip > IntegrationEnvironment.java && rm IntegrationEnvironment.java.gz.b64 && base64 -d PlatformConfiguration.java.gz.b64 | gunzip > PlatformConfiguration.java && rm PlatformConfiguration.java.gz.b64 && base64 -d SecurityConfiguration.java.gz.b64 | gunzip > SecurityConfiguration.java && rm SecurityConfiguration.java.gz.b64 && base64 -d SignInConfiguration.java.gz.b64 | gunzip > SignInConfiguration.java && rm SignInConfiguration.java.gz.b64 && base64 -d StoreAndPaymentConfiguration.java.gz.b64 | gunzip > StoreAndPaymentConfiguration.java && rm StoreAndPaymentConfiguration.java.gz.b64
+        RUN cd src/main/java/com/polymer/config && base64 -d GoogleOAuthCredentials.java.gz.b64 | gunzip > GoogleOAuthCredentials.java && rm GoogleOAuthCredentials.java.gz.b64 && base64 -d HexagonalConfiguration.java.gz.b64 | gunzip > HexagonalConfiguration.java && rm HexagonalConfiguration.java.gz.b64 && base64 -d IntegrationConfiguration.java.gz.b64 | gunzip > IntegrationConfiguration.java && rm IntegrationConfiguration.java.gz.b64 && base64 -d IntegrationEnvironment.java.gz.b64 | gunzip > IntegrationEnvironment.java && rm IntegrationEnvironment.java.gz.b64 && base64 -d PlatformConfiguration.java.gz.b64 | gunzip > PlatformConfiguration.java && rm PlatformConfiguration.java.gz.b64 && base64 -d SecurityConfiguration.java.gz.b64 | gunzip > SecurityConfiguration.java && rm SecurityConfiguration.java.gz.b64 && base64 -d SignInConfiguration.java.gz.b64 | gunzip > SignInConfiguration.java && rm SignInConfiguration.java.gz.b64 && base64 -d StoreAndPaymentConfiguration.java.gz.b64 | gunzip > StoreAndPaymentConfiguration.java && rm StoreAndPaymentConfiguration.java.gz.b64
         COPY <<'Order.java' <<'OrderDraft.java' <<'OrderStatistics.java' <<'OrderStatus.java' src/main/java/com/polymer/domain/
         package com.polymer.domain;
         
@@ -21321,6 +21369,36 @@ services:
             }
         }
         HexagonalArchitectureTest.java
+        COPY <<'GoogleOAuthCredentialsTest.java.gz.b64' src/test/java/com/polymer/config/
+        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
+        tXK38x9uA1/WYxQAAA==
+        GoogleOAuthCredentialsTest.java.gz.b64
+        RUN cd src/test/java/com/polymer/config && base64 -d GoogleOAuthCredentialsTest.java.gz.b64 | gunzip > GoogleOAuthCredentialsTest.java && rm GoogleOAuthCredentialsTest.java.gz.b64
         COPY <<'BusinessEventTest.java' <<'LifecycleDomainTest.java.gz.b64' <<'OrderDomainTest.java' <<'PasswordPolicyTest.java' <<'SignInPaymentStoreDomainTest.java.gz.b64' <<'TechStoreDomainTest.java.gz.b64' <<'WebPlatformDomainTest.java' src/test/java/com/polymer/domain/
         package com.polymer.domain;
         
@@ -21946,8 +22024,13 @@ services:
       SMTP_PASSWORD_FILE: /run/secrets/smtp_password
       POLYMER_MAIL_FROM: ${POLYMER_MAIL_FROM:-Polymer <no-reply@polymer.local>}
       # v7: «Continuar con Google» (OpenID Connect). Vacíos = botón oculto. Origen público para los enlaces de los correos.
+      # v8: el JSON del cliente OAuth descargado de Google Cloud (secrets/google-oauth.json, nunca en Git ni en la imagen).
+      GOOGLE_OAUTH_JSON_FILE: /run/secrets/google_oauth
       GOOGLE_CLIENT_ID_FILE: /run/secrets/google_client_id
       GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+      # v8 · Producción (AWS con HTTPS): POLYMER_PUBLIC_URL=https://tu-dominio y, si el proxy no conserva el host,
+      # POLYMER_GOOGLE_REDIRECT_URI=https://tu-dominio/login/oauth2/code/google (registrada en Google Cloud).
+      POLYMER_GOOGLE_REDIRECT_URI: ${POLYMER_GOOGLE_REDIRECT_URI:-}
       POLYMER_PUBLIC_URL: ${POLYMER_PUBLIC_URL:-http://localhost:8080}
       # v7: tienda física (mapa de Google Maps, horario de hoy) y calendario público opcional de Google Calendar.
       POLYMER_STORE_ADDRESS: ${POLYMER_STORE_ADDRESS:-Av. Javier Prado Este 4200}
@@ -21956,7 +22039,7 @@ services:
       POLYMER_STORE_LONGITUDE: ${POLYMER_STORE_LONGITUDE:--76.9753}
       POLYMER_GOOGLE_CALENDAR_ID: ${POLYMER_GOOGLE_CALENDAR_ID:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    secrets: [db_password, demo_password, rabbitmq_password, google_client_id, google_client_secret, smtp_password]
+    secrets: [db_password, demo_password, rabbitmq_password, google_oauth, google_client_id, google_client_secret, smtp_password]
     depends_on:
       db:
         condition: service_healthy
@@ -39264,6 +39347,9 @@ secrets:
   rabbitmq_password:
     file: ./secrets/rabbitmq_password.txt
   # v7: opcionales; polymer.cmd los crea VACÍOS si no existen (vacío = integración desactivada).
+  # v8: JSON del cliente OAuth de Google (Google Auth Platform → Clientes → Aplicación web → Descargar JSON).
+  google_oauth:
+    file: ./secrets/google-oauth.json
   google_client_id:
     file: ./secrets/google_client_id.txt
   google_client_secret:

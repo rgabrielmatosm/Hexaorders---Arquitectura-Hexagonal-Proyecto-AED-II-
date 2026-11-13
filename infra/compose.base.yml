@@ -113,8 +113,13 @@ services:
       SMTP_PASSWORD_FILE: /run/secrets/smtp_password
       POLYMER_MAIL_FROM: ${POLYMER_MAIL_FROM:-Polymer <no-reply@polymer.local>}
       # v7: «Continuar con Google» (OpenID Connect). Vacíos = botón oculto. Origen público para los enlaces de los correos.
+      # v8: el JSON del cliente OAuth descargado de Google Cloud (secrets/google-oauth.json, nunca en Git ni en la imagen).
+      GOOGLE_OAUTH_JSON_FILE: /run/secrets/google_oauth
       GOOGLE_CLIENT_ID_FILE: /run/secrets/google_client_id
       GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+      # v8 · Producción (AWS con HTTPS): POLYMER_PUBLIC_URL=https://tu-dominio y, si el proxy no conserva el host,
+      # POLYMER_GOOGLE_REDIRECT_URI=https://tu-dominio/login/oauth2/code/google (registrada en Google Cloud).
+      POLYMER_GOOGLE_REDIRECT_URI: ${POLYMER_GOOGLE_REDIRECT_URI:-}
       POLYMER_PUBLIC_URL: ${POLYMER_PUBLIC_URL:-http://localhost:8080}
       # v7: tienda física (mapa de Google Maps, horario de hoy) y calendario público opcional de Google Calendar.
       POLYMER_STORE_ADDRESS: ${POLYMER_STORE_ADDRESS:-Av. Javier Prado Este 4200}
@@ -123,7 +128,7 @@ services:
       POLYMER_STORE_LONGITUDE: ${POLYMER_STORE_LONGITUDE:--76.9753}
       POLYMER_GOOGLE_CALENDAR_ID: ${POLYMER_GOOGLE_CALENDAR_ID:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-    secrets: [db_password, demo_password, rabbitmq_password, google_client_id, google_client_secret, smtp_password]
+    secrets: [db_password, demo_password, rabbitmq_password, google_oauth, google_client_id, google_client_secret, smtp_password]
     depends_on:
       db:
         condition: service_healthy
@@ -488,6 +493,9 @@ secrets:
   rabbitmq_password:
     file: ./secrets/rabbitmq_password.txt
   # v7: opcionales; polymer.cmd los crea VACÍOS si no existen (vacío = integración desactivada).
+  # v8: JSON del cliente OAuth de Google (Google Auth Platform → Clientes → Aplicación web → Descargar JSON).
+  google_oauth:
+    file: ./secrets/google-oauth.json
   google_client_id:
     file: ./secrets/google_client_id.txt
   google_client_secret:
