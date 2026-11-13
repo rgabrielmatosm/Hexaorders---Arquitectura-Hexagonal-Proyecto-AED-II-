@@ -95,6 +95,7 @@ public class SecurityConfiguration {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/orders", "/api/orders/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/catalog/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/store", "/api/store/**").permitAll()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/shop/quote", "/api/shop/checkout-summary").permitAll()

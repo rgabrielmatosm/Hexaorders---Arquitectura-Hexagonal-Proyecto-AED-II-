@@ -51,6 +51,8 @@ class LocalizedPagesTest {
     @MockitoBean com.polymer.application.port.in.CartUseCases carts;
     @MockitoBean AccountUseCases accounts;
     @MockitoBean com.polymer.application.port.in.SignInUseCases signIn;
+    @MockitoBean com.polymer.application.port.in.PaymentUseCases payments;
+    @MockitoBean com.polymer.application.port.in.StoreUseCases store;
     @MockitoBean AdministrationUseCases administration;
     @MockitoBean OperationsUseCases operations;
     @MockitoBean LogisticsUseCases logistics;

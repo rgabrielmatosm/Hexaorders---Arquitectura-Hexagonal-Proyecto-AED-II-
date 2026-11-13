@@ -31,6 +31,20 @@ public final class MicrometerBusinessTelemetry implements BusinessTelemetry {
         deliveryCounter("rescheduled");
         conflicts();
         for (IncidentCategory category : IncidentCategory.values()) incidentCounter(category);
+        for (String method : PAYMENT_METHODS) for (String outcome : PAYMENT_OUTCOMES) paymentCounter(method, outcome);
+    }
+
+    static final List<String> PAYMENT_METHODS = List.of("CARD", "YAPE", "PLIN");
+    static final List<String> PAYMENT_OUTCOMES = List.of("started", "paid", "declined", "expired");
+
+    private Counter paymentCounter(String method, String outcome) {
+        return Counter.builder("polymer_payments").description("Pagos en línea por método y resultado")
+                .tag("method", method).tag("outcome", outcome).register(registry);
+    }
+
+    @Override
+    public void payment(String method, String outcome) {
+        if (PAYMENT_METHODS.contains(method) && PAYMENT_OUTCOMES.contains(outcome)) paymentCounter(method, outcome).increment();
     }
 
     private Counter placed(OrderStatus decision) {
