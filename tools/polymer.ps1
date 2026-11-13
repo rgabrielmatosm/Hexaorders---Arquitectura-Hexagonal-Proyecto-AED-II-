@@ -488,8 +488,9 @@ function Import-LegacySecrets([switch]$Explicit) {
 
 function Get-HostPorts {
     # Puertos que POLYMER publica en 127.0.0.1 (deben coincidir con tools/validate_delivery.py).
-    $ports = [ordered]@{ 8080 = 'frontend (tienda)'; 8081 = 'order-api'; 8000 = 'risk-engine'; 9091 = 'prometheus'; 3000 = 'grafana' }
-    if ($FullMode) { $ports[15672] = 'rabbitmq'; $ports[8025] = 'mailpit'; $ports[13133] = 'otel-collector'; $ports[12345] = 'alloy' }
+    # Claves de TEXTO: en un [ordered] un índice entero se interpreta como posición, no como clave.
+    $ports = [ordered]@{ '8080' = 'frontend (tienda)'; '8081' = 'order-api'; '8000' = 'risk-engine'; '9091' = 'prometheus'; '3000' = 'grafana' }
+    if ($FullMode) { $ports['15672'] = 'rabbitmq'; $ports['8025'] = 'mailpit'; $ports['13133'] = 'otel-collector'; $ports['12345'] = 'alloy' }
     return $ports
 }
 
@@ -518,7 +519,7 @@ function Assert-HostPortsFree {
     $programs = @()
     if ($OnWindows -and (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {
         foreach ($port in $ports.Keys) {
-            $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+            $listeners = @(Get-NetTCPConnection -State Listen -LocalPort ([int]$port) -ErrorAction SilentlyContinue)
             foreach ($listener in $listeners) {
                 $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
                 $name = if ($process) { $process.ProcessName } else { "PID $($listener.OwningProcess)" }
