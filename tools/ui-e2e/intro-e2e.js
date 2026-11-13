@@ -91,7 +91,10 @@ const introVisible = (page) => page.evaluate(() => Boolean(document.querySelecto
     check(footer.text.includes('Tecnología que conecta contigo.') && footer.text.includes('+51 900 000 000') && footer.text.includes('soporte@example.com')
       && footer.text.includes('Libro de reclamaciones') && footer.text.includes('DEMO'), 'Eslogan, contacto de demostración marcado como DEMO y Libro de reclamaciones');
     check(/RUC: no configurado/.test(footer.text) && !/RUC: \d/.test(footer.text), 'No se inventa ningún RUC');
-    check(/próximamente/.test(footer.text) && !/Visa|Mastercard|Yape|Plin/.test(footer.text), 'Los pagos no integrados se muestran como «próximamente» y no se anuncian marcas de pago');
+    // v7: tarjeta, Yape y Plin ya se pagan en el checkout (pasarelas de pruebas): el pie los lista y no anuncia
+    // marcas de tarjeta (Visa, Mastercard) ni métodos «próximamente» que no existan.
+    check(['Tarjeta de crédito o débito', 'Yape', 'Plin', 'Pago contra entrega'].every((m) => footer.text.includes(m))
+      && !/· próximamente/.test(footer.text) && !/Visa|Mastercard/.test(footer.text), 'El pie lista los pagos del checkout (tarjeta, Yape, Plin…) sin anunciar marcas de tarjeta');
     check(footer.social === 6, 'Iconos de Facebook, Instagram, TikTok, YouTube, LinkedIn y WhatsApp');
     const internal = [...new Set(footer.hrefs.filter((h) => h.startsWith(BASE_URL)).map((h) => h.split('#')[0]))];
     for (const href of internal) {
