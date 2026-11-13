@@ -316,7 +316,10 @@ jobs:
           test "$BEFORE" = "$AFTER"
           curl -sf "http://127.0.0.1:8080/api/orders/$ORDER" | python -c 'import json,sys; o=json.load(sys.stdin); assert o["customerId"]=="cliente-v6" and float(o["amount"])==321.5, o; print("Pedido de la v6 intacto:", o["id"])'
           test "$($C exec -T db psql -U orders -d orders -tAc "SELECT count(*) FROM contact_messages WHERE name = 'Migración CI'")" -eq 1
-          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT max(version::int) FROM flyway_schema_history")" -eq 10
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT max(version::int) FROM flyway_schema_history")" -eq 12
+          # v7: V11 no bloquea a nadie (cuentas existentes con el correo verificado) y V12 crea los pagos.
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT count(*) FROM app_users WHERE NOT email_verified")" -eq 0
+          test "$($C exec -T db psql -U orders -d orders -tAc "SELECT to_regclass('public.payments') IS NOT NULL")" = "t"
           # V10 solo crea user_preferences: no toca usuarios ni hashes (el idioma por defecto es español).
           test "$($C exec -T db psql -U orders -d orders -tAc "SELECT to_regclass('public.user_preferences') IS NOT NULL")" = "t"
           test "$($C exec -T db psql -U orders -d orders -tAc "SELECT display_name FROM app_users WHERE username = 'admin'")" = "Administración Polymer"

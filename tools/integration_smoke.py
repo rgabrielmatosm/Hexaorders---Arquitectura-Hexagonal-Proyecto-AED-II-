@@ -277,7 +277,9 @@ def recovered(state: Path):
     saved = json.loads(state.read_text(encoding='utf-8'))
     eventually('outbox vacío tras la recuperación', lambda: prom('polymer_outbox_pending') == [0.0], timeout=120)
     ok(True, 'El outbox se vació al volver RabbitMQ')
-    messages = eventually('correos del pedido retenido', lambda: (lambda m: m if len(m) >= 2 else None)(mails_to(saved['email'])), timeout=120)
+    # v7: el código de verificación del cliente nuevo también está en su buzón; aquí cuentan los del pedido.
+    order_mails = lambda: [m for m in mails_to(saved['email']) if not re.match(r'^\d{6} ', m['Subject'])]
+    messages = eventually('correos del pedido retenido', lambda: (lambda m: m if len(m) >= 2 else None)(order_mails()), timeout=120)
     ok(all(saved['order'][:8] in m['Subject'] for m in messages), f'Llegaron los correos del pedido creado durante la caída ({len(messages)})')
     anon = Session()
     anon.call('GET', '/api/catalog/products', expect=200)
