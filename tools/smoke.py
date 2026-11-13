@@ -9,7 +9,9 @@ from pathlib import Path
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / 'services/order-api/src/main/resources/static'
 EXPECTED_TYPES = {'.html': 'text/html', '.css': 'text/css', '.js': 'javascript', '.svg': 'image/svg+xml',
-                  '.json': 'application/json', '.txt': 'text/plain'}  # catálogos de idioma y lista de contraseñas comunes
+                  '.json': 'application/json', '.txt': 'text/plain',
+                  # v9: fotos del equipo (testimonios) y otras imágenes estáticas.
+                  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}  # catálogos de idioma y lista de contraseñas comunes
 
 
 def request(url, body=None, headers=None):
